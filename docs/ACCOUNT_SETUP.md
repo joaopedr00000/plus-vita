@@ -1,5 +1,15 @@
 # Connect your own Sony account
 
+## Beta 2: experimental encrypted optical QR pairing
+
+1. Download the [offline pairing helper](../release/qr-pairing.html) as a local HTML file on your phone or PC. Open it in a browser supporting local Web Crypto. It makes no network requests itself.
+2. On Vita choose Get started → Continue → Pair with QR code. Sign in at playstation.com on your phone and scan the official Sony response-page QR. Copy the response privately.
+3. Press Cross to generate the temporary key QR. Copy the key or type its 32 hexadecimal characters into the offline helper. Paste the Sony response and generate an encrypted QR. The helper uses AES-128-GCM and a fresh nonce, and clears the fields after generation.
+4. Press Cross on Vita and aim its rear camera at the generated QR. Only an authenticated response for this session is accepted. The key expires after three minutes. The result uses the existing sign-in validator and does not write the original JSON import file.
+5. Keep both screens private, clear the clipboard, and never screenshot or share either code. Remember still governs locally readable saved credentials. This is not Sony's official device-code login.
+
+Camera operation and browser compatibility need hardware testing. If either fails, use Import JSON (including PS TV). Never paste a credential into an online QR generator.
+
 ## Save your sign-in JSON on a phone or PC
 
 1. Sign in to your own account at [PlayStation](https://www.playstation.com/).

@@ -100,28 +100,32 @@ def self_segments(data):
         yield segment
 
 
-RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13', 'beta1': b'00.14'}
+RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13', 'beta1': b'00.14', 'beta2': b'00.15'}
 
 
 def package_findings(vpk, root, version='v000'):
     errors = collections.Counter()
+    resources = dict(RESOURCES)
+    if version == 'beta2':
+        resources.update({'licenses/quirc.txt':'vita-client/third_party/quirc/LICENSE','licenses/qrcodegen.txt':'vita-client/third_party/qrcodegen/LICENSE'})
+    allowlist = set(resources) | {'eboot.bin','sce_sys/param.sfo'}
     with zipfile.ZipFile(vpk) as package:
         if package.comment:
             errors['package.archive_metadata'] += 1
         names = package.namelist()
-        if set(names) != ALLOWLIST or len(names) != len(set(names)):
+        if set(names) != allowlist or len(names) != len(set(names)):
             errors['package.resource_inventory'] += 1
         for member in package.infolist():
             if member.extra or member.comment:
                 errors['package.archive_metadata'] += 1
-            if member.filename not in ALLOWLIST or member.file_size > MAX_MEMBER or member.flag_bits & 1:
+            if member.filename not in allowlist or member.file_size > MAX_MEMBER or member.flag_bits & 1:
                 errors['package.disallowed_resource'] += 1
                 continue
             data = package.read(member)
             for category in findings(data, artifact=True):
                 errors['package.'+category] += 1
-            if member.filename in RESOURCES:
-                expected = committed_resource(root, RESOURCES[member.filename])
+            if member.filename in resources:
+                expected = committed_resource(root, resources[member.filename])
                 if hashlib.sha256(data).digest() != hashlib.sha256(expected).digest():
                     errors['package.resource_identity'] += 1
             if member.filename.endswith('.png'):
@@ -157,7 +161,7 @@ def package_findings(vpk, root, version='v000'):
                         raise ValueError('invalid_app_identity')
                     name=data[keys+key:data.index(b'\0',keys+key)]
                     identity[name]=data[values+offset:values+offset+length].rstrip(b'\0')
-                title_id, title = (b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita')
+                title_id, title = (b'PLVTB0001', b'Plus-Vita Beta 2') if version == 'beta2' else ((b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita'))
                 if identity.get(b'APP_VER')!=RELEASE_APP_VERSIONS[version] or identity.get(b'TITLE_ID')!=title_id or identity.get(b'TITLE')!=title:
                     errors['package.app_identity'] += 1
     return errors
@@ -249,7 +253,7 @@ def main():
         errors['gate.unreadable_or_unsupported_input'] += 1
     report = {'software_privacy_pass': not errors, 'checks': checks,
               'findings': dict(errors), 'counts': dict(stats),
-              'hardware_release_gate': 'pending_beta1_hardware' if args.version == 'beta1' else ('pending_54' if args.version == 'v002' else 'pending_23'),
+              'hardware_release_gate': 'pending_beta2_hardware' if args.version == 'beta2' else 'pending_beta1_hardware' if args.version == 'beta1' else ('pending_54' if args.version == 'v002' else 'pending_23'),
               'publication_authorized': False}
     encoded = json.dumps(report, indent=2) + '\n'
     if args.report:

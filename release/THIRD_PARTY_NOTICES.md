@@ -55,3 +55,8 @@ Custom artwork was supplied by the maintainer, with image-generated background
 and wordmark derivatives. [Artwork preparation and provenance](../vita-client/assets/branding/README.md)
 are documented. No user account file, private device photo, game artwork or Sony
 font file is included as a custom branding asset.
+
+## Beta 2 QR pairing
+- [quirc](https://github.com/dlbeer/quirc), decoder: [license](../vita-client/third_party/quirc/LICENSE).
+- [Nayuki QR Code generator](https://github.com/nayuki/QR-Code-generator), C encoder: [license](../vita-client/third_party/qrcodegen/LICENSE).
+- [Kazuhiko Arase QR Code Generator](https://github.com/kazuhikoarase/qrcode-generator): original copyright and MIT notice in [qr-generator.js](qr-generator.js) and [offline helper](qr-pairing.html).
