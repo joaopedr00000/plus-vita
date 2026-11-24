@@ -18,13 +18,14 @@ int main(void)
     assert(memcmp(key1,key2,32)!=0);
     entropy[0]^=1;assert(plus_vita_pair_make_key(entropy,d1,key3));assert(memcmp(key1,key3,32)!=0);
     assert(!plus_vita_pair_make_key(zero,d1,key3));
+    assert(!plus_vita_pair_make_key(entropy,zero,key3));
     read_payload(p);read_payload(q);assert(strcmp(p,q)!=0);
     assert(plus_vita_pair_decode(key1,(const unsigned char *)p,strlen(p),out,sizeof(out)));
     assert(strlen(out)==76);for(unsigned i=10;i<74;i++)assert(out[i]=='Z');
     assert(plus_vita_pair_decode(key2,(const unsigned char *)q,strlen(q),out,sizeof(out)));
     assert(!plus_vita_pair_decode(key1,(const unsigned char *)q,strlen(q),out,sizeof(out))&&out[0]==0);
     assert(!plus_vita_pair_decode(key2,(const unsigned char *)p,strlen(p),out,sizeof(out))&&out[0]==0);
-    p[60]=p[60]=='A'?'B':'A'; /* mutate ciphertext, not session ID */
+    p[80]=p[80]=='A'?'B':'A'; /* mutate ciphertext, not session ID */
     assert(!plus_vita_pair_decode(key1,(const unsigned char *)p,strlen(p),out,sizeof(out))&&out[0]==0);
     assert(!plus_vita_pair_decode(key1,(const unsigned char *)p,171,out,sizeof(out)));
     puts("QR per-device key, per-session entropy, two-device interoperability and cross-session rejection: passed");
