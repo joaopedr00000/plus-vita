@@ -1064,7 +1064,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			detail_view(app,"PS3 sample incomplete. Reopen FTP to retrieve the diagnostic log.");
 		else if(event.status==PLUS_VITA_RESULT_STREAM_STOPPED) stream_stopped_view(app);
 		else if(event.status==PLUS_VITA_RESULT_SERVICE_ERROR)
-			detail_view(app,"The cloud service could not start this session.\nTry Play again later for a fresh attempt.");
+			detail_view(app,"The cloud service could not start this session.\nTry Play again and manually select an available server.");
 		else if(event.status==PLUS_VITA_RESULT_UNSUPPORTED)
 			detail_view(app,"This title is not supported for cloud Play on this client.\nChoose another game.");
 		else detail_view(app, event.status==PLUS_VITA_RESULT_CANCELLED

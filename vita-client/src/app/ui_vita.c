@@ -6,6 +6,7 @@
 #include "ui_flow.h"
 #include "play_vita.h"
 #include "attempt_log.h"
+#include "../platform/cloud_experimental.h"
 #if PLUS_VITA_FONT_COMPARISON
 #include "comparison_capture.h"
 #endif
@@ -394,7 +395,8 @@ int plus_vita_app_run(void)
 			if(operation && operation==plus_vita_app_view(app).operation) {
 				#if PLUS_VITA_PS5_EXPERIMENTAL
 				/* Discovery deliberately stops before allocation. Only names are retained by the UI. */
-				if(allocation_error!=CHIAKI_ERR_SUCCESS && provision.datacenter_pings) {
+				if(allocation_error==CHIAKI_ERR_CANCELED && provision.datacenter_pings
+					&& provision.error_message && !strcmp(provision.error_message,PLUS_VITA_DC_LIST_READY)) {
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
 						.operation=operation,.status=PLUS_VITA_RESULT_DATACENTERS,.data=provision.datacenter_pings},0);
 					plus_vita_diagnostic_ui_end();

@@ -107,6 +107,14 @@ static void *allocate(void *context)
 		plus_vita_diagnostic_chiaki_log,NULL);
 	plus_vita_diagnostic_event("allocation.begin",0);
 	ChiakiErrorCode error=chiaki_cloud_provision_session(&config,&play->provision,&log);
+	#if PLUS_VITA_PS5_EXPERIMENTAL
+	/* Distinguish intentional discovery from cancellation or a failed allocation. */
+	if(!strcmp(job->datacenter,PLUS_VITA_DC_DISCOVER) && error==CHIAKI_ERR_CANCELED
+		&& play->provision.datacenter_pings && !cancelled(play)) {
+		free(play->provision.error_message);
+		play->provision.error_message=strdup(PLUS_VITA_DC_LIST_READY);
+	}
+	#endif
 	plus_vita_diagnostic_event("allocation.complete",(int)error);
 	pthread_mutex_lock(&play->mutex);
 	play->error=error;

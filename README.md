@@ -8,7 +8,7 @@
 
 This branch adds an experimental PS5 Cloud route using the existing Pylux provisioning library, informed by [PS5 Cloud Play](https://github.com/tertiumndatur/ps5-cloud-play). PS3/PS4 remain on PS Now. The Vita still requires H.264; PS5 Cloud ordinarily uses HEVC, so AVC negotiation may be refused or produce no compatible stream. No successful PS5 stream or GTA VI test is claimed.
 
-Select a title and Play to discover the service-provided datacenter list. Select a server manually; no automatic server fallback is used. The bitrate control cycles 4, 8, 12 and 15 Mbps before connecting. The video profile stays at 720p (the original decoder validation limit). Server availability and title entitlement are checked by Sony. The app does not bypass account, subscription or regional requirements.
+Select a title and Play to discover the service-provided datacenter list. Select a server manually; no automatic server fallback is used. The bitrate control cycles 4, 8, 12 and 15 Mbps before connecting. The selected server alone is probed for actual RTT and MTU; failed probes stop the attempt instead of substituting another server. The video profile stays at 720p (the original decoder validation limit). The existing audited H.264 parameter-set guard also remains enabled, so an unfamiliar PS5 bitstream may be rejected even if AVC is offered. Server availability and title entitlement are checked by Sony. The app does not bypass account, subscription or regional requirements.
 
 Build with VitaSDK and initialized recursive submodules as in the original build instructions. Set `-DPLUS_VITA_PS5_EXPERIMENTAL=OFF` to restore the original build path. This branch is not a validated VPK release. Keep your account JSON and logs private; do not publish test credentials.
 

@@ -8,6 +8,7 @@
 #define PLUS_VITA_PS5_EXPERIMENTAL 0
 #endif
 #define PLUS_VITA_DC_DISCOVER "__list__"
+#define PLUS_VITA_DC_LIST_READY "PLUS_VITA_DATACENTER_LIST_READY"
 static inline bool plus_vita_cloud_ascii_id(const char *value,size_t max)
 {
 	if(!value || !*value || strlen(value)>=max) return false;

@@ -532,6 +532,36 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     message(FATAL_ERROR "Pylux strict datacenter patch point not found")
   endif()
   string(REPLACE "${PV_FORCE_OLD}" "${PV_FORCE_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Measure only the manually selected server. Do not send the upstream dummy
+  # RTT/MTU values, and never select another server if this probe fails.
+  set(PV_PING_OLD [=[
+		// dummy ping (RTT 20, MTU 1454/1254); bypass pinging entirely.
+		json_object_array_add(c->ping_results, gk_ping_obj(forced, 20, 1454, 1254,
+			cc_json_int(match, "port"), cc_json_str(match, "publicIp"), cc_json_int(match, "maxBandwidth"), true));
+		CHIAKI_LOGI(c->log, "[GAIKAI] forced datacenter %s (ping bypassed)", forced);
+]=])
+  set(PV_PING_NEW [=[
+		int64_t rtt_us = -1;
+		uint32_t mtu_in = 0, mtu_out = 0;
+		gk_progress(c, "Pinging selected Datacenter - Step 8 of 10");
+		if(gk_cancelled(c)) { json_object_put(dcs); return CHIAKI_ERR_CANCELED; }
+		cc_ping_datacenter(c->log, cc_json_str(match, "publicIp"), cc_json_int(match, "port"),
+			c->lock_session_key ? c->lock_session_key : "", c->cfg->service_type,
+			&rtt_us, &mtu_in, &mtu_out);
+		if(gk_cancelled(c)) { json_object_put(dcs); return CHIAKI_ERR_CANCELED; }
+		if(rtt_us <= 0 || !mtu_in || !mtu_out) {
+			c->ping_timeout = true;
+			json_object_put(dcs);
+			return CHIAKI_ERR_NETWORK;
+		}
+		json_object_array_add(c->ping_results, gk_ping_obj(forced, (int)((rtt_us + 999) / 1000), mtu_in, mtu_out,
+			cc_json_int(match, "port"), cc_json_str(match, "publicIp"), cc_json_int(match, "maxBandwidth"), true));
+]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PING_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux selected server ping patch point not found")
+  endif()
+  string(REPLACE "${PV_PING_OLD}" "${PV_PING_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
   # this is an experimental capability request, NOT a proven PS5 service profile.
   foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
