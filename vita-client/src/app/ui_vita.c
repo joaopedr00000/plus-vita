@@ -7,6 +7,9 @@
 #include "play_vita.h"
 #include "attempt_log.h"
 #include "../platform/cloud_experimental.h"
+#if PLUS_VITA_QR_PAIRING
+#include "qr_pair_vita.h"
+#endif
 #if PLUS_VITA_FONT_COMPARISON
 #include "comparison_capture.h"
 #endif
@@ -130,6 +133,29 @@ static bool draw(UiDisplay *display, PlusVitaUiFlow *flow)
 	return true;
 }
 
+#if PLUS_VITA_QR_PAIRING
+static bool pair_frame(void *context,const char *heading,const char *message,const unsigned char *qr,int n,const uint32_t *camera)
+{
+	UiDisplay *d=context;uint32_t *p=d->pixels[d->back];
+	for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=RGB(8,25,58);
+	plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,RGB(240,245,255));
+	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,RGB(235,240,255));
+	if(qr && n>0 && n<=41) {
+		int scale=340/(n+8),size=(n+8)*scale;
+		for(int y=0;y<size;y++)for(int x=0;x<size;x++){
+			int qx=x/scale-4,qy=y/scale-4;
+			bool dark=qx>=0&&qy>=0&&qx<n&&qy<n&&qr[qy*n+qx];
+			p[(100+y)*PITCH+600+x]=dark?RGB(0,0,0):RGB(255,255,255);
+		}
+	}
+	if(camera)for(int y=0;y<360;y++)for(int x=0;x<640;x++)p[(150+y)*PITCH+160+x]=camera[y*640+x]|0xff000000u;
+	SceDisplayFrameBuf fb={.size=sizeof(fb),.base=p,.pitch=PITCH,.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8,.width=WIDTH,.height=HEIGHT};
+	if(sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME)<0)return false;
+	d->displayed=true;
+	if(sceDisplayWaitSetFrameBuf()<0)return false;
+	d->back^=1u;return true;
+}
+#endif
 static bool handle_input(PlusVitaUiFlow *flow, PlusVitaAccount *account,
 	PlusVitaPlay *play, PlusVitaAppEvent event)
 {
@@ -326,6 +352,18 @@ int plus_vita_app_run(void)
 			{
 				if(effect.kind == PLUS_VITA_EFFECT_PREPARE_SETUP)
 					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_SETUP_READY, .operation = effect.operation },0);
+				#if PLUS_VITA_QR_PAIRING
+				else if(effect.kind==PLUS_VITA_EFFECT_QR_PAIR) {
+					char json[80]={0};
+					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_qr_pair(pair_frame,display,json,sizeof(json)):PLUS_VITA_RESULT_BUSY;
+					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
+					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_IMPORT_READ,.operation=effect.operation,.status=status,.data=json,.data_size=strlen(json)},0);
+					volatile char *wipe=json;for(size_t i=0;i<sizeof(json);i++)wipe[i]=0;
+					SceCtrlData after={0};menu_read(&menu_controller,&after);
+					plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.buttons=after.buttons,.left_x=after.lx,.left_y=after.ly,.time_us=sceKernelGetProcessTimeWide()}});
+					touched=true;previous_poll=flow.input_since=0;
+				}
+				#endif
 				else if(effect.kind == PLUS_VITA_EFFECT_EDIT_LABEL || effect.kind == PLUS_VITA_EFFECT_EDIT_SEARCH)
 				{
 					char label[129]; PlusVitaCredentialImeResult keyboard;

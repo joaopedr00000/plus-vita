@@ -338,6 +338,15 @@ static void setup_view(PlusVitaApp *app)
 			{ PLUS_VITA_ACTION_BACK, "Back", 64, 444, 832, 52 }
 		}, .action_count = 3
 	};
+#if PLUS_VITA_QR_PAIRING
+	app->view.title="Connect your Sony account.";
+	app->view.body="Pair using your phone and the Vita camera, or import JSON.\nRemembered account files remain locally readable.";
+	app->view.actions[0].y=284;app->view.actions[0].height=48;
+	app->view.actions[1].y=336;app->view.actions[1].height=48;
+	app->view.actions[3]=app->view.actions[2];
+	app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_QR_PAIR,"Pair with QR code",64,390,832,48};
+	app->view.action_count=4;
+#endif
 }
 
 static void account_error(PlusVitaApp *app, const char *message)
@@ -969,6 +978,10 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		}
 		if(event.kind == PLUS_VITA_EVENT_IMPORT_READ && app->waiting_for == PLUS_VITA_EFFECT_READ_IMPORT)
 		{
+#if PLUS_VITA_QR_PAIRING
+			if(event.status==PLUS_VITA_RESULT_CANCELLED) {setup_view(app);return effect;}
+			if(event.status==PLUS_VITA_RESULT_UNSUPPORTED) {account_error(app,"QR pairing could not start. Use Import JSON or retry on a Vita with a camera.");return effect;}
+#endif
 			if(event.status != PLUS_VITA_RESULT_OK)
 			{
 				account_error(app, result_message(event.status));
@@ -1114,7 +1127,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			*view = (PlusVitaAppView){
 				.screen = PLUS_VITA_APP_SETUP_GUIDE, .title = "Sign in on your phone or PC.",
 				.subtitle = "YOUR SONY ACCOUNT", .hint = "X  Select     O  Back",
-				.body = "1. Sign in at playstation.com on your phone or PC.\n2. Open ca.account.sony.com/api/v1/ssocookie.\n3. Save the response as plus-vita-auth.json.\nKeep this file private. Complete Sony's sign-in prompts.",
+				.body =
+#if PLUS_VITA_QR_PAIRING
+				"Sign in on your phone or PC. Choose Continue, then Pair with QR code or Import JSON.\nComplete Sony's sign-in prompts on your own device.",
+#else
+				"1. Sign in at playstation.com on your phone or PC.\n2. Open ca.account.sony.com/api/v1/ssocookie.\n3. Save the response as plus-vita-auth.json.\nKeep this file private. Complete Sony's sign-in prompts.",
+#endif
 				.actions = {
 					{ PLUS_VITA_ACTION_CONTINUE, "Continue", 64, 380, 832, 52 },
 					{ PLUS_VITA_ACTION_BACK, "Back", 64, 444, 832, 52 }
@@ -1254,6 +1272,14 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		}
 		else if(action == PLUS_VITA_ACTION_IMPORT)
 			return import_account(app);
+#if PLUS_VITA_QR_PAIRING
+		else if(action == PLUS_VITA_ACTION_QR_PAIR && view->screen==PLUS_VITA_APP_SETUP) {
+			effect=import_account(app);
+			effect.kind=PLUS_VITA_EFFECT_QR_PAIR;
+			view->body="Pairing with your phone. Circle cancels.";
+			return effect;
+		}
+#endif
 		else if(action == PLUS_VITA_ACTION_REMEMBER)
 		{
 			if(view->screen == PLUS_VITA_APP_ACCOUNT)
