@@ -1188,9 +1188,10 @@ static void probe_handle_streaminfo(PlusVitaStreamProbe *probe, uint8_t *buf,
 	ChiakiAudioHeader output_audio;
 	chiaki_audio_header_load(&output_audio, context.audio_header);
 	if(!probe->capture_only)
-		probe->audio_playback = plus_vita_audio_start(&output_audio, probe->log);
-#if PLUS_VITA_ADAPTIVE_STREAM
-		plus_vita_audio_set_profile(probe->audio_playback,probe->profile_kbps);
+		#if PLUS_VITA_ADAPTIVE_STREAM
+		probe->audio_playback=plus_vita_audio_start_profile(&output_audio,probe->log,probe->profile_kbps);
+#else
+		probe->audio_playback=plus_vita_audio_start(&output_audio,probe->log);
 #endif
 	if(!probe->capture_only && !probe->audio_playback)
 	{
@@ -1935,10 +1936,10 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 				|| sceKernelGetProcessTimeWide() / 1000u - last_display >= 100;
 			if(show)
 			{
+chiaki_mutex_unlock(&probe->mutex);
 #if PLUS_VITA_ADAPTIVE_STREAM
 				if(probe->input&&probe->input->hud&&probe->input->paint_hud&&hud_line[0])probe->input->paint_hud(probe->input->hud_context,plus_vita_video_present_back_buffer(&present),hud_line);
 #endif
-				chiaki_mutex_unlock(&probe->mutex);
 				native_result = plus_vita_video_present_frame(&present);
 				display_sum += present.last_display_us;
 				wait_sum += present.last_wait_us;

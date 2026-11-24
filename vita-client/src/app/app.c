@@ -304,6 +304,9 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	PlusVitaAppView view=app->view; view.account_epoch=app->account_epoch;
 	memcpy(view.artwork_metadata,app->artwork_metadata,sizeof(view.artwork_metadata));
 	view.account_connected=app->connected;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;
+#endif
 	if(!view.list_total && view.action_count) {
 		view.list_total=view.action_count;view.focus=view.selected;
 		view.list_x=view.actions[0].x;view.list_y=view.actions[0].y;
@@ -821,6 +824,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 {
 	PlusVitaAppView *view = &app->view;
 	PlusVitaAppEffect effect = { .kind = PLUS_VITA_EFFECT_NONE };
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
+		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;return effect;
+	}
+#endif
 	if(event.kind==PLUS_VITA_EVENT_CONTROLS_LOADED) {
 		if(plus_vita_control_layout_valid(&event.controls)) app->controls=event.controls;
 		return effect;

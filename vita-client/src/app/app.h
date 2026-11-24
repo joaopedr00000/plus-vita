@@ -68,6 +68,8 @@ typedef struct {
 	size_t pressed_index;
 	unsigned controls_page;
 	PlusVitaControlDevice control_device;
+	unsigned stream_profile;
+	bool stream_hud;
 } PlusVitaAppView;
 typedef enum {
 	PLUS_VITA_EVENT_PAD,
@@ -83,7 +85,7 @@ typedef enum {
 	PLUS_VITA_EVENT_TOUCH_DOWN, PLUS_VITA_EVENT_TOUCH_MOVE,
 	PLUS_VITA_EVENT_TOUCH_UP, PLUS_VITA_EVENT_TOUCH_CANCEL,
 	PLUS_VITA_EVENT_SCROLL, PLUS_VITA_EVENT_FOCUS,
-	PLUS_VITA_EVENT_CONTROLS_LOADED, PLUS_VITA_EVENT_CONTROLS_SAVED, PLUS_VITA_EVENT_CONTROL_DEVICE
+	PLUS_VITA_EVENT_CONTROLS_LOADED, PLUS_VITA_EVENT_CONTROLS_SAVED, PLUS_VITA_EVENT_CONTROL_DEVICE, PLUS_VITA_EVENT_STREAM_SETTINGS
 } PlusVitaAppEventKind;
 typedef enum {
 	PLUS_VITA_RESULT_OK, PLUS_VITA_RESULT_STORAGE_ERROR, PLUS_VITA_RESULT_MISSING,
@@ -120,6 +122,8 @@ typedef struct {
 	size_t entry_count;
 	bool restore_blocked, retained_json;
 	bool playback_started;
+	unsigned stream_profile;
+	bool stream_hud;
 	bool log_available;
 	unsigned play_stage;
 	char store_country[8], store_language[8], language[8];

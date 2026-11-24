@@ -231,13 +231,18 @@ failed:
 	return NULL;
 }
 
-PlusVitaAudioPlayback *plus_vita_audio_start(const ChiakiAudioHeader *h, ChiakiLog *log)
+PlusVitaAudioPlayback *plus_vita_audio_start_profile(const ChiakiAudioHeader *h, ChiakiLog *log,unsigned cap_kbps)
 {
 	CHIAKI_LOGI(log, "Stream probe audio header channels=%u rate=%u bits=%u samples=%u", h->channels, h->rate, h->bits, h->frame_size);
 	if(h->rate != 48000 || h->bits != 16 || h->frame_size != 480 || (h->channels != 1 && h->channels != 2)) return NULL;
 	PlusVitaAudioPlayback *a = calloc(1, sizeof(*a));
 	if(!a) return NULL;
 	a->log = log; a->channels = h->channels; a->port = -1;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
+#else
+	(void)cap_kbps;
+#endif
 	/* Receive callback only allocates the bounded queue and launches worker.
 	 * Opus and audio-port initialization never run on its default stack. */
 	if(pthread_mutex_init(&a->mutex, NULL)) goto free_audio;
@@ -255,13 +260,9 @@ free_mutex: pthread_mutex_destroy(&a->mutex);
 free_audio: free(a); return NULL;
 }
 
-void plus_vita_audio_set_profile(PlusVitaAudioPlayback *a,unsigned cap_kbps)
+PlusVitaAudioPlayback *plus_vita_audio_start(const ChiakiAudioHeader *h,ChiakiLog *log)
 {
-#if PLUS_VITA_ADAPTIVE_STREAM
-	if(a){pthread_mutex_lock(&a->mutex);a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;pthread_mutex_unlock(&a->mutex);}
-#else
-	(void)a;(void)cap_kbps;
-#endif
+	return plus_vita_audio_start_profile(h,log,0);
 }
 
 bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uint8_t *data, size_t size)

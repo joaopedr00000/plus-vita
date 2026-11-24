@@ -62,7 +62,7 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_adaptive_stream.c -o /tmp/pv-adaptive
           /tmp/pv-adaptive
-          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
+          cc -std=c11 -Wall -Wextra -Werror -Ivita-client/src/platform vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
           /tmp/pv-reorder
       - name: Test native application workflow
         run: sh tools/test-app-workflow.sh

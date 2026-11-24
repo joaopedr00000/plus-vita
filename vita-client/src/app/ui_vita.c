@@ -29,6 +29,7 @@
 #include <psp2/touch.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #define WIDTH 960
@@ -210,6 +211,23 @@ static int menu_read(PlusVitaController *controller,SceCtrlData *pad)
 	return count;
 }
 
+#if PLUS_VITA_ADAPTIVE_STREAM
+#define PV_STREAM_PREFS "ux0:data/plus-vita-stream.cfg"
+static void stream_prefs_load(PlusVitaApp *app)
+{
+	unsigned profile=15000,hud=0;char extra=0;
+	FILE *f=fopen(PV_STREAM_PREFS,"rb");
+	if(f){unsigned p=0,h=0;if(fscanf(f,"%u %u %c",&p,&h,&extra)==2&&pv_profile_cap(p)==p&&h<=1){profile=p;hud=h;}fclose(f);}
+	plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_SETTINGS,.stream_profile=profile,.stream_hud=hud!=0});
+}
+static void stream_prefs_save(unsigned profile,bool hud)
+{
+	FILE *f=fopen(PV_STREAM_PREFS ".tmp","wb");if(!f)return;
+	bool ok=fprintf(f,"%u %u\n",profile,(unsigned)hud)>0;
+	if(fclose(f)!=0)ok=false;
+	if(!ok||rename(PV_STREAM_PREFS ".tmp",PV_STREAM_PREFS)!=0)remove(PV_STREAM_PREFS ".tmp");
+}
+#endif
 int plus_vita_app_run(void)
 {
 	plus_vita_diagnostic_ui_begin();
@@ -257,11 +275,22 @@ int plus_vita_app_run(void)
 	unsigned reported_play_stage=0;
 	bool metadata_reported=false;
 	PlusVitaAppScreen reported_screen=PLUS_VITA_APP_CLOSED;
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	stream_prefs_load(app);
+	PlusVitaAppView saved_prefs=plus_vita_app_view(app);
+	unsigned saved_profile=saved_prefs.stream_profile;bool saved_hud=saved_prefs.stream_hud;
+#endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
 	int result = 0;
 	uint64_t previous_poll = 0, last_report = plus_vita_latency_now_us();
 	while(plus_vita_app_view(app).screen != PLUS_VITA_APP_CLOSED)
 	{
+#if PLUS_VITA_ADAPTIVE_STREAM
+		PlusVitaAppView prefs=plus_vita_app_view(app);
+		if(prefs.stream_profile!=saved_profile||prefs.stream_hud!=saved_hud){
+			saved_profile=prefs.stream_profile;saved_hud=prefs.stream_hud;stream_prefs_save(saved_profile,saved_hud);
+		}
+#endif
 		plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
 		bool workers_idle=plus_vita_account_idle(account) && !plus_vita_play_busy(play);
 		if(plus_vita_attempt_log_prepare(&flow,workers_idle)) {

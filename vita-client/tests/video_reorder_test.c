@@ -103,8 +103,17 @@ static void empty_and_clock(void)
 	puts("PASS: idle/partial frame, backward clock sample and ambiguous half-range rejected safely");
 }
 
+static void configurable_grace(void)
+{
+ PlusVitaVideoReorder w={.grace_us=48000};admit(&w,1,0);int b=admit(&w,2,1000);plus_vita_video_reorder_ready(&w,b,2000);
+ assert(plus_vita_video_reorder_poll(&w,21000,false).action==PLUS_VITA_VIDEO_REORDER_WAIT);
+ assert(plus_vita_video_reorder_poll(&w,48999,false).action==PLUS_VITA_VIDEO_REORDER_WAIT);
+ assert(plus_vita_video_reorder_poll(&w,49000,false).action==PLUS_VITA_VIDEO_REORDER_DROP);
+ assert(plus_vita_video_reorder_poll(&w,49001,false).action==PLUS_VITA_VIDEO_REORDER_READY);
+}
 int main(void)
 {
+ configurable_grace();
 	immediate_and_wrap();
 	late_completion();
 	expiry_and_missing();
