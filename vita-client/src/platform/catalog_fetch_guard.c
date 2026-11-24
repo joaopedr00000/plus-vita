@@ -20,6 +20,7 @@ unsigned int plus_vita_catalog_fetch_guard_attempts(void)
 	return attempts;
 }
 
+#if !PLUS_VITA_PS5_EXPERIMENTAL
 CCNativeResult cc_fetch_psnow_native(ChiakiLog *log, const char *npsso,
 	struct json_object **out_games, char *out_country, size_t cc_sz,
 	char *out_language, size_t lang_sz, char *out_store_country,
@@ -64,6 +65,8 @@ CCOwnedResult cc_fetch_owned(ChiakiLog *log, const char *npsso,
 	if(out_component_ids) *out_component_ids = NULL;
 	return CC_OWNED_ERROR;
 }
+
+#endif
 
 ChiakiErrorCode chiaki_holepunch_generate_client_device_uid(
 	char *out, size_t *out_size)

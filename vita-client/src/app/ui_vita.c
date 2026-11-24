@@ -392,6 +392,17 @@ int plus_vita_app_run(void)
 			uint64_t operation=0;
 			plus_vita_play_take(play,&provision,&allocation_error,&operation);
 			if(operation && operation==plus_vita_app_view(app).operation) {
+				#if PLUS_VITA_PS5_EXPERIMENTAL
+				/* Discovery deliberately stops before allocation. Only names are retained by the UI. */
+				if(allocation_error!=CHIAKI_ERR_SUCCESS && provision.datacenter_pings) {
+					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
+						.operation=operation,.status=PLUS_VITA_RESULT_DATACENTERS,.data=provision.datacenter_pings},0);
+					plus_vita_diagnostic_ui_end();
+					plus_vita_play_result_clear(&provision);
+					flow.dirty=true;
+					continue;
+				}
+				#endif
 				bool user_stopped=false;
 				bool collecting_sample=allocation_error==CHIAKI_ERR_SUCCESS
 					&& plus_vita_stream_probe_collects_sample(&provision);

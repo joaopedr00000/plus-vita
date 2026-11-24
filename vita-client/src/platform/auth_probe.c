@@ -5,6 +5,10 @@
 #include "cover_policy.h"
 
 #include <chiaki/random.h>
+#if PLUS_VITA_PS5_EXPERIMENTAL
+#include <chiaki/cloudcatalog.h>
+#endif
+#include "cloud_experimental.h"
 #include <curl_http.h>
 #include <json_object.h>
 #include <json_tokener.h>
@@ -257,6 +261,53 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 			entry->launch_id_valid = false;
 	return true;
 }
+
+#if PLUS_VITA_PS5_EXPERIMENTAL
+/* Keep the audited legacy catalogue intact; add only authorized PS5 stream rows.
+ * No upstream catalogue logs or account-specific cache survive this request. */
+static void append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAuthProbeResult *result)
+{
+	const char *cache="ux0:data/plus-vita-ps5-catalog";
+	char locale[24];
+	snprintf(locale,sizeof(locale),"%s-%s",result->store_language,result->store_country);
+	ChiakiCloudCatalogConfig config={.npsso=credential->value,.locale=locale,.cache_dir=cache,.force_refresh=true};
+	ChiakiCloudCatalogResult catalog={0};
+	ChiakiLog log;
+	chiaki_log_init(&log,0,NULL,NULL);
+	chiaki_cloudcatalog_invalidate_cache(cache);
+	ChiakiErrorCode err=chiaki_cloudcatalog_fetch_unified(&config,&catalog,&log);
+	if(err==CHIAKI_ERR_SUCCESS && catalog.json) {
+		struct json_object *root=json_tokener_parse(catalog.json), *games=NULL;
+		if(root && json_object_object_get_ex(root,"games",&games) && json_object_is_type(games,json_type_array)) {
+			static const char *const service_keys[]={"streamServiceType",NULL};
+			static const char *const platform_keys[]={"platform",NULL};
+			static const char *const stream_keys[]={"streamIdentifier",NULL};
+			static const char *const category_keys[]={"category",NULL};
+			for(size_t i=0;i<json_object_array_length(games) && result->native_titles_count<4096;i++) {
+				struct json_object *row=json_object_array_get_idx(games,i);
+				if(!row || !json_object_is_type(row,json_type_object)) continue;
+				const char *service=catalog_string(row,service_keys), *platform=catalog_string(row,platform_keys);
+				const char *stream=catalog_string(row,stream_keys), *category=catalog_string(row,category_keys);
+				if(!service || strcmp(service,"pscloud") || !platform || strcmp(platform,"ps5")
+					|| !category || (strcmp(category,"owned") && strcmp(category,"streamable"))
+					|| !plus_vita_cloud_identifier_valid(stream)) continue;
+				bool duplicate=false;
+				for(unsigned n=0;n<result->native_titles_count;n++)
+					if(!strcmp(result->native_titles[n].ps5_stream_id,stream)) duplicate=true;
+				if(duplicate) continue;
+				if(!append_catalog_entry(result,row)) break;
+				PlusVitaCatalogEntry *entry=&result->native_titles[result->native_titles_count-1];
+				if(!entry->launch_id_valid) { result->native_titles_count--; continue; }
+				snprintf(entry->platform,sizeof(entry->platform),"PS5");
+				snprintf(entry->ps5_stream_id,sizeof(entry->ps5_stream_id),"%s",stream);
+			}
+		}
+		if(root) json_object_put(root);
+	}
+	chiaki_cloudcatalog_result_fini(&catalog);
+	chiaki_cloudcatalog_invalidate_cache(cache);
+}
+#endif
 
 static bool fetch_native_catalog(const char *base_url, const char *jsession,
 	PlusVitaAuthProbeResult *result)
@@ -573,8 +624,12 @@ void plus_vita_auth_probe(const PlusVitaCredential *credential,
 		result->native_catalog_complete = fetch_native_catalog(store_base_url,
 			jsession, result);
 	secure_clear(store_base_url, sizeof(store_base_url));
-	if(result->native_catalog_complete)
+	if(result->native_catalog_complete) {
 		fetch_owned_entitlements(credential, result);
+#if PLUS_VITA_PS5_EXPERIMENTAL
+		append_ps5_catalog(credential,result);
+#endif
+	}
 
 cleanup_session:
 	secure_clear(jsession, sizeof(jsession));

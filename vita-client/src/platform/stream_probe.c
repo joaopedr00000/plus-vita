@@ -2433,9 +2433,10 @@ ChiakiErrorCode plus_vita_stream_probe_with_pump(const ChiakiCloudProvisionResul
 	info.disable_audio_video = CHIAKI_NONE_DISABLED;
 	info.enable_crypt = true;
 	info.enable_dualsense = false;
-	info.protocol_version = 9;
+	const bool ps5_cloud = !strcmp(provision->platform, "ps5");
+	info.protocol_version = ps5_cloud ? 12 : 9;
 	info.close_socket = true;
-	info.service_type = CHIAKI_SERVICE_TYPE_PSNOW;
+	info.service_type = ps5_cloud ? CHIAKI_SERVICE_TYPE_PSCLOUD : CHIAKI_SERVICE_TYPE_PSNOW;
 	info.psn_wrapper_type = provision->psn_wrapper_type;
 	info.is_ping_handshake = false;
 	plus_vita_diagnostic_stream_startup(PLUS_VITA_STREAM_STARTUP_TRANSPORT);

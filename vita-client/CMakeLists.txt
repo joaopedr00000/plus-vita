@@ -10,6 +10,7 @@ endif()
 
 project(plus_vita_smoke C)
 option(PLUS_VITA_RELEASE_CANDIDATE "Build the anonymous distribution profile" OFF)
+option(PLUS_VITA_PS5_EXPERIMENTAL "Manual datacenter picker and experimental PS5 cloud H.264" ON)
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
   message(FATAL_ERROR "Unsupported Plus-Vita distribution version")
@@ -502,6 +503,45 @@ else()
     message(FATAL_ERROR "Pylux Gaikai allocation-log patch point was not found")
   endif()
 endif()
+if(PLUS_VITA_PS5_EXPERIMENTAL)
+  # Discover only: return the server-provided list without allocating a session.
+  # Manual selection is strict; do not use a different datacenter implicitly.
+  set(PV_DISCOVER_OLD [=[
+	c->ping_results = json_object_new_array();
+	if(use_forced)
+]=])
+  set(PV_DISCOVER_NEW [=[
+	if(forced && strcmp(forced, "__list__") == 0)
+	{
+		c->dc_picker = gk_build_picker(c, dcs);
+		json_object_put(dcs);
+		return CHIAKI_ERR_CANCELED;
+	}
+	c->ping_results = json_object_new_array();
+	if(use_forced)
+]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_DISCOVER_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux datacenter discovery patch point not found")
+  endif()
+  string(REPLACE "${PV_DISCOVER_OLD}" "${PV_DISCOVER_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  set(PV_FORCE_OLD [=[if(!c->selected_ping) c->selected_ping = json_object_array_get_idx(c->ping_results, 0);]=])
+  set(PV_FORCE_NEW [=[if(!c->selected_ping) return CHIAKI_ERR_UNKNOWN;]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_FORCE_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux strict datacenter patch point not found")
+  endif()
+  string(REPLACE "${PV_FORCE_OLD}" "${PV_FORCE_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
+  # this is an experimental capability request, NOT a proven PS5 service profile.
+  foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
+    string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PROFILE}" PV_POS)
+    if(PV_POS EQUAL -1)
+      message(FATAL_ERROR "Pylux PS5 codec patch point not found")
+    endif()
+    string(REPLACE "${PV_PROFILE}" "hw4.1" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  endforeach()
+endif()
 file(WRITE "${PLUS_VITA_GAIKAI_SOURCE}" "${PLUS_VITA_GAIKAI_TEXT}")
 
 # Preserve a release and a new touch in one update when a contact slot is
@@ -655,11 +695,16 @@ set_source_files_properties("${PYLUX_ROOT}/lib/src/log.c" PROPERTIES
 set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_merge.c" PROPERTIES
   COMPILE_OPTIONS "-Wno-error=format-truncation"
 )
+if(PLUS_VITA_PS5_EXPERIMENTAL)
+  set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c" PROPERTIES
+    COMPILE_OPTIONS "-Wno-error=unused-but-set-variable")
+else()
 set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c" PROPERTIES
   COMPILE_DEFINITIONS
     "cc_fetch_psnow_native=plus_vita_disabled_psnow_native_impl;cc_fetch_imagic=plus_vita_disabled_imagic_impl;cc_imagic_result_fini=plus_vita_disabled_imagic_fini_impl;cc_fetch_owned=plus_vita_disabled_owned_impl"
   COMPILE_OPTIONS "-Wno-error=unused-but-set-variable"
 )
+endif()
 set_source_files_properties("${PLUS_VITA_CLOUD_SESSION_SOURCE}" PROPERTIES
   COMPILE_OPTIONS "-include;arpa/inet.h"
 )
@@ -726,6 +771,7 @@ if(PLUS_VITA_INPUT_WORKER)
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
+  PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
   PLUS_VITA_PS3_STARTUP_SAMPLE=$<BOOL:${PLUS_VITA_PS3_STARTUP_SAMPLE}>
   PLUS_VITA_PS3_REPLAY=$<BOOL:${PLUS_VITA_PS3_REPLAY}>

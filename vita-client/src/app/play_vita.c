@@ -2,6 +2,7 @@
 #include "play_vita.h"
 #include "../platform/diagnostic_log.h"
 #include "../platform/request_cancel.h"
+#include "../platform/cloud_experimental.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
@@ -84,15 +85,21 @@ static void *allocate(void *context)
 {
 	PlusVitaPlay *play=context;
 	const PlusVitaAppEffect *job=&play->job;
+	#if PLUS_VITA_PS5_EXPERIMENTAL
+	const bool ps5=job->game.ps5_stream_id[0]!=0;
+	#else
+	const bool ps5=false;
+	#endif
 	ChiakiCloudProvisionConfig config={
-		.service_type="psnow", .game_identifier=job->game.id,
+		.service_type=ps5 ? "pscloud" : "psnow",
+		.game_identifier=ps5 ? job->game.ps5_stream_id : job->game.id,
 		.game_name="", .npsso=job->credential.value,
 		.store_country=job->store_country,
 		.store_lang=job->store_language,
 		.owned_entitlement_id="", .owned_platform="",
 		.catalog_is_foreign=false, .skip_account_attr_check=true,
-		.forced_datacenter="Auto", .prior_datacenters_json="",
-		.game_language=job->language, .resolution=720, .bitrate_kbps=8000,
+		.forced_datacenter=job->datacenter[0] ? job->datacenter : "Auto", .prior_datacenters_json="",
+		.game_language=job->language, .resolution=720, .bitrate_kbps=job->bitrate_kbps ? (int)job->bitrate_kbps : 8000,
 		.progress=progress, .is_cancelled=cancelled, .user=play
 	};
 	ChiakiLog log;
@@ -123,6 +130,10 @@ bool plus_vita_play_start(PlusVitaPlay *play,const PlusVitaAppEffect *effect)
 		|| !effect->game.launch_id_valid || !effect->store_country[0]
 		|| !effect->store_language[0] || !effect->language[0]
 		|| !effect->credential.length) return false;
+	#if PLUS_VITA_PS5_EXPERIMENTAL
+	if((strcmp(effect->datacenter,PLUS_VITA_DC_DISCOVER) && !plus_vita_manual_dc_valid(effect->datacenter))
+		|| !plus_vita_bitrate_valid(effect->bitrate_kbps)) return false;
+	#endif
 	play->job=*effect;
 	play->stage=0;
 	play->complete=false;

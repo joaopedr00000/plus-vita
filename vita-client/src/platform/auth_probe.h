@@ -19,6 +19,7 @@ typedef struct plus_vita_catalog_entry_t
 	bool launch_id_valid;
 	char cover_url[512];
 	PlusVitaArtworkMetadata cover_metadata;
+	char ps5_stream_id[128]; /* Exact entitlement identifier returned by unified catalogue. */
 } PlusVitaCatalogEntry;
 
 typedef struct plus_vita_auth_probe_result_t

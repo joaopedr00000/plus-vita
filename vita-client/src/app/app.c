@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <json_object.h>
 #include <json_tokener.h>
+#include "../platform/cloud_experimental.h"
 
 #ifndef PLUS_VITA_APP_VERSION
 #define PLUS_VITA_APP_VERSION "v000"
@@ -45,6 +46,11 @@ struct plus_vita_app_t {
 	size_t binding_focus, binding_first, action_focus, action_first, catalogue_first;
 	char controls_status[256], binding_labels[5][160];
 	char controls_help[1024];
+#if PLUS_VITA_PS5_EXPERIMENTAL
+	char datacenters[64][128], dc_status[160], bitrate_label[64];
+	size_t dc_count, dc_page;
+	unsigned bitrate_kbps;
+#endif
 };
 
 static void welcome(PlusVitaApp *app)
@@ -682,6 +688,60 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 		.actions={{game->launch_id_valid ? PLUS_VITA_ACTION_PLAY : PLUS_VITA_ACTION_DISABLED,game->launch_id_valid ? "Play" : "Play unavailable",64,380,832,52},{PLUS_VITA_ACTION_BACK,"Back",64,444,832,52}},.action_count=2};
 }
 
+#if PLUS_VITA_PS5_EXPERIMENTAL
+static void datacenters_view(PlusVitaApp *app)
+{
+	if(!app->bitrate_kbps) app->bitrate_kbps=8000;
+	snprintf(app->dc_status,sizeof(app->dc_status),"Choose a server manually. Page %u of %u. No automatic fallback.",
+		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
+	snprintf(app->bitrate_label,sizeof(app->bitrate_label),"Bitrate: %u Mbps (change)",app->bitrate_kbps/1000);
+	PlusVitaAppView view={.screen=PLUS_VITA_APP_DATACENTERS,.title="Choose cloud server.",
+		.subtitle="MANUAL DATACENTER",.body=app->dc_status,.hint="X  Select     O  Back"};
+	size_t first=app->dc_page*3;
+	for(size_t i=first;i<app->dc_count && i<first+3;i++) {
+		size_t n=view.action_count;
+		view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_DATACENTER,app->datacenters[i],64,234+(int)n*38,832,32};
+	}
+	if(app->dc_page) {
+		size_t n=view.action_count;
+		view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_DC_PREVIOUS,"Previous servers",64,234+(int)n*38,832,32};
+	}
+	if(first+3<app->dc_count) {
+		size_t n=view.action_count;
+		view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_DC_NEXT,"Next servers",64,234+(int)n*38,832,32};
+	}
+	size_t n=view.action_count;
+	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BITRATE,app->bitrate_label,64,234+(int)n*38,832,32};
+	n=view.action_count;
+	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,234+(int)n*38,832,32};
+	app->view=view;
+}
+static bool datacenters_read(PlusVitaApp *app,const char *json)
+{
+	app->dc_count=app->dc_page=0;
+	if(!json || strlen(json)>65536) return false;
+	struct json_object *root=json_tokener_parse(json);
+	if(!root || !json_object_is_type(root,json_type_array)) {
+		if(root) json_object_put(root);
+		return false;
+	}
+	for(size_t i=0;i<json_object_array_length(root) && app->dc_count<64;i++) {
+		struct json_object *row=json_object_array_get_idx(root,i), *value=NULL;
+		if(!row || !json_object_is_type(row,json_type_object)
+			|| !json_object_object_get_ex(row,"dataCenter",&value)
+			|| !json_object_is_type(value,json_type_string)) continue;
+		const char *name=json_object_get_string(value);
+		if(!name || (size_t)json_object_get_string_len(value)!=strlen(name)
+			|| !plus_vita_manual_dc_valid(name)) continue;
+		bool duplicate=false;
+		for(size_t n=0;n<app->dc_count;n++) if(!strcmp(name,app->datacenters[n])) duplicate=true;
+		if(!duplicate) snprintf(app->datacenters[app->dc_count++],128,"%s",name);
+	}
+	json_object_put(root);
+	return app->dc_count>0;
+}
+#endif
+
 static void stream_stopped_view(PlusVitaApp *app)
 {
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
@@ -992,6 +1052,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		app->pending_operation=0; app->waiting_for=PLUS_VITA_EFFECT_NONE;
 		if(event.status==PLUS_VITA_RESULT_REJECTED) return remove_saved(app, false, true);
 		if(event.status==PLUS_VITA_RESULT_OK) catalogue_view(app);
+		#if PLUS_VITA_PS5_EXPERIMENTAL
+		else if(event.status==PLUS_VITA_RESULT_DATACENTERS) {
+			if(datacenters_read(app,event.data)) datacenters_view(app);
+			else detail_view(app,"No eligible cloud servers were returned. Try Play again.");
+		}
+		#endif
 		else if(event.status==PLUS_VITA_RESULT_SAMPLE_SAVED)
 			detail_view(app,"PS3 sample saved. Reopen FTP to retrieve it.");
 		else if(event.status==PLUS_VITA_RESULT_SAMPLE_INCOMPLETE)
@@ -1117,6 +1183,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			|| (view->screen == PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) {
 			settings_view(app); return effect;
 		}
+		#if PLUS_VITA_PS5_EXPERIMENTAL
+		if(view->screen==PLUS_VITA_APP_DATACENTERS) { detail_view(app,NULL); return effect; }
+		#endif
 		if(view->screen==PLUS_VITA_APP_DETAILS || view->screen==PLUS_VITA_APP_STREAM_STOPPED
 			|| app->waiting_for==PLUS_VITA_EFFECT_EDIT_SEARCH || app->waiting_for==PLUS_VITA_EFFECT_PLAY) {
 			app->pending_operation=0; app->waiting_for=PLUS_VITA_EFFECT_NONE; catalogue_view(app); return effect;
@@ -1148,11 +1217,35 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(action==PLUS_VITA_ACTION_SEARCH) return plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_SEARCH});
 		else if(action==PLUS_VITA_ACTION_CLEAR_SEARCH) { app->search[0]=0; filter_catalogue(app); app->search_focus=false; catalogue_view(app); }
 		else if(action==PLUS_VITA_ACTION_GAME && view->screen==PLUS_VITA_APP_CATALOGUE) detail_view(app,NULL);
+		#if PLUS_VITA_PS5_EXPERIMENTAL
+		else if(view->screen==PLUS_VITA_APP_DATACENTERS) {
+			if(action==PLUS_VITA_ACTION_BACK) detail_view(app,NULL);
+			else if(action==PLUS_VITA_ACTION_DC_PREVIOUS && app->dc_page) { app->dc_page--; datacenters_view(app); }
+			else if(action==PLUS_VITA_ACTION_DC_NEXT && (app->dc_page+1)*3<app->dc_count) { app->dc_page++; datacenters_view(app); }
+			else if(action==PLUS_VITA_ACTION_BITRATE) { app->bitrate_kbps=plus_vita_next_bitrate(app->bitrate_kbps); datacenters_view(app); }
+			else if(action==PLUS_VITA_ACTION_DATACENTER) {
+				size_t index=app->dc_page*3+view->selected;
+				if(index>=app->dc_count) return effect;
+				PlusVitaCatalogEntry game=app->catalogue[app->matches[app->catalogue_selection]];
+				effect=operation(app,PLUS_VITA_EFFECT_PLAY,"Connecting to your selected cloud server. Circle cancels.",true);
+				effect.game=game; effect.controls=app->controls;
+				snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",app->datacenters[index]);
+				effect.bitrate_kbps=app->bitrate_kbps;
+				return effect;
+			}
+			return effect;
+		}
+		#endif
 		else if(action==PLUS_VITA_ACTION_PLAY && (view->screen==PLUS_VITA_APP_DETAILS
 			|| view->screen==PLUS_VITA_APP_STREAM_STOPPED)) {
 			PlusVitaCatalogEntry game=*view->detail;
 			effect=operation(app,PLUS_VITA_EFFECT_PLAY,"Preparing a cloud session. Circle cancels.",true);
-			effect.game=game;effect.controls=app->controls;return effect;
+			effect.game=game;effect.controls=app->controls;
+#if PLUS_VITA_PS5_EXPERIMENTAL
+			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",PLUS_VITA_DC_DISCOVER);
+			effect.bitrate_kbps=app->bitrate_kbps ? app->bitrate_kbps : 8000;
+#endif
+			return effect;
 		}
 		else if(action == PLUS_VITA_ACTION_CATALOGUE)
 		{
