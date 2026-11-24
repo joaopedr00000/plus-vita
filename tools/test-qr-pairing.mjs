@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {webcrypto} from 'node:crypto';
+import assert from 'node:assert/strict';
+const html=fs.readFileSync('release/qr-pairing.html','utf8');
+const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+assert.equal(scripts.length,2);
+const canvas={getContext:()=>({fillRect(){}})};
+const fields={key:{value:'000102030405060708090a0b0c0d0e0f'},token:{value:'Z'.repeat(64)},qr:canvas,status:{},make:{},clear:{}};
+const context=vm.createContext({document:{getElementById:id=>fields[id]},crypto:webcrypto,TextEncoder,btoa,addEventListener(){},setTimeout(){return 1},clearTimeout(){}});
+vm.runInContext(scripts[0][1],context);
+vm.runInContext('const original=qrcode; var payload=""; qrcode=(...args)=>{const qr=original(...args),add=qr.addData; qr.addData=(s)=>{payload=s;return add(s);};return qr;}',context);
+vm.runInContext(scripts[1][1],context);
+await fields.make.onclick();
+assert.equal(fields.key.value,'');
+assert.equal(fields.token.value,'');
+assert.equal(canvas.hidden,false);
+const payload=vm.runInContext('payload',context);
+assert.equal(payload.length,128);
+assert.ok(payload.startsWith('PV2:'));
+console.log(payload);
