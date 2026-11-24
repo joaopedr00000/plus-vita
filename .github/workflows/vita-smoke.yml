@@ -47,16 +47,23 @@ jobs:
         with:
           submodules: recursive
       - name: Test experimental datacenter and bitrate helpers
-        if: github.ref == 'refs/heads/beta1' || github.ref == 'refs/heads/beta2'
+        if: github.ref == 'refs/heads/beta1' || github.ref == 'refs/heads/beta3'
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_cloud_experimental.c -o /tmp/plus-vita-cloud-test
           /tmp/plus-vita-cloud-test
       - name: Test offline browser to native encrypted QR interoperability
-        if: github.ref == 'refs/heads/beta2'
+        if: github.ref == 'refs/heads/beta3'
         run: |
           sudo apt-get update
           sudo apt-get install -y libmbedtls-dev
           sh tools/test-qr-pairing.sh
+      - name: Test adaptive streaming policy
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_adaptive_stream.c -o /tmp/pv-adaptive
+          /tmp/pv-adaptive
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
+          /tmp/pv-reorder
       - name: Test native application workflow
         run: sh tools/test-app-workflow.sh
       - name: Test saved control layouts through Settings and gameplay input
@@ -83,7 +90,7 @@ jobs:
         run: sh tools/test-app-freetype.sh
 
   build:
-    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta2'
+    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta3'
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     strategy:
@@ -133,8 +140,8 @@ jobs:
           python3 tools/test-publication-gate.py build/vita/plus_vita_smoke.vpk
       # Publishing a downloadable VPK remains gated by the privacy audit in #22.
 
-  beta2-build:
-    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/beta2'
+  beta3-build:
+    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/beta3'
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     permissions:
@@ -148,19 +155,19 @@ jobs:
       - name: Allow Git reads
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Check source and history
-        run: python3 tools/publication_gate.py --version beta2
+        run: python3 tools/publication_gate.py --version beta3
       - name: Configure beta profile
         run: >-
-          cmake -S vita-client -B build/beta2 -DCMAKE_BUILD_TYPE=Release
+          cmake -S vita-client -B build/beta3 -DCMAKE_BUILD_TYPE=Release
           -DPLUS_VITA_RELEASE_CANDIDATE=ON -DPLUS_VITA_RELEASE_VERSION=v002
-          -DPLUS_VITA_PS5_EXPERIMENTAL=ON -DPLUS_VITA_BETA1=ON -DPLUS_VITA_BETA2=ON
+          -DPLUS_VITA_PS5_EXPERIMENTAL=ON -DPLUS_VITA_BETA1=ON -DPLUS_VITA_BETA2=ON -DPLUS_VITA_BETA3=ON
       - name: Build and normalize VPK
         run: |
-          cmake --build build/beta2 --parallel
+          cmake --build build/beta3 --parallel
           mkdir -p dist
           python3 - <<'PY'
           import zipfile
-          with zipfile.ZipFile('build/beta2/plus_vita_smoke.vpk') as source, zipfile.ZipFile('dist/plus-vita-v0.1.0-beta.2.vpk','w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as target:
+          with zipfile.ZipFile('build/beta3/plus_vita_smoke.vpk') as source, zipfile.ZipFile('dist/plus-vita-v0.1.0-beta.3.vpk','w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as target:
               for name in sorted(source.namelist()):
                   info = zipfile.ZipInfo(name,date_time=(1980,1,1,0,0,0))
                   info.compress_type=zipfile.ZIP_DEFLATED
@@ -170,17 +177,17 @@ jobs:
           PY
       - name: Verify beta package and leak fixtures
         run: |
-          python3 tools/publication_gate.py --version beta2 --vpk dist/plus-vita-v0.1.0-beta.2.vpk
-          python3 tools/test-publication-gate.py dist/plus-vita-v0.1.0-beta.2.vpk --version beta2
+          python3 tools/publication_gate.py --version beta3 --vpk dist/plus-vita-v0.1.0-beta.3.vpk
+          python3 tools/test-publication-gate.py dist/plus-vita-v0.1.0-beta.3.vpk --version beta3
           cd dist
-          sha256sum plus-vita-v0.1.0-beta.2.vpk > SHA256SUMS.txt
+          sha256sum plus-vita-v0.1.0-beta.3.vpk > SHA256SUMS.txt
       - name: Include offline QR pairing helper
         run: |
           cp release/qr-pairing.html dist/qr-pairing.html
           (cd dist && sha256sum qr-pairing.html >> SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: plus-vita-beta2
+          name: plus-vita-beta3
           path: dist/
           if-no-files-found: error
 

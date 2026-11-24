@@ -1189,6 +1189,9 @@ static void probe_handle_streaminfo(PlusVitaStreamProbe *probe, uint8_t *buf,
 	chiaki_audio_header_load(&output_audio, context.audio_header);
 	if(!probe->capture_only)
 		probe->audio_playback = plus_vita_audio_start(&output_audio, probe->log);
+#if PLUS_VITA_ADAPTIVE_STREAM
+		plus_vita_audio_set_profile(probe->audio_playback,probe->profile_kbps);
+#endif
 	if(!probe->capture_only && !probe->audio_playback)
 	{
 		CHIAKI_LOGE(probe->log, "Stream probe audio initialization failed or unsupported header");

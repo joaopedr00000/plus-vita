@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "adaptive_stream.h"
 #define AUDIO_QUEUE 32
 #define AUDIO_UNIT_MAX 255
 #define AUDIO_BLOCK 960
@@ -23,6 +24,8 @@ struct plus_vita_audio_playback_t {
 	bool stop, failed;
 	AudioUnit queue[AUDIO_QUEUE];
 	unsigned head, count, peak, dropped, decoded, outputs, concealed, stale;
+	unsigned prebuffer_base, prebuffer_target, clean_audio_units;
+	bool audio_buffering, audio_fade;
 	bool sequence_valid;
 	uint16_t sequence;
 	int16_t block[AUDIO_BLOCK * 2];
@@ -148,6 +151,15 @@ static void *audio_worker(void *user)
 	unsigned pending_local_drops = 0;
 	for(;;) {
 		pthread_mutex_lock(&a->mutex);
+		#if PLUS_VITA_ADAPTIVE_STREAM
+		if(a->prebuffer_base && !a->count && a->decoded && !a->audio_buffering) {
+			a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,true);
+			a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;a->fill=0;
+		}
+		while(!a->stop && a->audio_buffering && a->count<a->prebuffer_target)
+			pthread_cond_wait(&a->cond,&a->mutex);
+		if(a->audio_buffering && a->count>=a->prebuffer_target)a->audio_buffering=false;
+#endif
 		if(!a->stop && !a->count) {
 			uint64_t wait_started_us = sceKernelGetProcessTimeWide();
 			while(!a->stop && !a->count) pthread_cond_wait(&a->cond, &a->mutex);
@@ -162,6 +174,11 @@ static void *audio_worker(void *user)
 		AudioUnit unit = a->queue[a->head];
 		a->head = (a->head + 1) % AUDIO_QUEUE; a->count--;
 		unsigned queue_after_pop = a->count, dropped_total = a->dropped;
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(a->prebuffer_base && ++a->clean_audio_units>=2000) {
+			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,false);
+		}
+#endif
 		pthread_mutex_unlock(&a->mutex);
 		uint64_t queue_age_us = sceKernelGetProcessTimeWide() - unit.arrived_us;
 		a->queue_age_total_us += queue_age_us;
@@ -192,6 +209,9 @@ static void *audio_worker(void *user)
 		int n = opus_decode(a->decoder, unit.data, (opus_int32)unit.size, pcm, 480, 0);
 		if(n != 480) { CHIAKI_LOGE(a->log, "Stream probe audio decode failed samples=%d", n); goto failed; }
 		a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(a->audio_fade){for(unsigned i=0;i<240;i++)for(unsigned ch=0;ch<a->channels;ch++)pcm[i*a->channels+ch]=(int16_t)((int32_t)pcm[i*a->channels+ch]*(int)i/240);a->audio_fade=false;}
+#endif
 		audio_measure(a, pcm, (unsigned)n);
 		if(a->decoded == 1 || a->decoded % 1000 == 0) {
 			CHIAKI_LOGI(a->log, "Stream probe audio PCM levels decoded=%u peak_L=%u peak_R=%u rms_L=%u rms_R=%u nonzero_L=%llu nonzero_R=%llu queue=%u dropped=%u concealed=%u stale=%u",
@@ -235,6 +255,15 @@ free_mutex: pthread_mutex_destroy(&a->mutex);
 free_audio: free(a); return NULL;
 }
 
+void plus_vita_audio_set_profile(PlusVitaAudioPlayback *a,unsigned cap_kbps)
+{
+#if PLUS_VITA_ADAPTIVE_STREAM
+	if(a){pthread_mutex_lock(&a->mutex);a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;pthread_mutex_unlock(&a->mutex);}
+#else
+	(void)a;(void)cap_kbps;
+#endif
+}
+
 bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uint8_t *data, size_t size)
 {
 	if(!a || !size || size > AUDIO_UNIT_MAX) return false;
@@ -249,7 +278,11 @@ bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uin
 	}
 	a->last_arrival_us = arrived_us;
 	a->arrived++;
-	if(a->count == AUDIO_QUEUE) {
+	unsigned queue_limit=AUDIO_QUEUE;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	if(a->prebuffer_base)queue_limit=16;
+#endif
+	if(a->count >= queue_limit) {
 		unsigned carry = a->queue[a->head].local_drops_before + 1;
 		a->head = (a->head + 1) % AUDIO_QUEUE; a->count--; a->dropped++;
 		a->queue[a->head].local_drops_before += carry;
