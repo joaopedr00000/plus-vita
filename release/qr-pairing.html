@@ -3,7 +3,7 @@
 <title>Plus-Vita offline QR pairing</title>
 <style>body{font:17px system-ui,sans-serif;max-width:520px;padding:20px;margin:auto;background:#101b33;color:#f4f7fd}a{color:#8dd0ff}label{display:block;margin:16px 0}input,textarea,button{box-sizing:border-box;font:inherit;padding:12px;width:100%;border-radius:8px}button{margin:10px 0;cursor:pointer}canvas{display:block;margin:12px auto;max-width:100%;height:auto;image-rendering:pixelated}canvas[hidden]{display:none}small{display:block;color:#c6d3e8}</style>
 <h1>Plus-Vita QR pairing</h1><p>Download this file and open it locally in a browser supporting Web Crypto. No network requests or persistent storage are used by the helper. Sign in on <a href="https://www.playstation.com/" target="_blank" rel="noopener noreferrer">PlayStation</a>, then copy the response from the <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener noreferrer">official Sony token page</a>.</p>
-<label>Temporary key shown by Vita <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="32 hex characters or PVKEY2:…"></label><label>Sony response (JSON or token) <textarea id="token" autocomplete="off" autocapitalize="off" spellcheck="false" rows="3"></textarea></label>
+<label>Temporary key shown by Vita <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="64 hex characters or PVKEY3:…"></label><label>Sony response (JSON or token) <textarea id="token" autocomplete="off" autocapitalize="off" spellcheck="false" rows="3"></textarea></label>
 <button id="make" type="button">Generate encrypted QR</button><button id="clear" type="button">Clear everything</button><p id="status" role="status"></p><canvas id="qr" hidden></canvas>
 <small>Point the rear Vita camera at the QR. Never share either QR or screenshot. Clear the clipboard after pairing. If local browser crypto is unavailable, use Import JSON instead.</small>
 <script>
@@ -2314,24 +2314,26 @@ function clear(){generation++;clearTimeout(expiry);k.value='';t.value='';c.width
 document.getElementById('clear').onclick=clear;
 button.onclick=async()=>{
   const attempt=++generation;button.disabled=true;clearTimeout(expiry);c.hidden=true;c.width=c.height=1;
-  let bytes,secret,iv,encrypted,out;
+  let bytes,secret,iv,encrypted,out,sidInput,sid;
   try{
     if(!globalThis.crypto?.subtle)throw Error('Local Web Crypto unavailable. Use Import JSON instead.');
-    const key=k.value.trim().replace(/^PVKEY2:/i,'');
-    if(!/^[0-9a-fA-F]{32}$/.test(key))throw Error('Enter the temporary key shown by Vita.');
+    const key=k.value.trim().replace(/^PVKEY3:/i,'').replace(/\s/g,'');
+    if(!/^[0-9a-fA-F]{64}$/.test(key))throw Error('Enter the temporary key shown by Vita.');
     let token=t.value.trim();if(token.startsWith('{')){try{token=JSON.parse(token).npsso;}catch{throw Error('Invalid Sony response.');}}
     if(typeof token!=='string'||!/^[a-zA-Z0-9]{64}$/.test(token))throw Error('Expected Sony response or a 64-character token.');
     bytes=new TextEncoder().encode(token);secret=Uint8Array.from(key.match(/../g),h=>parseInt(h,16));iv=crypto.getRandomValues(new Uint8Array(12));
+    sidInput=new Uint8Array(47);sidInput.set(new TextEncoder().encode('PlusVitaQR3-sid'));sidInput.set(secret,15);
+    sid=new Uint8Array(await crypto.subtle.digest('SHA-256',sidInput));
     const imported=await crypto.subtle.importKey('raw',secret,'AES-GCM',false,['encrypt']);
-    encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode('PlusVitaQR2'),tagLength:128},imported,bytes));
+    encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:sid,tagLength:128},imported,bytes));
     if(attempt!==generation)return;
-    out=new Uint8Array(92);out.set(iv);out.set(encrypted,12);
-    const qr=qrcode(0,'M');qr.addData('PV2:'+btoa(String.fromCharCode(...out)));qr.make();
+    out=new Uint8Array(124);out.set(sid);out.set(iv,32);out.set(encrypted,44);
+    const qr=qrcode(0,'M');qr.addData('PV3:'+btoa(String.fromCharCode(...out)));qr.make();
     const n=qr.getModuleCount(),scale=8;c.width=c.height=(n+8)*scale;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#000';
     for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))ctx.fillRect((x+4)*scale,(y+4)*scale,scale,scale);
     k.value='';t.value='';c.hidden=false;s.textContent='Ready. Scan this QR with your Vita.';expiry=setTimeout(clear,180000);
   }catch(e){if(attempt===generation)s.textContent=e.message||'Pairing failed.';}
-  finally{for(const v of [bytes,secret,iv,encrypted,out])if(v)v.fill(0);if(attempt===generation)button.disabled=false;}
+  finally{for(const v of [bytes,secret,iv,encrypted,out,sidInput,sid])if(v)v.fill(0);if(attempt===generation)button.disabled=false;}
 };
 addEventListener('pagehide',clear);
 </script></html>

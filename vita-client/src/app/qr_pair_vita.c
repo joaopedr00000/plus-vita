@@ -7,6 +7,7 @@
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/rng.h>
+#include <psp2/net/net.h>
 #include <qrcodegen.h>
 #include <quirc.h>
 #include <stdio.h>
@@ -38,17 +39,19 @@ static bool next_page(uint64_t start)
 PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap)
 {
 	PlusVitaAppResult result=PLUS_VITA_RESULT_UNSUPPORTED;
-	uint8_t key[16]={0};char code[40]={0},msg[500]={0};uint32_t *pixels=NULL;
+	uint8_t key[32]={0},entropy[32]={0};SceNetEtherAddr device={0};char code[72]={0},msg[500]={0};uint32_t *pixels=NULL;
 	SceUID block=-1;struct quirc *decoder=NULL;bool opened=false,started=false;
 	struct quirc_code *q=NULL;struct quirc_data *d=NULL;
 	if(!frame||!json||cap<77)return result;
 	plus_vita_pair_clear(json,cap);
 	uint64_t start=sceKernelGetProcessTimeWide();
-	if(!qr_screen(frame,ctx,"1 / 3  Sign in to Sony","Sign in at playstation.com on your phone, then scan the official Sony response-page QR.\nCopy the response privately.\nOpen the downloaded offline pairing helper (see release notes).\n\nX  Next    O  Cancel","https://ca.account.sony.com/api/v1/ssocookie"))goto done;
+	if(!frame(ctx,"1 / 3  Sign in to Sony","On your phone, sign in at playstation.com. Open the official Sony response link in the downloaded offline helper. Copy the response privately. X Next / O Cancel",NULL,0,NULL))goto done;
 	if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
-	if(sceKernelGetRandomNumber(key,sizeof(key))<0)goto done;
-	memcpy(code,"PVKEY2:",7);for(unsigned i=0;i<sizeof(key);i++)snprintf(code+7+i*2,3,"%02x",(unsigned)key[i]);
-	snprintf(msg,sizeof(msg),"Scan/copy this temporary key into the offline helper, or type it below.\n%s\nPaste Sony's response into the helper and generate its encrypted QR.\nKeep both screens private.\nX  Scan phone QR    O  Cancel",code+7);
+	/* No shared/static QR, clock-derived key or fallback to predictable entropy. */
+	if(sceKernelGetRandomNumber(entropy,sizeof(entropy))<0||sceNetGetMacAddress(&device,0)<0||sizeof(device)!=6||!plus_vita_pair_make_key(entropy,(const uint8_t *)&device,key))goto done;
+	plus_vita_pair_clear(entropy,sizeof(entropy));plus_vita_pair_clear(&device,sizeof(device));
+	memcpy(code,"PVKEY3:",7);for(unsigned i=0;i<sizeof(key);i++)snprintf(code+7+i*2,3,"%02x",(unsigned)key[i]);
+	snprintf(msg,sizeof(msg),"Scan/copy this one-time key into the offline helper, or type both lines together.\n%.32s\n%s\nPaste Sony's response and generate an encrypted QR. Keep both screens private.\nX  Scan phone QR    O  Cancel",code+7,code+39);
 	start=sceKernelGetProcessTimeWide();
 	if(!qr_screen(frame,ctx,"2 / 3  Pair privately",msg,code))goto done;
 	if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
@@ -61,6 +64,7 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 	opened=true;
 	if(sceCameraStart(SCE_CAMERA_DEVICE_BACK)<0)goto done;
 	started=true;result=PLUS_VITA_RESULT_CANCELLED;
+	if(!frame(ctx,"3 / 3  Scan encrypted QR","Aim the rear camera at your phone. O  Cancel.",NULL,0,NULL))goto done;
 	while(sceKernelGetProcessTimeWide()-start<DURATION&&!(buttons()&SCE_CTRL_CIRCLE)){
 		SceCameraRead read={.size=sizeof(read),.mode=0};
 		if(sceCameraRead(SCE_CAMERA_DEVICE_BACK,&read)>=0){
@@ -69,7 +73,7 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 			quirc_end(decoder);
 			for(int i=0;i<quirc_count(decoder);i++){
 				quirc_extract(decoder,i,q);
-				if(!quirc_decode(q,d)&&d->payload_len>0&&plus_vita_pair_decode(key,d->payload,(size_t)d->payload_len,json,cap)){result=PLUS_VITA_RESULT_OK;goto done;}
+				if(!quirc_decode(q,d)&&sceKernelGetProcessTimeWide()-start<DURATION&&d->payload_len>0&&plus_vita_pair_decode(key,d->payload,(size_t)d->payload_len,json,cap)){result=PLUS_VITA_RESULT_OK;goto done;}
 				plus_vita_pair_clear(d,sizeof(*d));plus_vita_pair_clear(q,sizeof(*q));
 			}
 			if(!frame(ctx,"3 / 3  Scan encrypted QR","Aim the rear camera at the phone. O  Cancel. The key expires after three minutes.",NULL,0,pixels))break;
@@ -84,7 +88,7 @@ done:
 	if(decoder){int w=0,h=0;uint8_t *image=quirc_begin(decoder,&w,&h);if(image&&w>0&&h>0)plus_vita_pair_clear(image,(size_t)w*h);quirc_destroy(decoder);}
 	if(q){plus_vita_pair_clear(q,sizeof(*q));free(q);}
 	if(d){plus_vita_pair_clear(d,sizeof(*d));free(d);}
-	plus_vita_pair_clear(key,sizeof(key));plus_vita_pair_clear(code,sizeof(code));plus_vita_pair_clear(msg,sizeof(msg));
+	plus_vita_pair_clear(entropy,sizeof(entropy));plus_vita_pair_clear(&device,sizeof(device));plus_vita_pair_clear(key,sizeof(key));plus_vita_pair_clear(code,sizeof(code));plus_vita_pair_clear(msg,sizeof(msg));
 	if(result!=PLUS_VITA_RESULT_OK)plus_vita_pair_clear(json,cap);
 	frame(ctx,"QR pairing finished","Returning to account setup...",NULL,0,NULL);
 	frame(ctx,"QR pairing finished","Returning to account setup...",NULL,0,NULL);
