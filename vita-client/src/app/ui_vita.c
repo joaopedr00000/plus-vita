@@ -156,6 +156,14 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
 	d->back^=1u;return true;
 }
 #endif
+#if PLUS_VITA_ADAPTIVE_STREAM
+static void performance_hud(void *context,uint32_t *pixels,const char *line)
+{
+	UiDisplay *d=context;
+	for(unsigned y=0;y<24;y++)for(unsigned x=0;x<960;x++)pixels[y*1024+x]=RGB(5,15,25);
+	plus_vita_font_draw(d->font,pixels,1024,line,(PlusVitaTextBox){6,1,948,22},14,false,RGB(255,255,255));
+}
+#endif
 static bool handle_input(PlusVitaUiFlow *flow, PlusVitaAccount *account,
 	PlusVitaPlay *play, PlusVitaAppEvent event)
 {
@@ -390,6 +398,10 @@ int plus_vita_app_run(void)
 				else if(effect.kind==PLUS_VITA_EFFECT_PLAY)
 				{
 					session_input.layout=effect.controls;
+					session_input.profile_kbps=effect.profile_kbps;session_input.hud=effect.hud;session_input.playback_started=false;
+#if PLUS_VITA_ADAPTIVE_STREAM
+					session_input.paint_hud=performance_hud;session_input.hud_context=display;
+#endif
 					if(plus_vita_play_busy(play) || !plus_vita_account_idle(account))
 						plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
 							.operation=effect.operation,.status=PLUS_VITA_RESULT_BUSY},0);
@@ -464,12 +476,12 @@ int plus_vita_app_run(void)
 						.status=stopped==PLUS_VITA_RECOVERY_SLEEP ? PLUS_VITA_RESULT_SLEEP : PLUS_VITA_RESULT_NETWORK_ERROR},0);
 					plus_vita_recovery_acknowledge();
 				} else plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
-					.operation=operation,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
+					.operation=operation,.playback_started=session_input.playback_started,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
 						? PLUS_VITA_RESULT_OK : stream_error==CHIAKI_ERR_CANCELED
 						? PLUS_VITA_RESULT_CANCELLED : allocation_error!=CHIAKI_ERR_SUCCESS
 					? plus_vita_play_failure(allocation_error,&provision) : collecting_sample
 					? (stream_error==CHIAKI_ERR_SUCCESS ? PLUS_VITA_RESULT_SAMPLE_SAVED : PLUS_VITA_RESULT_SAMPLE_INCOMPLETE)
-					: PLUS_VITA_RESULT_STREAM_STOPPED},0);
+					: (PLUS_VITA_ADAPTIVE_STREAM && session_input.playback_started && !user_stopped && (stream_error==CHIAKI_ERR_TIMEOUT||stream_error==CHIAKI_ERR_NETWORK||stream_error==CHIAKI_ERR_HOST_UNREACH)) ? PLUS_VITA_RESULT_NETWORK_ERROR : PLUS_VITA_RESULT_STREAM_STOPPED},0);
 				SceCtrlData released={0};
 				menu_read(&menu_controller,&released);
 				plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,

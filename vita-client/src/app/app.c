@@ -50,6 +50,10 @@ struct plus_vita_app_t {
 	char datacenters[64][128], dc_status[160], bitrate_label[64];
 	size_t dc_count, dc_page;
 	unsigned bitrate_kbps;
+	bool hud;
+	bool auto_retry;
+	char selected_dc[128];
+	unsigned requested_kbps;
 #endif
 };
 
@@ -700,10 +704,10 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 #if PLUS_VITA_PS5_EXPERIMENTAL
 static void datacenters_view(PlusVitaApp *app)
 {
-	if(!app->bitrate_kbps) app->bitrate_kbps=8000;
+	if(!app->bitrate_kbps) app->bitrate_kbps=PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000;
 	snprintf(app->dc_status,sizeof(app->dc_status),"Choose a server manually. Page %u of %u. No automatic fallback.",
 		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
-	snprintf(app->bitrate_label,sizeof(app->bitrate_label),"Bitrate: %u Mbps (change)",app->bitrate_kbps/1000);
+	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? "%s: %u Mbps (change)" : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? (app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Quality") : "Bitrate: ",app->bitrate_kbps/1000);
 	PlusVitaAppView view={.screen=PLUS_VITA_APP_DATACENTERS,.title="Choose cloud server.",
 		.subtitle="MANUAL DATACENTER",.body=app->dc_status,.hint="X  Select     O  Back"};
 	size_t first=app->dc_page*3;
@@ -723,6 +727,10 @@ static void datacenters_view(PlusVitaApp *app)
 	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BITRATE,app->bitrate_label,64,234+(int)n*38,832,32};
 	n=view.action_count;
 	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,234+(int)n*38,832,32};
+	 #if PLUS_VITA_ADAPTIVE_STREAM
+	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=228+(int)i*34;view.actions[i].height=32;}
+	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,228+(int)view.action_count*34,832,32};view.action_count++;
+ #endif
 	app->view=view;
 }
 static bool datacenters_read(PlusVitaApp *app,const char *json)
@@ -1064,6 +1072,17 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(app->waiting_for!=PLUS_VITA_EFFECT_PLAY || !event.operation || event.operation!=app->pending_operation) return effect;
 		app->pending_operation=0; app->waiting_for=PLUS_VITA_EFFECT_NONE;
 		if(event.status==PLUS_VITA_RESULT_REJECTED) return remove_saved(app, false, true);
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(event.status==PLUS_VITA_RESULT_NETWORK_ERROR&&event.playback_started&&!app->auto_retry&&plus_vita_manual_dc_valid(app->selected_dc)&&app->catalogue_count) {
+			app->auto_retry=true;
+			effect=operation(app,PLUS_VITA_EFFECT_PLAY,"Reconnecting once to your selected server at reduced bitrate. Circle cancels.",true);
+			effect.game=app->catalogue[app->matches[app->catalogue_selection]];effect.controls=app->controls;
+			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",app->selected_dc);
+			app->requested_kbps=pv_retry_rate(app->bitrate_kbps,app->requested_kbps);
+			effect.bitrate_kbps=app->requested_kbps;effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;
+			return effect;
+		}
+#endif
 		if(event.status==PLUS_VITA_RESULT_OK) catalogue_view(app);
 		#if PLUS_VITA_PS5_EXPERIMENTAL
 		else if(event.status==PLUS_VITA_RESULT_DATACENTERS) {
@@ -1241,6 +1260,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			else if(action==PLUS_VITA_ACTION_DC_PREVIOUS && app->dc_page) { app->dc_page--; datacenters_view(app); }
 			else if(action==PLUS_VITA_ACTION_DC_NEXT && (app->dc_page+1)*3<app->dc_count) { app->dc_page++; datacenters_view(app); }
 			else if(action==PLUS_VITA_ACTION_BITRATE) { app->bitrate_kbps=plus_vita_next_bitrate(app->bitrate_kbps); datacenters_view(app); }
+			else if(action==PLUS_VITA_ACTION_HUD) { app->hud=!app->hud; datacenters_view(app); }
 			else if(action==PLUS_VITA_ACTION_DATACENTER) {
 				size_t index=app->dc_page*3+view->selected;
 				if(index>=app->dc_count) return effect;
@@ -1249,6 +1269,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				effect.game=game; effect.controls=app->controls;
 				snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",app->datacenters[index]);
 				effect.bitrate_kbps=app->bitrate_kbps;
+				effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;
+				app->requested_kbps=effect.bitrate_kbps;app->auto_retry=false;
+				snprintf(app->selected_dc,sizeof(app->selected_dc),"%s",effect.datacenter);
 				return effect;
 			}
 			return effect;
@@ -1261,7 +1284,8 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect.game=game;effect.controls=app->controls;
 #if PLUS_VITA_PS5_EXPERIMENTAL
 			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",PLUS_VITA_DC_DISCOVER);
-			effect.bitrate_kbps=app->bitrate_kbps ? app->bitrate_kbps : 8000;
+			effect.bitrate_kbps=app->bitrate_kbps ? app->bitrate_kbps : (PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000);
+			effect.profile_kbps=effect.bitrate_kbps;effect.hud=app->hud;
 #endif
 			return effect;
 		}

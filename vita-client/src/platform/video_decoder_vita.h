@@ -27,6 +27,8 @@ typedef struct plus_vita_video_decoder_t
 	unsigned int outputs;
 	uint64_t last_prepare_us;
 	uint64_t last_decode_us;
+	uint8_t *input_buffer;
+	size_t input_capacity;
 	bool module_loaded;
 	bool library_initialized;
 	bool decoder_created;

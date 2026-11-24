@@ -78,7 +78,8 @@ PlusVitaVideoReorderEvent plus_vita_video_reorder_poll(
 		window->waiting_since_us = first_future_us;
 	}
 	uint64_t wait_us = elapsed(now_us, window->waiting_since_us);
-	if(!pressure && wait_us < PLUS_VITA_VIDEO_REORDER_GRACE_US) return event;
+	unsigned grace=window->grace_us ? window->grace_us : PLUS_VITA_VIDEO_REORDER_GRACE_US;
+	if(!pressure && wait_us < grace) return event;
 	event.action = PLUS_VITA_VIDEO_REORDER_DROP;
 	event.slot = head;
 	event.index = window->next;

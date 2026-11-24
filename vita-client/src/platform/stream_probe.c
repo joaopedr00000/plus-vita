@@ -8,6 +8,7 @@
 #include "audio_playback_vita.h"
 #include "video_fec.h"
 #include "video_reorder.h"
+#include "adaptive_stream.h"
 #include "diagnostic_log.h"
 #include "feedback_latency.h"
 #include "input_vita.h"
@@ -183,6 +184,8 @@ typedef struct plus_vita_stream_probe_t
 	unsigned int queue_head;
 	unsigned int queue_count;
 	unsigned int queue_peak;
+	unsigned profile_kbps, local_queue_resyncs;
+	uint64_t video_rx_bytes;
 	unsigned int incomplete_frames;
 	unsigned int stale_packets;
 	ProbeVideoAssembly video_assembly[PLUS_VITA_VIDEO_REORDER_SLOTS];
@@ -724,6 +727,21 @@ static ChiakiErrorCode probe_video_submit(PlusVitaStreamProbe *probe,
 		probe_video_assembly_reset(assembly);
 		return CHIAKI_ERR_SUCCESS;
 	}
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	/* Drop the entire pending reference chain only with an explicit IDR recovery.
+	 * Never feed dependent P frames after local backlog discard. */
+	if(!probe->capture_only && probe->video_decoded_frame && probe->queue_count>=pv_profile_queue(probe->profile_kbps) && !probe->awaiting_recovery_idr) {
+		while(probe->queue_count) {
+			free(probe->queue[probe->queue_head].data);
+			memset(&probe->queue[probe->queue_head],0,sizeof(probe->queue[0]));
+			probe->queue_head=(probe->queue_head+1)%PROBE_QUEUE_MAX;probe->queue_count--;
+		}
+		probe->local_queue_resyncs++;
+		probe->recovery_output_pending=false;
+		ChiakiErrorCode recovery=probe_begin_video_recovery(probe,assembly->frame_index,assembly->frame_index);
+		if(recovery!=CHIAKI_ERR_SUCCESS){free(frame);return recovery;}
+	}
+#endif
 	bool guarded_idr = false;
 	if(!probe->capture_only)
 	{
@@ -1407,6 +1425,7 @@ static void probe_takion_cb(ChiakiTakionEvent *event, void *user)
 		if(event->av->is_video)
 		{
 			probe->video_packets++;
+			probe->video_rx_bytes+=event->av->data_size;
 			if(probe->video_packets == 1)
 				CHIAKI_LOGI(probe->log,
 					"Stream probe first video packet received: %lu bytes",
@@ -1589,6 +1608,9 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 	uint64_t last_heartbeat = started;
 	const uint64_t first_frame_timeout = probe->ps3_live ? PS3_MEDIA_START_TIMEOUT_MS : PROBE_TIMEOUT_MS;
 	uint64_t first_display = 0, last_display = 0;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	uint64_t hud_at=started,hud_rx=0;unsigned hud_frames=0,hud_saved=0,hud_expired=0;char hud_line[180]={0};
+#endif
 	unsigned int displayed = 0;
 	unsigned int decoded = 0, presentation_skips = 0;
 	unsigned int recovery_generation_fed = 0;
@@ -1755,6 +1777,18 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			err = probe_send_heartbeat_if_due(probe, now, &last_heartbeat);
 			if(err != CHIAKI_ERR_SUCCESS) break;
 		}
+		#if PLUS_VITA_ADAPTIVE_STREAM
+		if(now-hud_at>=1000) {
+			unsigned saved=probe->reorder_saved_frames-hud_saved,expired=probe->reorder_expired_frames-hud_expired;
+			probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);
+			unsigned rx=(unsigned)((probe->video_rx_bytes-hud_rx)*8/(now-hud_at));
+			unsigned fps=(unsigned)((uint64_t)(displayed-hud_frames)*1000/(now-hud_at));
+			snprintf(hud_line,sizeof(hud_line),"FPS %u  RX %u kbps  RTT %llu ms  Q %u  WAIT %u ms  DEC %llu us  GAP %u  RESYNC %u",
+				fps,rx,(unsigned long long)(probe->provision->rtt_us/1000),probe->queue_count,probe->video_reorder.grace_us/1000,
+				(unsigned long long)probe->video_decoder.last_decode_us,expired,probe->local_queue_resyncs);
+			hud_at=now;hud_rx=probe->video_rx_bytes;hud_frames=displayed;hud_saved=probe->reorder_saved_frames;hud_expired=probe->reorder_expired_frames;
+		}
+#endif
 		if(probe->state == PROBE_EXPECT_MEDIA && now - last_feedback >= 200)
 		{
 			probe_reception_flush(probe, false);
@@ -1887,6 +1921,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 		if(produced)
 		{
 			probe->video_decoded_frame = true;
+			if(probe->input)probe->input->playback_started=true;
 			decoded++;
 			/* Preserve every compressed reference frame. Only discard an
 			 * already-decoded display update when catching up; its back
@@ -1897,6 +1932,9 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 				|| sceKernelGetProcessTimeWide() / 1000u - last_display >= 100;
 			if(show)
 			{
+#if PLUS_VITA_ADAPTIVE_STREAM
+				if(probe->input&&probe->input->hud&&probe->input->paint_hud&&hud_line[0])probe->input->paint_hud(probe->input->hud_context,plus_vita_video_present_back_buffer(&present),hud_line);
+#endif
 				chiaki_mutex_unlock(&probe->mutex);
 				native_result = plus_vita_video_present_frame(&present);
 				display_sum += present.last_display_us;
@@ -2376,6 +2414,11 @@ ChiakiErrorCode plus_vita_stream_probe_with_pump(const ChiakiCloudProvisionResul
 		.ps3_live = (PLUS_VITA_PS3_LIVE || PLUS_VITA_RELEASE_PS3)
 			&& !strcmp(provision->platform, "ps3"),
 		.capture_only = plus_vita_stream_probe_collects_sample(provision) };
+	if(input)input->playback_started=false;
+	probe.profile_kbps=pv_profile_cap(input?input->profile_kbps:15000);
+#if PLUS_VITA_ADAPTIVE_STREAM
+	probe.video_reorder.grace_us=pv_profile_reorder(probe.profile_kbps);
+#endif
 	if(input && plus_vita_control_layout_valid(&input->layout)) probe.controls=input->layout;
 	else plus_vita_control_layout_defaults(&probe.controls);
 	CHIAKI_LOGI(log, "Stream probe build=%s", PLUS_VITA_STREAM_PROBE_BUILD);

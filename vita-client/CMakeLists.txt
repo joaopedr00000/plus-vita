@@ -13,6 +13,7 @@ option(PLUS_VITA_RELEASE_CANDIDATE "Build the anonymous distribution profile" OF
 option(PLUS_VITA_PS5_EXPERIMENTAL "Manual datacenter picker and experimental PS5 cloud H.264" OFF)
 option(PLUS_VITA_BETA1 "Build the separately identified PS5 Cloud beta" OFF)
 option(PLUS_VITA_BETA2 "Build Beta 2 with experimental QR pairing" OFF)
+option(PLUS_VITA_BETA3 "Build adaptive streaming beta" OFF)
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
   message(FATAL_ERROR "Unsupported Plus-Vita distribution version")
@@ -76,6 +77,14 @@ if(PLUS_VITA_BETA2)
   set(VITA_APP_NAME "Plus-Vita Beta 2")
   set(VITA_VERSION "00.15")
   set(PLUS_VITA_PUBLIC_VERSION "v0.1.0-beta.2")
+endif()
+if(PLUS_VITA_BETA3)
+  if(NOT PLUS_VITA_BETA2 OR PLUS_VITA_PS3_STARTUP_SAMPLE OR PLUS_VITA_PS3_REPLAY OR PLUS_VITA_PS3_LIVE)
+    message(FATAL_ERROR "Beta3 requires Beta2 graphical release profile")
+  endif()
+  set(VITA_APP_NAME "Plus-Vita Beta 3")
+  set(VITA_VERSION "00.16")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.1.0-beta.3")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -827,6 +836,7 @@ if(PLUS_VITA_BETA2)
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   PLUS_VITA_QR_PAIRING=$<BOOL:${PLUS_VITA_BETA2}>
+  PLUS_VITA_ADAPTIVE_STREAM=$<BOOL:${PLUS_VITA_BETA3}>
   PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
   PLUS_VITA_PS3_STARTUP_SAMPLE=$<BOOL:${PLUS_VITA_PS3_STARTUP_SAMPLE}>

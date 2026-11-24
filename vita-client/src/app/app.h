@@ -41,7 +41,7 @@ typedef enum {
 	PLUS_VITA_ACTION_BIND_ACTION, PLUS_VITA_ACTION_FRONT_MOTION, PLUS_VITA_ACTION_CONTROL_DEFAULTS,
 	PLUS_VITA_ACTION_SAVE_CONTROLS, PLUS_VITA_ACTION_CANCEL_CONTROLS,
 	PLUS_VITA_ACTION_BIND_PREVIOUS, PLUS_VITA_ACTION_BIND_NEXT,
-	PLUS_VITA_ACTION_DATACENTER, PLUS_VITA_ACTION_DC_PREVIOUS, PLUS_VITA_ACTION_DC_NEXT, PLUS_VITA_ACTION_BITRATE, PLUS_VITA_ACTION_QR_PAIR
+	PLUS_VITA_ACTION_DATACENTER, PLUS_VITA_ACTION_DC_PREVIOUS, PLUS_VITA_ACTION_DC_NEXT, PLUS_VITA_ACTION_BITRATE, PLUS_VITA_ACTION_QR_PAIR, PLUS_VITA_ACTION_HUD
 } PlusVitaAppAction;
 typedef struct {
 	PlusVitaAppAction id;
@@ -119,6 +119,7 @@ typedef struct {
 	const PlusVitaCatalogEntry *entries;
 	size_t entry_count;
 	bool restore_blocked, retained_json;
+	bool playback_started;
 	bool log_available;
 	unsigned play_stage;
 	char store_country[8], store_language[8], language[8];
@@ -145,6 +146,8 @@ typedef struct {
 	PlusVitaCatalogEntry game;
 	char datacenter[128]; /* Empty only in legacy builds. */
 	unsigned bitrate_kbps;
+	unsigned profile_kbps;
+	bool hud;
 	char store_country[8], store_language[8], language[8];
 	PlusVitaControlLayout controls;
 } PlusVitaAppEffect;

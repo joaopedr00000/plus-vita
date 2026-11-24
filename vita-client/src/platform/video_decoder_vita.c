@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 #include "video_decoder_vita.h"
+#include "adaptive_stream.h"
 
 #include <psp2/sysmodule.h>
 #include <psp2/kernel/processmgr.h>
@@ -69,6 +70,7 @@ void plus_vita_video_decoder_fini(PlusVitaVideoDecoder *decoder)
 		sceVideodecTermLibrary(SCE_VIDEODEC_TYPE_HW_AVCDEC);
 	if(decoder->module_loaded)
 		sceSysmoduleUnloadModule(SCE_SYSMODULE_AVCDEC);
+	free(decoder->input_buffer);
 	memset(decoder, 0, sizeof(*decoder));
 	decoder->decoder_block = -1;
 }
@@ -182,7 +184,17 @@ int plus_vita_video_decoder_decode(PlusVitaVideoDecoder *decoder,
 	}
 
 	size_t input_size = header_size + frame_size;
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	/* Reuse synchronous submission scratch memory; preserve header and padding. */
+	if(decoder->input_capacity<input_size+AVC_INPUT_PADDING){
+		uint8_t *next=realloc(decoder->input_buffer,input_size+AVC_INPUT_PADDING);
+		if(!next)return -1;
+		decoder->input_buffer=next;decoder->input_capacity=input_size+AVC_INPUT_PADDING;
+	}
+	uint8_t *input=decoder->input_buffer;
+#else
 	uint8_t *input = malloc(input_size + AVC_INPUT_PADDING);
+#endif
 	if(!input)
 	{
 		CHIAKI_LOGE(decoder->log, "Vita AVC decode input allocation failed: size=%lu",
@@ -218,7 +230,9 @@ int plus_vita_video_decoder_decode(PlusVitaVideoDecoder *decoder,
 	start = sceKernelGetProcessTimeWide();
 	int result = sceAvcdecDecode(&decoder->decoder, &au, &pictures);
 	decoder->last_decode_us = sceKernelGetProcessTimeWide() - start;
+	#if !PLUS_VITA_ADAPTIVE_STREAM
 	free(input);
+#endif
 	decoder->submissions++;
 	if(result < 0 || decoder->submissions <= 4 || decoder->submissions % 60 == 0)
 		CHIAKI_LOGI(decoder->log,

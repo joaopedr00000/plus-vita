@@ -12,6 +12,11 @@
 typedef struct {
 	PlusVitaControlLayout layout;
 	PlusVitaController controller;
+	unsigned profile_kbps;
+	bool playback_started;
+	bool hud;
+	void (*paint_hud)(void *context,uint32_t *pixels,const char *line);
+	void *hud_context;
 } PlusVitaStreamInput;
 
 #if PLUS_VITA_INPUT_WORKER && PLUS_VITA_DEFERRED_LOG

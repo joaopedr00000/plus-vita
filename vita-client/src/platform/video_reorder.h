@@ -21,6 +21,7 @@ typedef struct {
 	bool started, waiting;
 	uint16_t next;
 	uint64_t waiting_since_us;
+	unsigned grace_us; /* zero preserves the original fixed grace */
 	PlusVitaVideoReorderSlot slots[PLUS_VITA_VIDEO_REORDER_SLOTS];
 } PlusVitaVideoReorder;
 typedef enum {
