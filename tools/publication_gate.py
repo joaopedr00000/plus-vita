@@ -100,7 +100,7 @@ def self_segments(data):
         yield segment
 
 
-RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13'}
+RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13', 'beta1': b'00.14'}
 
 
 def package_findings(vpk, root, version='v000'):
@@ -157,7 +157,8 @@ def package_findings(vpk, root, version='v000'):
                         raise ValueError('invalid_app_identity')
                     name=data[keys+key:data.index(b'\0',keys+key)]
                     identity[name]=data[values+offset:values+offset+length].rstrip(b'\0')
-                if identity.get(b'APP_VER')!=RELEASE_APP_VERSIONS[version] or identity.get(b'TITLE_ID')!=b'PLVT00001' or identity.get(b'TITLE')!=b'Plus-Vita':
+                title_id, title = (b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita')
+                if identity.get(b'APP_VER')!=RELEASE_APP_VERSIONS[version] or identity.get(b'TITLE_ID')!=title_id or identity.get(b'TITLE')!=title:
                     errors['package.app_identity'] += 1
     return errors
 
@@ -248,7 +249,7 @@ def main():
         errors['gate.unreadable_or_unsupported_input'] += 1
     report = {'software_privacy_pass': not errors, 'checks': checks,
               'findings': dict(errors), 'counts': dict(stats),
-              'hardware_release_gate': 'pending_54' if args.version == 'v002' else 'pending_23',
+              'hardware_release_gate': 'pending_beta1_hardware' if args.version == 'beta1' else ('pending_54' if args.version == 'v002' else 'pending_23'),
               'publication_authorized': False}
     encoded = json.dumps(report, indent=2) + '\n'
     if args.report:
