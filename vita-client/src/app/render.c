@@ -2,6 +2,7 @@
 #include "render.h"
 #include <string.h>
 #include "../platform/build_identity.h"
+#include "../platform/adaptive_stream.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #endif
