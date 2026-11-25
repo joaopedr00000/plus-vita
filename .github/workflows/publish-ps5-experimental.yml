@@ -1,0 +1,55 @@
+name: Publish validated PS5 cloud experimental build
+on:
+  push:
+    branches:
+      - 'release/ps5-experimental-1'
+    paths:
+      - '.github/workflows/publish-ps5-experimental.yml'
+      - 'release/ps5-experimental-1.md'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/ps5-experimental-1'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vitaplus-ps5-experimental-1
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: 'faf5ac60ef9dbe45efd1e45510820a4c0e4cffcd'
+      SOURCE_RUN: '45635069629'
+      ARTIFACT_ID: '15032379083'
+      RELEASE_TAG: 'v0.0.2-ps5-experimental.1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify successful source run and exact artifact
+        run: |
+          set -eu
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > /tmp/vp-run.json
+          jq -e --arg sha "$SOURCE_SHA" '.head_sha == $sha and .status == "completed" and .conclusion == "success"' /tmp/vp-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > /tmp/vp-artifact.json
+          jq -e '.expired == false and .name == "plus-vita-v0.0.2"' /tmp/vp-artifact.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts" | jq -e --argjson id "$ARTIFACT_ID" '.artifacts | any(.id == $id and .expired == false)'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: '45635069629'
+          name: plus-vita-v0.0.2
+          path: dist
+      - name: Verify and publish separate prerelease
+        run: |
+          set -eu
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          test -s dist/VitaPlus-v0.0.2.vpk
+          python3 tools/publication_gate.py --version v0.0.2 --vpk dist/VitaPlus-v0.0.2.vpk
+          mv dist/VitaPlus-v0.0.2.vpk dist/VitaPlus-v0.0.2-ps5-experimental.1.vpk
+          (cd dist && sha256sum VitaPlus-v0.0.2-ps5-experimental.1.vpk > SHA256SUMS.txt)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; refusing overwrite."
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" dist/VitaPlus-v0.0.2-ps5-experimental.1.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --title "VitaPlus — PS5 Cloud Server Fix (Experimental 1)" --notes-file release/ps5-experimental-1.md --prerelease --latest=false
