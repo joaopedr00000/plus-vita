@@ -20,11 +20,24 @@
 #define DURATION 180000000ULL
 static bool qr_screen(PlusVitaPairFrame frame,void *ctx,const char *heading,const char *message,const char *content)
 {
-	uint8_t temp[qrcodegen_BUFFER_LEN_FOR_VERSION(6)],qr[qrcodegen_BUFFER_LEN_FOR_VERSION(6)];
-	unsigned char modules[41*41]={0};
-	bool ok=qrcodegen_encodeText(content,temp,qr,qrcodegen_Ecc_MEDIUM,1,6,qrcodegen_Mask_AUTO,true);
+	uint8_t temp[qrcodegen_BUFFER_LEN_FOR_VERSION(9)],qr[qrcodegen_BUFFER_LEN_FOR_VERSION(9)];
+	unsigned char modules[53*53]={0};
+	bool ok=qrcodegen_encodeText(content,temp,qr,qrcodegen_Ecc_MEDIUM,1,9,qrcodegen_Mask_AUTO,true);
 	if(ok){int n=qrcodegen_getSize(qr);for(int y=0;y<n;y++)for(int x=0;x<n;x++)modules[y*n+x]=qrcodegen_getModule(qr,x,y);ok=frame(ctx,heading,message,modules,n,NULL);}
 	plus_vita_pair_clear(temp,sizeof(temp));plus_vita_pair_clear(qr,sizeof(qr));plus_vita_pair_clear(modules,sizeof(modules));return ok;
+}
+/* QR URLs go only to Sony. The unique fragment is never sent in HTTP requests.
+ * It is navigation metadata, not an OAuth credential or a pairing authorization. */
+static bool sony_page(PlusVitaPairFrame frame,void *ctx,const char *heading,const char *message,const char *base)
+{
+	uint8_t nonce[16]={0};char url[128]={0},hex[33]={0};
+	if(sceKernelGetRandomNumber(nonce,sizeof(nonce))<0)return false;
+	unsigned nonzero=0;
+	for(unsigned i=0;i<sizeof(nonce);i++){nonzero|=nonce[i];snprintf(hex+2*i,3,"%02x",(unsigned)nonce[i]);}
+	int n=snprintf(url,sizeof(url),"%s#pv-%s",base,hex);
+	bool ok=nonzero&&n>0&&(size_t)n<sizeof(url)&&qr_screen(frame,ctx,heading,message,url);
+	plus_vita_pair_clear(nonce,sizeof(nonce));plus_vita_pair_clear(hex,sizeof(hex));plus_vita_pair_clear(url,sizeof(url));
+	return ok;
 }
 static unsigned buttons(void){SceCtrlData data={0};sceCtrlPeekBufferPositive(0,&data,1);return data.buttons;}
 static bool next_page(uint64_t start)
@@ -35,6 +48,20 @@ static bool next_page(uint64_t start)
 		if(pressed&SCE_CTRL_CROSS)return true;
 		sceKernelDelayThread(20000);
 	}return false;
+}
+PlusVitaAppResult plus_vita_sony_login(PlusVitaPairFrame frame,void *ctx,bool sign_in_first)
+{
+	if(!frame)return PLUS_VITA_RESULT_UNSUPPORTED;
+	if(sign_in_first){
+		if(!sony_page(frame,ctx,"1 / 2  Official Sony sign-in","Scan with your phone. Sign in ONLY at playstation.com using your email and password or passkey. Complete Sony verification. X Next / O Cancel","https://www.playstation.com/"))return PLUS_VITA_RESULT_UNSUPPORTED;
+		if(!next_page(sceKernelGetProcessTimeWide()))return PLUS_VITA_RESULT_CANCELLED;
+	}
+	if(!sony_page(frame,ctx,sign_in_first?"2 / 2  Sony token":"Open the official Sony token page","Use the same signed-in phone browser. If needed, sign in at playstation.com first. Read only the 64-character npsso value. X Enter token privately / O Cancel","https://ca.account.sony.com/api/v1/ssocookie"))return PLUS_VITA_RESULT_UNSUPPORTED;
+	if(!next_page(sceKernelGetProcessTimeWide()))return PLUS_VITA_RESULT_CANCELLED;
+	/* Erase both display buffers before invoking the masked IME. */
+	frame(ctx,"Enter the Sony token","Never enter your Sony password here.",NULL,0,NULL);
+	frame(ctx,"Enter the Sony token","Never enter your Sony password here.",NULL,0,NULL);
+	return PLUS_VITA_RESULT_OK;
 }
 PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap)
 {

@@ -141,7 +141,7 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
 	for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=RGB(8,25,58);
 	plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,RGB(240,245,255));
 	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,RGB(235,240,255));
-	if(qr && n>0 && n<=41) {
+	if(qr && n>0 && n<=53) {
 		int scale=340/(n+8),size=(n+8)*scale;
 		for(int y=0;y<size;y++)for(int x=0;x<size;x++){
 			int qx=x/scale-4,qy=y/scale-4;
@@ -391,6 +391,24 @@ int plus_vita_app_run(void)
 				if(effect.kind == PLUS_VITA_EFFECT_PREPARE_SETUP)
 					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_SETUP_READY, .operation = effect.operation },0);
 				#if PLUS_VITA_QR_PAIRING
+				else if(effect.kind==PLUS_VITA_EFFECT_SONY_LOGIN||effect.kind==PLUS_VITA_EFFECT_TOKEN_LOGIN){
+					char json[80]={0};
+					PlusVitaCredential token={0};PlusVitaCredentialImeResult keyboard={0};
+					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?
+						plus_vita_sony_login(pair_frame,display,effect.kind==PLUS_VITA_EFFECT_SONY_LOGIN):PLUS_VITA_RESULT_BUSY;
+					if(status==PLUS_VITA_RESULT_OK){
+						plus_vita_credential_ime_read_masked(&token,&keyboard);
+						status=!keyboard.initialized?PLUS_VITA_RESULT_UNSUPPORTED:!keyboard.accepted?PLUS_VITA_RESULT_CANCELLED:!keyboard.validated?PLUS_VITA_RESULT_STORAGE_ERROR:PLUS_VITA_RESULT_OK;
+						if(status==PLUS_VITA_RESULT_OK && (token.length!=64||snprintf(json,sizeof(json),"{\"npsso\":\"%s\"}",token.value)!=76))status=PLUS_VITA_RESULT_STORAGE_ERROR;
+					}
+					plus_vita_credential_clear(&token);
+					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
+					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_IMPORT_READ,.operation=effect.operation,.status=status,.data=json,.data_size=strlen(json)},0);
+					volatile char *wipe=json;for(size_t i=0;i<sizeof(json);i++)wipe[i]=0;
+					SceCtrlData after={0};menu_read(&menu_controller,&after);
+					plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.buttons=after.buttons,.left_x=after.lx,.left_y=after.ly,.time_us=sceKernelGetProcessTimeWide()}});
+					touched=true;previous_poll=flow.input_since=0;
+				}
 				else if(effect.kind==PLUS_VITA_EFFECT_QR_PAIR) {
 					char json[80]={0};
 					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_qr_pair(pair_frame,display,json,sizeof(json)):PLUS_VITA_RESULT_BUSY;

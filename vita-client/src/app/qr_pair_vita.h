@@ -3,5 +3,6 @@
 #define PLUS_VITA_QR_PAIR_VITA_H
 #include "app.h"
 typedef bool (*PlusVitaPairFrame)(void *,const char *,const char *,const unsigned char *,int,const uint32_t *);
+PlusVitaAppResult plus_vita_sony_login(PlusVitaPairFrame frame,void *context,bool sign_in_first);
 PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *context,char *json,size_t cap);
 #endif

@@ -1,5 +1,11 @@
 # Connect your own Sony account
 
+## Beta 3: sign in on Sony without transferring files
+
+Choose **Sign in on Sony (email / passkey)** to open the real PlayStation website on your phone with a unique QR. Complete all sign-in prompts on Sony's website. The second QR opens Sony's own token-response endpoint in the same browser. Choose Cross and type only the 64-character NPSSO in the masked Vita keyboard. If already signed in, choose **QR login / enter token (no files)** to skip the first page. No HTML download, VitaShell transfer, password or verification code is required by the Vita app in this mode. The token is validated by the existing account workflow and the temporary UI buffers are cleared. Turn Remember off if you do not want the app-managed locally readable token saved. A fresh QR navigation nonce is generated on each page; it does not grant authorization or change Sony's regional policy. This flow still requires manual token entry and is not official Sony device-code authorization.
+
+Never enter your Sony email or password in a third-party login form. The Plus-Vita screens are not Sony screens. Only enter them on the actual official Sony site.
+
 ## Beta 2: experimental encrypted optical QR pairing
 
 1. Download the [offline pairing helper](../release/qr-pairing.html) as a local HTML file on your phone or PC. Open it in a browser supporting local Web Crypto. It makes no network requests itself.
@@ -8,7 +14,7 @@
 4. Press Cross on Vita and aim its rear camera at the generated QR. Only an authenticated response for this session is accepted. A new key mixes 256 bits of kernel-generated cryptographic entropy with a local hardware network discriminator; the raw MAC address is never displayed or transmitted. No static pairing QR or predictable fallback is used. A different device/session is rejected even if it uses the same Sony account. Absolute mathematical collision-free operation cannot be guaranteed offline; the cryptographic collision risk is negligible. The key expires after three minutes. The result uses the existing sign-in validator and does not write the original JSON import file.
 5. Keep both screens private, clear the clipboard, and never screenshot or share either code. Remember still governs locally readable saved credentials. This is not Sony's official device-code login.
 
-Camera operation and browser compatibility need hardware testing. If either fails, use Import JSON (including PS TV). Never paste a credential into an online QR generator.
+Camera operation and browser compatibility need hardware testing. If either fails, use the no-file token keyboard flow or Import JSON (including PS TV). Never paste a credential into an online QR generator.
 
 ## Save your sign-in JSON on a phone or PC
 

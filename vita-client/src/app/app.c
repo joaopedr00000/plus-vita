@@ -357,18 +357,22 @@ static void setup_view(PlusVitaApp *app)
 	};
 #if PLUS_VITA_QR_PAIRING
 	app->view.title="Connect your Sony account.";
-	app->view.body="Pair using your phone and the Vita camera, or import JSON.\nRemembered account files remain locally readable.";
+	app->view.body="Sign in only on Sony. No password is requested by Plus-Vita.\nChoose browser login, encrypted QR pairing, or JSON import.";
 	app->view.actions[0].y=284;app->view.actions[0].height=48;
 	app->view.actions[1].y=336;app->view.actions[1].height=48;
 	app->view.actions[3]=app->view.actions[2];
-	app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_QR_PAIR,"Pair with QR code",64,390,832,48};
-	app->view.action_count=4;
+	app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_SONY_LOGIN,"Sign in on Sony (email / passkey)",64,0,832,40};
+	app->view.actions[3]=(PlusVitaAppButton){PLUS_VITA_ACTION_TOKEN_LOGIN,"QR login / enter token (no files)",64,0,832,40};
+	app->view.actions[4]=(PlusVitaAppButton){PLUS_VITA_ACTION_QR_PAIR,"Encrypted QR (offline helper)",64,0,832,40};
+	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,40};
+	app->view.action_count=6;
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*40;app->view.actions[i].height=34;}
 #endif
 #if PLUS_VITA_ADAPTIVE_STREAM
-	app->view.actions[4]=app->view.actions[app->view.action_count-1];
+	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
 	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,40};
 	app->view.action_count++;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=268+(int)i*46;app->view.actions[i].height=40;}
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*40;app->view.actions[i].height=34;}
 #endif
 }
 
@@ -1323,6 +1327,10 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(action == PLUS_VITA_ACTION_IMPORT)
 			return import_account(app);
 #if PLUS_VITA_QR_PAIRING
+		else if((action==PLUS_VITA_ACTION_SONY_LOGIN||action==PLUS_VITA_ACTION_TOKEN_LOGIN)&&view->screen==PLUS_VITA_APP_SETUP) {
+			effect=import_account(app);effect.kind=action==PLUS_VITA_ACTION_SONY_LOGIN?PLUS_VITA_EFFECT_SONY_LOGIN:PLUS_VITA_EFFECT_TOKEN_LOGIN;
+			view->body="Sign in privately in Sony's browser. Circle cancels.";return effect;
+		}
 		else if(action == PLUS_VITA_ACTION_QR_PAIR && view->screen==PLUS_VITA_APP_SETUP) {
 			effect=import_account(app);
 			effect.kind=PLUS_VITA_EFFECT_QR_PAIR;
