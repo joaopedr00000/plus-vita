@@ -54,7 +54,7 @@ struct plus_vita_app_t {
 	unsigned binding_input;
 	size_t binding_focus, binding_first, action_focus, action_first, catalogue_first;
 	char controls_status[256], binding_labels[5][256];
-	char controls_help[1024];
+	char controls_help[2048];
 #if PLUS_VITA_PS5_EXPERIMENTAL
 	char datacenters[64][128], dc_status[160], bitrate_label[64];
 	size_t dc_count, dc_page;
@@ -263,13 +263,13 @@ static void controls_view(PlusVitaApp *app)
 	if(app->control_device==PLUS_VITA_DEVICE_DS3 || app->control_device==PLUS_VITA_DEVICE_DS4) {
 		bool ds4=app->control_device==PLUS_VITA_DEVICE_DS4;
 		snprintf(app->controls_help,sizeof(app->controls_help),
-			"%s: pair in PS TV system settings using USB + PS.\n"
+			PV_TR("%s: pair in PS TV system settings using USB + PS.\n"
 			"Menus: D-pad/stick, Cross selects, Circle goes back.\n"
 			"Physical buttons, sticks, L1/R1, L2/R2 and L3/R3 work in games.\n"
 			"Control mapping: assign a button to cloud touchpad click.\n"
 			"Touchpad movement, motion and rumble are unavailable.\n"
 			"Hold %s for 2 seconds to stop.\n"
-			"Reconnect, then release all controls before playing.",
+			"Reconnect, then release all controls before playing."),
 			ds4 ? "DualShock 4" : "DualShock 3",ds4 ? "OPTIONS + SHARE" : "START + SELECT");
 		app->view.body=app->controls_help;
 	}

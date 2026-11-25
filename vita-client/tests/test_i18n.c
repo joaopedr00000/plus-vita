@@ -21,6 +21,13 @@ int main(void){
         assert(strstr(pv_about_exit[l][0],"GTA VI") && strstr(pv_about_exit[l][0],"Plus-Vita"));
         assert(!strstr(pv_translate(l,"ABOUT VITAPLUS"),"PLUS-VITA"));
         assert(!strstr(pv_translate(l,"EXIT VITAPLUS"),"PLUS-VITA"));
+        for(unsigned k=0;k<PV_CONTROL_HELP_COUNT;k++){
+            assert(pv_control_help[l][k] && *pv_control_help[l][k]);
+            assert(!strcmp(pv_translate(l,pv_control_help[0][k]),pv_control_help[l][k]));
+        }
+        const char *fmt=pv_control_help[l][1]; unsigned slots=0;
+        while((fmt=strchr(fmt,'%'))!=NULL){assert(fmt[1]=='s');++slots;fmt+=2;}
+        assert(slots==2);
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
@@ -48,5 +55,7 @@ int main(void){
     assert(!strcmp(pv_translate(2,"ABOUT VITAPLUS"),"SOBRE O VITAPLUS"));
     assert(!strcmp(pv_translate(2,"EXIT VITAPLUS"),"SAIR DO VITAPLUS"));
     assert(strstr(pv_translate(2,pv_about_exit[0][0]),"ganância"));
+    assert(strstr(pv_translate(2,pv_control_help[0][0]),"Toque traseiro"));
+    assert(!strcmp(pv_translate(2,"L2 button"),"Botão L2"));
     puts("19 locale tables validated");return 0;
 }
