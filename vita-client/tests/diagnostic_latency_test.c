@@ -32,7 +32,7 @@ int main(void)
 	plus_vita_diagnostic_stream_timing_end(&write_call, &mutex_wait);
 	assert(write_call.count == 1 && mutex_wait.count == 1);
 	plus_vita_diagnostic_end();
-	FILE *file = fopen("plus-vita-allocation.log", "r");
+	FILE *file = fopen("VitaPlus.log", "r");
 	assert(file);
 	char line[512];
 	bool redacted = false;

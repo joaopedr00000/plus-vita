@@ -346,7 +346,7 @@ int plus_vita_app_run(void)
 			plus_vita_diagnostic_event(interruption==PLUS_VITA_RECOVERY_SLEEP ? "recovery.sleep" : "recovery.wifi",0);
 			handle_input(&flow,account,play,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_INTERRUPTED,
 				.status=interruption==PLUS_VITA_RECOVERY_SLEEP ? PLUS_VITA_RESULT_SLEEP : PLUS_VITA_RESULT_NETWORK_ERROR});
-			if(flow.cancel_account && workers_idle) plus_vita_diagnostic_ui_end();
+			if(flow.cancel_account && workers_idle) plus_vita_diagnostic_event("attempt.end",0);
 			plus_vita_recovery_acknowledge();
 			current=plus_vita_app_view(app);
 		}
@@ -508,7 +508,7 @@ int plus_vita_app_run(void)
 							plus_vita_diagnostic_event("allocation.complete",(int)CHIAKI_ERR_NETWORK);
 							plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
 								.operation=effect.operation,.status=!recovery_ready ? PLUS_VITA_RESULT_SERVICE_ERROR : PLUS_VITA_RESULT_NETWORK_ERROR},0);
-							plus_vita_diagnostic_ui_end();
+							plus_vita_diagnostic_event("attempt.end",0);
 						}
 					}
 				}
@@ -560,7 +560,7 @@ int plus_vita_app_run(void)
 					&& provision.error_message && !strcmp(provision.error_message,PLUS_VITA_DC_LIST_READY)) {
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
 						.operation=operation,.status=PLUS_VITA_RESULT_DATACENTERS,.data=provision.datacenter_pings},0);
-					plus_vita_diagnostic_ui_end();
+					plus_vita_diagnostic_event("attempt.end",0);
 					plus_vita_play_result_clear(&provision);
 					flow.dirty=true;
 					continue;
@@ -603,9 +603,9 @@ int plus_vita_app_run(void)
 				plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_CANCEL},0);
 				flow.dirty=true;
 			}
-			/* Complete/cancelled attempts stay readable on disk while browsing.
-			 * No old allocation worker remains to produce into the next log. */
-			plus_vita_diagnostic_ui_end();
+			/* Keep all attempts in this launch's log. The writer flushes each record. */
+			plus_vita_diagnostic_event("attempt.end",0);
+			plus_vita_diagnostic_ui_flush();
 			plus_vita_play_result_clear(&provision);
 		} else if(play && plus_vita_app_view(app).operation) {
 			unsigned stage=plus_vita_play_stage(play);

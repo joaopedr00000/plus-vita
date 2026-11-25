@@ -18,7 +18,7 @@
 #elif defined(__vita__)
 #define PLUS_VITA_DIAGNOSTIC_PATH PLUS_VITA_DIAGNOSTIC_VITA_PATH
 #else
-#define PLUS_VITA_DIAGNOSTIC_PATH "plus-vita-allocation.log"
+#define PLUS_VITA_DIAGNOSTIC_PATH "VitaPlus.log"
 #endif
 
 static FILE *diagnostic_file;
@@ -31,6 +31,39 @@ static bool diagnostic_stream_timing;
 static PlusVitaLatencyStats diagnostic_write_call, diagnostic_mutex_wait;
 static bool diagnostic_io_ok;
 static uint64_t diagnostic_started_us;
+static time_t diagnostic_wall_start;
+static char diagnostic_start_utc[32];
+
+/* Local RTC wall clock at launch; elapsed monotonic time keeps record ordering
+ * meaningful even if the system clock changes during streaming. */
+static void diagnostic_timestamp(char out[32],uint64_t elapsed_ms)
+{
+	struct tm utc;
+	time_t stamp=diagnostic_wall_start;
+	if(stamp!=(time_t)-1)stamp+=(time_t)(elapsed_ms/1000u);
+	if(stamp==(time_t)-1||!gmtime_r(&stamp,&utc)||
+		!strftime(out,32,"%Y-%m-%dT%H:%M:%SZ",&utc))
+		strcpy(out,"unavailable");
+}
+static FILE *diagnostic_open(void)
+{
+	FILE *f=fopen(PLUS_VITA_DIAGNOSTIC_PATH,"w");
+#if defined(__vita__) && !PLUS_VITA_PS3_REPLAY
+	/* Only remove known former names, never unrelated log or credential files. */
+	if(f){
+		remove("ux0:data/plus-vita-allocation.log");
+		remove("ux0:data/plus-vita-v0.0.1.log");
+#ifdef PLUS_VITA_CATALOG_REVISION
+		remove("ux0:data/plus-vita-" PLUS_VITA_CATALOG_REVISION ".log");
+#endif
+	}
+#endif
+	return f;
+}
+static bool diagnostic_header(FILE *f)
+{
+	return f && fprintf(f,"VitaPlus structured diagnostic v3\nsession_start_utc=%s\nClock: console RTC at launch + monotonic elapsed time. Secrets and HTTP payloads excluded.\n",diagnostic_start_utc)>0 && fflush(f)==0;
+}
 #define RECORD_SIZE 1024u
 #define TAIL_CAPACITY 64u
 #define BODY_LIMIT (PLUS_VITA_DIAGNOSTIC_MAX_BYTES - (TAIL_CAPACITY + 2u) * RECORD_SIZE)
@@ -124,8 +157,8 @@ static void *diagnostic_writer(void *unused)
 	(void)unused;
 	/* Storage can stall even during open/header writes. The UI publishes only
 	 * this bounded worker; all device I/O belongs to it. */
-	FILE *opened=fopen(PLUS_VITA_DIAGNOSTIC_PATH,"w");
-	bool storage_ok=opened && fputs("plus-vita structured diagnostic v2\n",opened)>=0 && fflush(opened)==0;
+	FILE *opened=diagnostic_open();
+	bool storage_ok=diagnostic_header(opened);
 	pthread_mutex_lock(&diagnostic_write_mutex);
 	diagnostic_file=opened;
 	diagnostic_io_ok=storage_ok && !diagnostic_timed_out;
@@ -196,6 +229,7 @@ static void write_line(const char *kind, const char *message, int code)
 	pthread_mutex_lock(&diagnostic_write_mutex);
 	uint64_t locked_us = plus_vita_latency_now_us();
 	uint64_t elapsed_ms=start_us>=diagnostic_started_us ? (start_us-diagnostic_started_us)/1000u : 0;
+	char timestamp[32];diagnostic_timestamp(timestamp,elapsed_ms);
 #if PLUS_VITA_DEFERRED_LOG
 	if(!diagnostic_accepting) { pthread_mutex_unlock(&diagnostic_write_mutex); return; }
 	diagnostic_sequence++;
@@ -213,8 +247,8 @@ static void write_line(const char *kind, const char *message, int code)
 	DiagnosticRecord *record = &q->records[(q->head + q->count) % q->capacity];
 	record->sequence = diagnostic_sequence;
 	record->critical = q == &critical_queue;
-	int length = snprintf(record->line, sizeof(record->line), "%06lu elapsed_ms=%llu %-8s code=%d %s\n",
-		diagnostic_sequence, (unsigned long long)elapsed_ms, kind, code, message);
+	int length = snprintf(record->line, sizeof(record->line), "%06lu elapsed_ms=%llu utc=%s %-8s code=%d %s\n",
+		diagnostic_sequence, (unsigned long long)elapsed_ms, timestamp, kind, code, message);
 	if(length < 0 || (size_t)length >= sizeof(record->line)) {
 		truncated++;
 		/* Keep every persisted record on a separate line. */
@@ -232,8 +266,8 @@ static void write_line(const char *kind, const char *message, int code)
 	}
 	diagnostic_sequence++;
 	char line[RECORD_SIZE];
-	snprintf(line,sizeof(line),"%06lu elapsed_ms=%llu %-8s code=%d %s\n",diagnostic_sequence,
-		(unsigned long long)elapsed_ms,kind,code,message);
+	snprintf(line,sizeof(line),"%06lu elapsed_ms=%llu utc=%s %-8s code=%d %s\n",diagnostic_sequence,
+		(unsigned long long)elapsed_ms,timestamp,kind,code,message);
 	if(!persist_record(line,strcmp(kind,"EVENT")==0 || strstr(message,"final")!=NULL)) diagnostic_io_ok=false;
 	if(diagnostic_stream_timing)
 	{
@@ -322,12 +356,12 @@ bool plus_vita_diagnostic_begin(void)
 	if(!diagnostic_close()) {
 		pthread_mutex_unlock(&diagnostic_lifecycle_mutex); return false;
 	}
+	diagnostic_wall_start=time(NULL);
+	diagnostic_timestamp(diagnostic_start_utc,0);
 	/* The deferred writer owns opening as well as subsequent persistence. */
 #if !PLUS_VITA_DEFERRED_LOG
-	FILE *opened = fopen(PLUS_VITA_DIAGNOSTIC_PATH, "w");
-	bool opened_ok = opened != NULL;
-	if(opened && (fputs("plus-vita allocation diagnostic v1\nSecrets and HTTP payloads are intentionally excluded.\n", opened) < 0
-		|| fflush(opened) != 0)) opened_ok = false;
+	FILE *opened = diagnostic_open();
+	bool opened_ok = diagnostic_header(opened);
 #endif
 	pthread_mutex_lock(&diagnostic_write_mutex);
 #if PLUS_VITA_DEFERRED_LOG
@@ -377,7 +411,7 @@ void plus_vita_diagnostic_event(const char *event, int code)
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
-		"ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase"};
+		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {

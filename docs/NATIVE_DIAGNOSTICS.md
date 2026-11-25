@@ -3,13 +3,10 @@
 This contract applies to the native Vita app. The desktop reference recorder
 remains memory-only under [diagnostics-policy.md](diagnostics-policy.md).
 
-The app starts one diagnostic attempt on launch and replaces it before an
-accepted explicit Play or fresh connection retry, including failed allocation.
-A busy request while an earlier allocation is closing cannot start a new
-attempt. That earlier worker must finish before a new one can own the log.
-There is no archive or automatic upload. The single path is
-`ux0:data/plus-vita-allocation.log` for normal Play. The offline PS3 replay
-uses its own path so that it preserves existing Play evidence.
+VitaPlus creates one log per graphical app launch at `ux0:data/VitaPlus.log`.
+Opening the app replaces the previous log; Play and retry actions append to the
+same bounded session log. The offline PS3 replay retains its separate path.
+There is no archive or automatic upload. Copy the log before reopening the app.
 
 The current development identity is `recovery-diagnostics-1`, with the accepted
 720p independent-input/deferred-writer profile. This is an experimental
@@ -21,7 +18,9 @@ the hardware comparison. It is not the public beta or a passed #22 gate.
 Only locally generated records reach the writer:
 
 - Fixed public build/profile constants, a local sequence and relative elapsed
-  milliseconds. Sequence and elapsed origin restart for each attempt.
+  milliseconds. Sequence and elapsed origin restart for each app launch.
+  The header records console RTC UTC at launch; records include UTC derived
+  from that origin and monotonic elapsed milliseconds.
 - Exact known allocation, stream, recovery, account-completion and UI-stage
   event names. Unknown names are dropped. Numeric result codes are limited to
   the native error range `-1..21`; unknown codes map to `-1`. Allocation stages
@@ -48,7 +47,7 @@ Only locally generated records reach the writer:
   dropped. These are local observations, not physical input response latency.
 
 No account/game text, payload, URL, address, port, identifier, secret, remote
-reason, absolute timestamp or arbitrary key/value field is accepted. Numeric
+reason or arbitrary key/value field is accepted. Only locally generated UTC timestamps are permitted. Numeric
 APIs are for their documented aggregate quantities only. New fields require
 explicit schema review and persistent-boundary canary tests.
 
@@ -65,11 +64,10 @@ Sink summaries account for queue, quota, truncation and drain losses.
 tail; `tail_retained` identifies that reserve, `tail_evicted` counts its replaced
 records, and `budget_dropped` counts actual quota losses (including evictions).
 
-Completed, failed and cancelled Play attempts drain/close after their allocation
-worker has finished, so terminal records are on disk while the user browses.
-Return to the catalogue does not replace the file. Startup-only evidence closes
-on app exit or the next explicit Play. UI timing snapshots are capped at 64 and
-reset before Play.
+Completed, failed and cancelled Play attempts retain their diagnostic records
+in the same session log. The writer flushes each persisted record, and
+`attempt.begin` / `attempt.end` delimit attempts. The file closes on app exit.
+UI timing snapshots remain bounded over the whole launch.
 
 The deferred worker owns open, header, writes, flush and close. Producers do no
 file I/O. Availability remains false until initialization actually persists;

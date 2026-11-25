@@ -42,4 +42,4 @@ body:
     id: log
     attributes:
       label: Current-session log (needed for priority)
-      description: Copy ux0:data/plus-vita-allocation.log before another launch or Play attempt, review it, and attach only that file. Reports without a log are not treated as priority; explain if unavailable. Never attach account or browser-response files.
+      description: Copy ux0:data/VitaPlus.log before another launch, review it, and attach only that file. Reports without a log are not treated as priority; explain if unavailable. Never attach account or browser-response files.

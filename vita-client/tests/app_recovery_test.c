@@ -89,7 +89,6 @@ static void offline_attempt_log(bool retry)
 {
 	assert(plus_vita_diagnostic_ui_begin());
 	plus_vita_diagnostic_event("recovery.sleep",0);
-	plus_vita_diagnostic_ui_end();
 	PlusVitaApp *app;
 	if(!retry) app=connected_app();
 	else {
@@ -110,14 +109,15 @@ static void offline_attempt_log(bool retry)
 	plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_INTERRUPTED,.status=PLUS_VITA_RESULT_NETWORK_ERROR},0);
 	assert(plus_vita_ui_flow_take(&flow).kind==PLUS_VITA_EFFECT_NONE);
 	plus_vita_diagnostic_ui_end();
-	FILE *file=fopen("plus-vita-allocation.log","rb");assert(file);
-	char line[2048];bool first=false,failed=false;
+	FILE *file=fopen("VitaPlus.log","rb");assert(file);
+	char line[2048];bool first=false,failed=false,prior=false,attempt=false;
 	while(fgets(line,sizeof(line),file)) {
-		assert(!strstr(line,"recovery.sleep"));
+		if(strstr(line,"recovery.sleep")) prior=true;
+		if(strstr(line,"attempt.begin")) attempt=true;
 		if(strstr(line,"000001 elapsed_ms=") && strstr(line,"BUILD")) first=true;
 		if(strstr(line,"recovery.wifi")) failed=true;
 	}
-	fclose(file);assert(first && failed);plus_vita_app_destroy(app);
+	fclose(file);assert(first && failed && prior && attempt);plus_vita_app_destroy(app);
 }
 
 static PlusVitaStreamStartup startup_failure;
@@ -243,6 +243,7 @@ ChiakiErrorCode plus_vita_stream_probe_with_pump(const ChiakiCloudProvisionResul
 static void play_startup_attempt_log(PlusVitaStreamStartup status, const char *failure)
 {
 	startup_failure=status;
+	assert(plus_vita_diagnostic_ui_begin());
 	PlusVitaApp *app=connected_app();
 	PlusVitaPlay *play=plus_vita_play_create();assert(play);
 	PlusVitaUiFlow flow={.app=app};
@@ -267,7 +268,7 @@ static void play_startup_attempt_log(PlusVitaStreamStartup status, const char *f
 
 	const char *const expected[]={"code=0 allocation.complete", "code=0 stream_probe.begin",
 		"code=0 stream.startup.transport", failure, "code=16 stream_probe.complete"};
-	FILE *file=fopen("plus-vita-allocation.log","rb");assert(file);
+	FILE *file=fopen("VitaPlus.log","rb");assert(file);
 	char line[2048];
 	size_t next=0;
 	while(fgets(line,sizeof(line),file)) {
