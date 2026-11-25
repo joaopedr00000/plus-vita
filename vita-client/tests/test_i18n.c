@@ -10,6 +10,10 @@ int main(void){
         for(unsigned k=0;k<PV_TEXT_COUNT;k++)assert(pv_text[l][k]&&*pv_text[l][k]);
         for(unsigned k=0;k<PV_EXTRA_COUNT;k++)assert(pv_extra[l][k]&&*pv_extra[l][k]);
         for(unsigned k=0;k<PV_DYNAMIC_COUNT;k++)assert(pv_dynamic[l][k]&&*pv_dynamic[l][k]);
+        for(unsigned k=0;k<PV_SESSION_TEXT_COUNT;k++) {
+            assert(pv_session_text[l][k]&&*pv_session_text[l][k]);
+            assert(!strcmp(pv_translate(l,pv_session_text[0][k]),pv_session_text[l][k]));
+        }
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
@@ -23,5 +27,7 @@ int main(void){
     assert(!strcmp(pv_translate(2,"No cover"),"Sem capa"));
     assert(!strcmp(pv_translate(2,""),""));
     assert(pv_translate(2,NULL)==NULL);
+    assert(!strcmp(pv_translate(2,"Finding a cloud server. Circle cancels."),"Buscando servidor. Círculo cancela."));
+    assert(!strcmp(pv_translate(2,"On"),"Sim"));
     puts("19 locale tables validated");return 0;
 }

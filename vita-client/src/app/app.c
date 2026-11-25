@@ -615,8 +615,8 @@ static int compare_titles(const void *left, const void *right)
 static void account_view(PlusVitaApp *app)
 {
 	snprintf(app->account_status, sizeof(app->account_status),
-		"Remember: %s. Local files are readable with file access.\nAccount label (entered by you): %s\nSony account name: %s",
-		app->saved ? "On" : "Off", app->label[0] ? app->label : "Not set", app->online_id[0] ? app->online_id : "Unavailable");
+		PV_TR("Remember: %s. Local files are readable with file access.\nAccount label (entered by you): %s\nSony account name: %s"),
+		PV_TR(app->saved ? "On" : "Off"), app->label[0] ? app->label : PV_TR("Not set"), app->online_id[0] ? app->online_id : PV_TR("Unavailable"));
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_ACCOUNT, .title = account_name(app),
 		.subtitle = "ACCOUNT", .body = app->account_status, .hint = "Left stick  Move     X  Select     O  Back",
 		.actions = {
