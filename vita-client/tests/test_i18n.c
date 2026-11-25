@@ -9,10 +9,13 @@ int main(void){
         assert(pv_locale_names[l]&&*pv_locale_names[l]);
         for(unsigned k=0;k<PV_TEXT_COUNT;k++)assert(pv_text[l][k]&&*pv_text[l][k]);
         for(unsigned k=0;k<PV_EXTRA_COUNT;k++)assert(pv_extra[l][k]&&*pv_extra[l][k]);
+        for(unsigned k=0;k<PV_DYNAMIC_COUNT;k++)assert(pv_dynamic[l][k]&&*pv_dynamic[l][k]);
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
     assert(!strcmp(pv_translate(2,"Loading cover"),"Carregando capa"));
     assert(!strcmp(pv_translate(2,"X  Select     O  Back"),"X  Selecionar     O  Voltar"));
+    assert(!strcmp(pv_translate(2,"Search: %s"),"Busca: %s"));
+    assert(!strcmp(pv_translate(2,"Unsupported regions: Off"),"Regiões sem suporte: Desativado"));
     puts("19 locale tables validated");return 0;
 }

@@ -8,6 +8,13 @@
 #define WIDTH 960
 #define HEIGHT 544
 #define RGB(r,g,b) (0xff000000u | ((uint32_t)(b)<<16) | ((uint32_t)(g)<<8) | (r))
+#if PLUS_VITA_ADAPTIVE_STREAM
+#define MENU_ACCENT RGB(104,190,255)
+#define MENU_BUTTON RGB(17,60,132)
+#else
+#define MENU_ACCENT RGB(246,198,91)
+#define MENU_BUTTON RGB(17,57,125)
+#endif
 /* Native pixel sizes from the hardware-selected A setup and tile views.
  * All screens share this painter and the system PVF path. Keep compact
  * Account/tile text at 18px and the accepted heading at 36px. */
@@ -62,7 +69,7 @@ static void wordmark(Canvas *display,const PlusVitaBranding *branding)
 {
 	const uint32_t *image=plus_vita_branding_wordmark(branding);
 	if(!image) {
-		text(display,"plus-vita",64,25,TEXT_BRAND,400,38,false,RGB(104,190,255));
+		text(display,"plus-vita",64,25,TEXT_BRAND,400,38,false,MENU_ACCENT);
 		return;
 	}
 	for(unsigned y=0;y<40;y++) for(unsigned x=0;x<224;x++) {
@@ -95,11 +102,11 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		if(background) memcpy(pixels+y*pitch,background+y*WIDTH,WIDTH*sizeof(*pixels));
 		else rectangle(display, 0, y, WIDTH, 1, RGB(0, 25 + y / 20, 70 + y / 6));
 	}
-	rectangle(display, 0, 0, WIDTH, 4, RGB(104, 190, 255));
+	rectangle(display, 0, 0, WIDTH, 4, MENU_ACCENT);
 	wordmark(display,branding);
 #endif
 	text(display, PLUS_VITA_BUILD_LABEL, 712, 32, TEXT_MICRO, 220, 24, false, RGB(195, 211, 239));
-	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, RGB(104, 190, 255));
+	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, MENU_ACCENT);
 	text(display, view->title, 64, 128, TEXT_HEADING, 832, 54, false, RGB(243, 247, 252));
 	int body_bottom = view->action_count ? view->actions[0].y - 12 : 480;
 	if(view->screen==PLUS_VITA_APP_CATALOGUE) {
@@ -124,7 +131,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 				{.name="A long game title with complete letters and deliberate overflow"}};
 			for(unsigned i=0;i<3;i++) {
 				int x=64+(int)i*286;
-				rounded(display,x,228,260,204,i==1 ? RGB(104,190,255) : RGB(17,57,125));
+				rounded(display,x,228,260,204,i==1 ? MENU_ACCENT : RGB(17,57,125));
 				cover(display,NULL,&samples[i],x+66,238);
 				text(display,samples[i].name,x+12,374,TEXT_COMPACT,236,48,true,i==1 ? RGB(9,29,66) : RGB(243,247,252));
 			}
@@ -140,7 +147,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		if(thumb<8) thumb=8;
 		int offset=(int)((size_t)(height-thumb)*view->list_first/(view->list_total-view->list_count));
 		rectangle(display,view->list_x+view->list_width+8,view->list_y,4,height,RGB(17,57,125));
-		rectangle(display,view->list_x+view->list_width+8,view->list_y+offset,4,thumb,RGB(104,190,255));
+		rectangle(display,view->list_x+view->list_width+8,view->list_y+offset,4,thumb,MENU_ACCENT);
 	}
 	for(size_t i = 0; i < view->action_count; i++)
 	{
@@ -148,7 +155,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		bool selected = i == view->selected;
 		bool pressed = view->touch_pressed && i == view->pressed_index;
 		rounded(display, button->x, button->y, button->width, button->height,
-			pressed ? RGB(77,180,244) : selected ? RGB(104, 190, 255) : RGB(17, 60, 132));
+			pressed ? RGB(77,180,244) : selected ? MENU_ACCENT : MENU_BUTTON);
 		bool compact=button->height<48;
 		int inset=button->height<=32 ? 2 : compact ? 4 : 8;
 		text(display,button->label,button->x+20,button->y+inset,

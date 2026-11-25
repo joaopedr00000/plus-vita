@@ -12,6 +12,9 @@
 #include "../platform/region_policy.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
+#define PV_TR(s) pv_translate(app->ui_language,(s))
+#else
+#define PV_TR(s) (s)
 #endif
 
 #ifndef PLUS_VITA_APP_VERSION
@@ -702,8 +705,7 @@ static void catalogue_view(PlusVitaApp *app)
 		.hint = "Left stick  Browse     X  Details     Triangle  Search     O  Back"
 	};
 	snprintf(app->catalogue_status, sizeof(app->catalogue_status),
-		"%u of %u games%s", (unsigned)app->matches_count, (unsigned)app->catalogue_count,
-		app->search[0] ? " match your search." : " available.");
+		PV_TR("%u / %u games"), (unsigned)app->matches_count, (unsigned)app->catalogue_count);
 	if(!app->catalogue_count)
 	{
 		view.title = "No cloud games found.";
@@ -731,7 +733,7 @@ static void catalogue_view(PlusVitaApp *app)
 		}
 		view.list_count=view.action_count;
 		view.detail=&app->catalogue[app->matches[app->catalogue_selection]];
-		snprintf(app->search_button,sizeof(app->search_button),"Search: %s",app->search[0] ? app->search : "All games");
+		snprintf(app->search_button,sizeof(app->search_button),PV_TR("Search: %s"),app->search[0] ? app->search : PV_TR("All games"));
 		size_t search_index=view.action_count;
 		view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_SEARCH,app->search_button,64,186,624,32};
 		view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",744,448,152,32};
@@ -743,8 +745,10 @@ static void catalogue_view(PlusVitaApp *app)
 static void detail_view(PlusVitaApp *app, const char *notice)
 {
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
-	snprintf(app->detail_status,sizeof(app->detail_status),"%s\nPlatform: %s\n%s",game->name,game->platform[0] ? game->platform : "Not specified",
-		notice ? notice : game->launch_id_valid ? "Cloud catalogue title. Streaming eligibility is checked at launch." : "Play unavailable: required launch information is missing.");
+	char platform_line[128];
+	snprintf(platform_line,sizeof(platform_line),PV_TR("Platform: %s"),game->platform[0] ? game->platform : PV_TR("Not specified"));
+	snprintf(app->detail_status,sizeof(app->detail_status),"%s\n%s\n%s",game->name,platform_line,
+		PV_TR(notice ? notice : game->launch_id_valid ? "Cloud catalogue title. Streaming eligibility is checked at launch." : "Play unavailable: required launch information is missing."));
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_DETAILS,.title=game->name,.subtitle="GAME DETAILS",.body=app->detail_status,.hint="X  Select     O  Back",.detail=game,
 		.actions={{game->launch_id_valid ? PLUS_VITA_ACTION_PLAY : PLUS_VITA_ACTION_DISABLED,game->launch_id_valid ? "Play" : "Play unavailable",64,380,832,52},{PLUS_VITA_ACTION_BACK,"Back",64,444,832,52}},.action_count=2};
 }
@@ -753,9 +757,9 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 static void datacenters_view(PlusVitaApp *app)
 {
 	if(!app->bitrate_kbps) app->bitrate_kbps=PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000;
-	snprintf(app->dc_status,sizeof(app->dc_status),"Choose a server manually. Page %u of %u. No automatic fallback.",
+	snprintf(app->dc_status,sizeof(app->dc_status),PV_TR("Choose a server manually. Page %u of %u. No automatic fallback."),
 		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
-	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? "%s: %u Mbps (change)" : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? (app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Quality") : "Bitrate: ",app->bitrate_kbps/1000);
+	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? PV_TR("%s: %u Mbps (change)") : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? PV_TR(app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Quality") : "Bitrate: ",app->bitrate_kbps/1000);
 	PlusVitaAppView view={.screen=PLUS_VITA_APP_DATACENTERS,.title="Choose cloud server.",
 		.subtitle="MANUAL DATACENTER",.body=app->dc_status,.hint="X  Select     O  Back"};
 	size_t first=app->dc_page*3;
