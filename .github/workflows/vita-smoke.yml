@@ -94,8 +94,14 @@ jobs:
       - name: Test authenticated local token vault
         run: |
           sudo apt-get install -y libmbedtls-dev
-          cc -std=c11 -O2 -Wall -Wextra -Werror vita-client/tests/test_account_vault.c -lmbedcrypto -o /tmp/vp-stream-test/vault
-          /tmp/vp-stream-test/vault
+          mkdir -p /tmp/pv-vault-test
+          printf '#define JSON_C_HAVE_INTTYPES_H 1\n#define JSON_C_HAVE_STDINT_H 1\n' > /tmp/pv-vault-test/json_config.h
+          cc -std=c11 -O2 -Wall -Wextra -Werror vita-client/tests/test_account_vault.c -lmbedcrypto -o /tmp/pv-vault-test/vault
+          /tmp/pv-vault-test/vault
+          cc -D_POSIX_C_SOURCE=200809L -std=c11 -O2 -Wall -Wextra -Werror -pthread -DPLUS_VITA_ACCOUNT_VAULT=1 -DPLUS_VITA_LAN_LOGIN=1 -Iexternal/pylux/lib/include -Iexternal/pylux/third-party/curl/include -Iexternal/json-c -I/tmp/pv-vault-test vita-client/src/app/account_vita.c vita-client/src/platform/credential.c vita-client/src/platform/random.c vita-client/tests/test_vault_storage.c -lmbedcrypto -l:libjson-c.so.5 -o /tmp/pv-vault-test/storage
+          (dir=$(mktemp -d); cd "$dir"; /tmp/pv-vault-test/storage)
+          cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ACCOUNT_VAULT=1 -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-vault-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_vault_menu.c -l:libjson-c.so.5 -o /tmp/pv-vault-test/menu
+          /tmp/pv-vault-test/menu
       - name: Test cloud response interoperability and privacy
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -Iexternal/json-c -I/tmp/pv-stream-test vita-client/tests/test_cloud_response.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/response

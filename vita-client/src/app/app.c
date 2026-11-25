@@ -1635,7 +1635,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		{
 			if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) { about_view(app); return effect; }
 			if(view->screen==PLUS_VITA_APP_DETAILS || view->screen==PLUS_VITA_APP_STREAM_STOPPED) { catalogue_view(app); return effect; }
-			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING || view->screen==PLUS_VITA_APP_STREAM_SETTINGS
+			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING || view->screen==PLUS_VITA_APP_STREAM_SETTINGS || view->screen==PLUS_VITA_APP_SECURITY
 				|| (view->screen==PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) { settings_view(app); return effect; }
 			app->pending_operation = 0;
 			app->waiting_for = PLUS_VITA_EFFECT_NONE;

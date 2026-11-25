@@ -162,6 +162,22 @@ static void save_account(PlusVitaAccount *account)
 		if(!unlocked){account->result.status=PLUS_VITA_RESULT_VAULT_LOCKED;return;}
 	}
 #endif
+#if PLUS_VITA_ACCOUNT_VAULT
+	/* Only the non-secret label needs JSON escaping. Keep the token's serialized
+	 * copy in a bounded, explicitly wiped buffer. */
+	if(account->job.credential.length!=64)return;
+	for(size_t j=0;j<64;j++){
+		unsigned char ch=(unsigned char)account->job.credential.value[j];
+		if(!((ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||(ch>='0'&&ch<='9')))return;
+	}
+	char plain[1024]={0};
+	struct json_object *root=json_object_new_string(account->job.label);
+	if(!root)return;
+	const char *quoted=json_object_to_json_string_ext(root,JSON_C_TO_STRING_PLAIN);
+	int len=quoted?snprintf(plain,sizeof(plain),"{\"npsso\":\"%.64s\",\"label\":%s}",account->job.credential.value,quoted):-1;
+	if(len<=0||(size_t)len>=sizeof(plain)){clear_bytes(plain,sizeof(plain));json_object_put(root);return;}
+	const char *data=plain;
+#else
 	struct json_object *root = json_object_new_object();
 	if(!root) return;
 	struct json_object *token = json_object_new_string_len(account->job.credential.value, (int)account->job.credential.length);
@@ -174,6 +190,7 @@ static void save_account(PlusVitaAccount *account)
 		json_object_put(label); json_object_put(root); return;
 	}
 	const char *data = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PLAIN);
+#endif
 	bool success = false;
 #if PLUS_VITA_ACCOUNT_VAULT
 	uint8_t entropy[28]={0},sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD]={0};
@@ -195,7 +212,7 @@ static void save_account(PlusVitaAccount *account)
 			clear_bytes(account->file,sizeof(account->file));
 		}
 	}
-	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));
+	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));pv_vault_wipe(plain,sizeof(plain));
 #else
 	FILE *file = fopen(ACCOUNT_TEMP, "wb");
 	if(file)
