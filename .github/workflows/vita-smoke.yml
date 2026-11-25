@@ -69,6 +69,11 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
+      - name: Test local QR login HTTP validation
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_lan_login_http.c -o /tmp/pv-lan-login
+          /tmp/pv-lan-login
       - name: Test reverse QR strict token validation
         if: github.ref == 'refs/heads/beta3'
         run: |
@@ -191,10 +196,6 @@ jobs:
           python3 tools/test-publication-gate.py dist/plus-vita-v0.1.0-beta.3.vpk --version beta3
           cd dist
           sha256sum plus-vita-v0.1.0-beta.3.vpk > SHA256SUMS.txt
-      - name: Include offline QR pairing helper
-        run: |
-          cp release/qr-pairing.html dist/qr-pairing.html
-          (cd dist && sha256sum qr-pairing.html >> SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
           name: plus-vita-beta3

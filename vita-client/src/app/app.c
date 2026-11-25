@@ -355,7 +355,11 @@ static void setup_view(PlusVitaApp *app)
 			{ PLUS_VITA_ACTION_BACK, "Back", 64, 444, 832, 52 }
 		}, .action_count = 3
 	};
-#if PLUS_VITA_QR_PAIRING
+#if PLUS_VITA_LAN_LOGIN
+	app->view.title="Connect your Sony account.";
+	app->view.body="Use your phone on the same trusted Wi-Fi. Sign in on Sony, then paste the response on the local page. No downloads. Local HTTP is unencrypted.";
+	app->view.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_LAN_LOGIN,"Sign in with QR code",64,0,832,44};
+#elif PLUS_VITA_QR_PAIRING
 	app->view.title="Connect your Sony account.";
 	app->view.body="Sign in only on Sony. No password is requested by Plus-Vita.\nChoose browser login, encrypted QR pairing, or JSON import.";
 	app->view.actions[0].y=284;app->view.actions[0].height=48;
@@ -410,7 +414,11 @@ static const char *result_message(PlusVitaAppResult result)
 		case PLUS_VITA_RESULT_STORAGE_ERROR:
 			return "The sign-in JSON could not be read. Check it with VitaShell and try again.";
 		case PLUS_VITA_RESULT_REJECTED:
+			#if PLUS_VITA_LAN_LOGIN
+			return "Your sign-in was rejected or expired.\nUse Sign in with QR code again.";
+#else
 			return "Your sign-in was rejected or has expired.\nSign in to Sony again, save a fresh JSON response and import it.";
+#endif
 		case PLUS_VITA_RESULT_NETWORK_ERROR:
 			return "Sony could not be reached. Check Wi-Fi and try again.\nYour account details have not been displayed or logged.";
 		case PLUS_VITA_RESULT_CATALOGUE_ERROR:
@@ -1019,7 +1027,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		{
 #if PLUS_VITA_QR_PAIRING
 			if(event.status==PLUS_VITA_RESULT_CANCELLED) {setup_view(app);return effect;}
+			#if PLUS_VITA_LAN_LOGIN
+			if(event.status==PLUS_VITA_RESULT_UNSUPPORTED) {account_error(app,"Local sign-in could not start. Connect to a private Wi-Fi network and retry.");return effect;}
+#else
 			if(event.status==PLUS_VITA_RESULT_UNSUPPORTED) {account_error(app,"QR pairing could not start. Use Import JSON or retry on a Vita with a camera.");return effect;}
+#endif
 #endif
 			if(event.status != PLUS_VITA_RESULT_OK)
 			{
@@ -1029,7 +1041,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->imported_valid = parse_import(&app->credential, event.data, event.data_size, NULL);
 			if(!app->imported_valid)
 			{
+				#if PLUS_VITA_LAN_LOGIN
+				account_error(app, "Invalid Sony response. Start QR sign-in again.");
+#else
 				account_error(app, "The JSON sign-in data was not valid. The file was kept.\nReplace it with a fresh browser JSON response and try again.");
+#endif
 				return effect;
 			}
 			app->waiting_for = PLUS_VITA_EFFECT_AUTHORIZE;
@@ -1179,7 +1195,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				.screen = PLUS_VITA_APP_SETUP_GUIDE, .title = "Sign in on your phone or PC.",
 				.subtitle = "YOUR SONY ACCOUNT", .hint = "X  Select     O  Back",
 				.body =
-#if PLUS_VITA_QR_PAIRING
+#if PLUS_VITA_LAN_LOGIN
+				"Connect your phone and Vita to the same trusted Wi-Fi. Choose Continue, then Sign in with QR code. Complete Sony sign-in on your phone.",
+#elif PLUS_VITA_QR_PAIRING
 				"Sign in on your phone or PC. Choose Continue, then Pair with QR code or Import JSON.\nComplete Sony's sign-in prompts on your own device.",
 #else
 				"1. Sign in at playstation.com on your phone or PC.\n2. Open ca.account.sony.com/api/v1/ssocookie.\n3. Save the response as plus-vita-auth.json.\nKeep this file private. Complete Sony's sign-in prompts.",
@@ -1326,6 +1344,13 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->welcome_selection = view->selected;
 			catalogue_view(app);
 		}
+		
+#if PLUS_VITA_LAN_LOGIN
+		else if(action==PLUS_VITA_ACTION_LAN_LOGIN&&view->screen==PLUS_VITA_APP_SETUP){
+			effect=import_account(app);effect.kind=PLUS_VITA_EFFECT_LAN_LOGIN;
+			view->body="Starting local QR sign-in. Circle cancels.";return effect;
+		}
+#else
 		else if(action == PLUS_VITA_ACTION_IMPORT)
 			return import_account(app);
 #if PLUS_VITA_QR_PAIRING
@@ -1339,6 +1364,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			view->body="Pairing with your phone. Circle cancels.";
 			return effect;
 		}
+#endif
 #endif
 		else if(action == PLUS_VITA_ACTION_REMEMBER)
 		{
@@ -1354,7 +1380,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				app->storage_return = PLUS_VITA_APP_SETUP;
 				return disable;
 			}
-			return operation(app, PLUS_VITA_EFFECT_ENABLE_AUTO, "Enabling automatic use of your retained JSON.", false);
+			return operation(app, PLUS_VITA_EFFECT_ENABLE_AUTO, "Enabling remembered sign-in.", false);
 		}
 		else if(action == PLUS_VITA_ACTION_RESTORE)
 			return operation(app, PLUS_VITA_EFFECT_LOAD_ACCOUNT, "Loading your remembered account.", true);
@@ -1379,7 +1405,13 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(action == PLUS_VITA_ACTION_FORGET)
 		{
 			app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_FORGET_CONFIRM, .title = "Forget this account?",
-				.subtitle = "ACCOUNT", .body = "This clears active sign-in and saved account data.\nYour JSON stays in place, but automatic sign-in is paused.\nChoose Import JSON explicitly to connect again.", .hint = "X  Select     O  Back",
+				.subtitle = "ACCOUNT", .body =
+#if PLUS_VITA_LAN_LOGIN
+				"This clears active sign-in and saved account data.\nUse QR sign-in to connect again.",
+#else
+				"This clears active sign-in and saved account data.\nYour JSON stays in place, but automatic sign-in is paused.\nChoose Import JSON explicitly to connect again.",
+#endif
+				.hint = "X  Select     O  Back",
 				.actions = {{ PLUS_VITA_ACTION_BACK, "Keep account", 64, 380, 832, 52 },
 				{ PLUS_VITA_ACTION_CONFIRM_FORGET, "Forget account", 64, 444, 832, 52 }}, .action_count = 2 };
 		}

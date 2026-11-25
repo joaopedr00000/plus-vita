@@ -9,6 +9,9 @@
 #include "../platform/cloud_experimental.h"
 #if PLUS_VITA_QR_PAIRING
 #include "qr_pair_vita.h"
+#if PLUS_VITA_LAN_LOGIN
+#include "lan_login_vita.h"
+#endif
 #endif
 #if PLUS_VITA_FONT_COMPARISON
 #include "comparison_capture.h"
@@ -390,7 +393,18 @@ int plus_vita_app_run(void)
 			{
 				if(effect.kind == PLUS_VITA_EFFECT_PREPARE_SETUP)
 					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_SETUP_READY, .operation = effect.operation },0);
-				#if PLUS_VITA_QR_PAIRING
+				#if PLUS_VITA_LAN_LOGIN
+				else if(effect.kind==PLUS_VITA_EFFECT_LAN_LOGIN){
+					char json[80]={0};
+					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_lan_login(pair_frame,display,json,sizeof(json)):PLUS_VITA_RESULT_BUSY;
+					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
+					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_IMPORT_READ,.operation=effect.operation,.status=status,.data=json,.data_size=strlen(json)},0);
+					volatile char *wipe=json;for(size_t i=0;i<sizeof(json);i++)wipe[i]=0;
+					SceCtrlData after={0};menu_read(&menu_controller,&after);
+					plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.buttons=after.buttons,.left_x=after.lx,.left_y=after.ly,.time_us=sceKernelGetProcessTimeWide()}});
+					touched=true;previous_poll=flow.input_since=0;
+				}
+				#elif PLUS_VITA_QR_PAIRING
 				else if(effect.kind==PLUS_VITA_EFFECT_SONY_LOGIN||effect.kind==PLUS_VITA_EFFECT_TOKEN_LOGIN){
 					char json[80]={0};
 					PlusVitaCredential token={0};PlusVitaCredentialImeResult keyboard={0};

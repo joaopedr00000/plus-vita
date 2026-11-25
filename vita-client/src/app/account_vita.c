@@ -82,7 +82,11 @@ static void load_account(PlusVitaAccount *account)
 	if(errno != ENOENT) { account->result.status = PLUS_VITA_RESULT_STORAGE_ERROR; return; }
 	FILE *file = fopen(ACCOUNT_FILE, "rb");
 	if(!file) {
+		#if PLUS_VITA_LAN_LOGIN
+		if(errno == ENOENT) account->result.status=PLUS_VITA_RESULT_MISSING;
+#else
 		if(errno == ENOENT) { account->result.retained_json = true; read_import(account); }
+#endif
 		else account->result.status = PLUS_VITA_RESULT_STORAGE_ERROR;
 		return;
 	}

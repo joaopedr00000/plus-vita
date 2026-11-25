@@ -828,7 +828,12 @@ if(PLUS_VITA_INPUT_WORKER)
   target_sources(${PROJECT_NAME} PRIVATE src/platform/input_worker.c)
 endif()
 
-if(PLUS_VITA_BETA2)
+if(PLUS_VITA_BETA3)
+  add_library(plus_vita_qr STATIC third_party/qrcodegen/qrcodegen.c)
+  target_include_directories(plus_vita_qr PUBLIC third_party/qrcodegen)
+  target_sources(${PROJECT_NAME} PRIVATE src/app/lan_login_vita.c)
+  target_link_libraries(${PROJECT_NAME} PRIVATE plus_vita_qr)
+elseif(PLUS_VITA_BETA2)
   add_library(plus_vita_qr STATIC third_party/quirc/quirc.c third_party/quirc/decode.c third_party/quirc/identify.c third_party/quirc/version_db.c third_party/qrcodegen/qrcodegen.c)
   target_include_directories(plus_vita_qr PUBLIC third_party/quirc third_party/qrcodegen)
   target_sources(${PROJECT_NAME} PRIVATE src/app/qr_pair_vita.c src/platform/qr_pair_crypto.c)
@@ -836,6 +841,7 @@ if(PLUS_VITA_BETA2)
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   PLUS_VITA_QR_PAIRING=$<BOOL:${PLUS_VITA_BETA2}>
+  PLUS_VITA_LAN_LOGIN=$<BOOL:${PLUS_VITA_BETA3}>
   PLUS_VITA_ADAPTIVE_STREAM=$<BOOL:${PLUS_VITA_BETA3}>
   PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
