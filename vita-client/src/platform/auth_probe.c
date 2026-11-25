@@ -497,6 +497,17 @@ cleanup:
 	secure_clear(token, sizeof(token));
 }
 
+static int auth_http(const CCHttpRequest *request,CCHttpResponse *response,int *raw)
+{
+#ifdef __vita__
+	extern ChiakiErrorCode plus_vita_http_perform_detailed(ChiakiLog *,const CCHttpRequest *,CCHttpResponse *,int *);
+	return plus_vita_http_perform_detailed(NULL,request,response,raw);
+#else
+	*raw=0;
+	return cc_http_perform(NULL,request,response);
+#endif
+}
+
 void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	PlusVitaAuthProbeResult *result,unsigned mode)
 {
@@ -543,10 +554,10 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	CCHttpResponse response = { 0 };
 	result->attempted = true;
 	result->transport_stage=1;
-	result->transport_error=cc_http_perform(NULL,&request,&response);
+	result->transport_error=auth_http(&request,&response,&result->curl_error);
 	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
 		wipe_response(&response);
-		result->transport_error=cc_http_perform(NULL,&request,&response);
+		result->transport_error=auth_http(&request,&response,&result->curl_error);
 	}
 	result->transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->http_status = response.status_code;
@@ -589,7 +600,7 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	CCHttpResponse session_response = { 0 };
 	char jsession[512] = { 0 };
 	result->transport_stage=2;
-	result->transport_error=cc_http_perform(NULL,&session_request,&session_response);
+	result->transport_error=auth_http(&session_request,&session_response,&result->curl_error);
 	result->session_transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->session_http_status = session_response.status_code;
 	result->session_created = result->session_transport_ok
@@ -622,10 +633,10 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	CCHttpResponse store_response = { 0 };
 	char store_base_url[1024] = { 0 };
 	result->transport_stage=3;
-	result->transport_error=cc_http_perform(NULL,&store_request,&store_response);
+	result->transport_error=auth_http(&store_request,&store_response,&result->curl_error);
 	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
 		wipe_response(&store_response);
-		result->transport_error=cc_http_perform(NULL,&store_request,&store_response);
+		result->transport_error=auth_http(&store_request,&store_response,&result->curl_error);
 	}
 	result->store_transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->store_http_status = store_response.status_code;

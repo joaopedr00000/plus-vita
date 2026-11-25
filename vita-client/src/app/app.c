@@ -1073,7 +1073,13 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				if(event.status==PLUS_VITA_RESULT_NETWORK_ERROR&&event.auth_stage){
 					const char *stage=event.auth_stage==1?"Sony authorization":event.auth_stage==2?"Sony session":"Sony store";
 					const char *reason=event.auth_transport_error==2?"DNS lookup failed":event.auth_transport_error==9?"Connection failed":event.auth_transport_error==15?"Connection timed out":event.auth_transport_error==16?"TLS verification or handshake failed":event.auth_transport_error==14?"Request cancelled":"Network transport failed";
-					snprintf(app->auth_status,sizeof(app->auth_status),"%s: %s (E%d).\nCheck Wi-Fi, DNS and system date/time. Retry keeps your token.",stage,reason,event.auth_transport_error);
+					if(event.auth_transport_error==16){
+						const char *tls_reason=event.auth_curl_error==35?"TLS handshake failed":event.auth_curl_error==60?"Certificate verification failed":event.auth_curl_error==77?"CA bundle could not be loaded":"TLS setup failed";
+						if(app->ui_language==2||app->ui_language==3){
+							const char *pt=event.auth_curl_error==35?"Falha na negociação TLS":event.auth_curl_error==60?"Falha na validação do certificado":event.auth_curl_error==77?"Falha ao carregar certificados":"Falha na configuração TLS";
+							snprintf(app->auth_status,sizeof(app->auth_status),"%s (E16/C%d).\nConfira data e hora do Vita. Tentar novamente mantém o token.",pt,event.auth_curl_error);
+						}else snprintf(app->auth_status,sizeof(app->auth_status),"%s: %s (E16/C%d).\nCheck system date/time. Retry keeps your token.",stage,tls_reason,event.auth_curl_error);
+					}else snprintf(app->auth_status,sizeof(app->auth_status),"%s: %s (E%d/C%d).\nCheck Wi-Fi, DNS and system date/time. Retry keeps your token.",stage,reason,event.auth_transport_error,event.auth_curl_error);
 					account_error(app,app->auth_status);
 				}else account_error(app, result_message(event.status));
 				return effect;

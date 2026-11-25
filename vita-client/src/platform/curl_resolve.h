@@ -8,4 +8,5 @@
 CURLcode plus_vita_curl_prepare_resolve(CURL *curl, const char *url,
 	struct curl_slist **resolve_list);
 
+CURLcode plus_vita_curl_secure_options(CURL *curl);
 #endif

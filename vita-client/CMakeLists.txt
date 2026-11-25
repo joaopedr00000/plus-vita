@@ -647,9 +647,16 @@ set(PLUS_VITA_CURL_URL_OLD [=[
 ]=])
 set(PLUS_VITA_CURL_URL_NEW [=[
 	curl_easy_setopt(curl, CURLOPT_URL, request->url);
+	CURLcode tls_options=plus_vita_curl_secure_options(curl);
+	if(tls_options!=CURLE_OK){
+		if(native_code)*native_code=(int)tls_options;
+		err=CHIAKI_ERR_INVALID_RESPONSE;
+		goto cleanup;
+	}
 	CURLcode resolve_result = plus_vita_curl_prepare_resolve(curl, request->url, &resolve_list);
 	if(resolve_result != CURLE_OK)
 	{
+		if(native_code)*native_code=(int)resolve_result;
 		if(log)
 			CHIAKI_LOGE(log, "cc_http_perform: synchronous DNS failed: %s", curl_easy_strerror(resolve_result));
 		err = resolve_result == CURLE_COULDNT_RESOLVE_HOST ? CHIAKI_ERR_PARSE_ADDR : CHIAKI_ERR_NETWORK;
@@ -667,6 +674,49 @@ string(REPLACE "${PLUS_VITA_CURL_URL_OLD}" "${PLUS_VITA_CURL_URL_NEW}"
 string(REPLACE "if(header_list)\n\t\tcurl_slist_free_all(header_list);"
   "if(header_list)\n\t\tcurl_slist_free_all(header_list);\n\tif(resolve_list)\n\t\tcurl_slist_free_all(resolve_list);"
   PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
+# Add a per-call numeric diagnostic result, avoiding shared mutable error state.
+set(PV_CURL_SIGNATURE_OLD [=[
+CHIAKI_EXPORT ChiakiErrorCode cc_http_perform(
+	ChiakiLog *log,
+	const CCHttpRequest *request,
+	CCHttpResponse *response)
+{
+]=])
+set(PV_CURL_SIGNATURE_NEW [=[
+ChiakiErrorCode plus_vita_curl_http_perform_detail(
+	ChiakiLog *log,
+	const CCHttpRequest *request,
+	CCHttpResponse *response,
+	int *native_code)
+{
+	if(native_code)*native_code=0;
+]=])
+string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PV_CURL_SIGNATURE_OLD}" PV_CURL_SIGNATURE_POS)
+if(PV_CURL_SIGNATURE_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux curl signature patch point missing")
+endif()
+string(REPLACE "${PV_CURL_SIGNATURE_OLD}" "${PV_CURL_SIGNATURE_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
+set(PV_CURL_PERFORM_OLD [=[
+	CURLcode res = curl_easy_perform(curl);
+]=])
+set(PV_CURL_PERFORM_NEW [=[
+	CURLcode res = curl_easy_perform(curl);
+	/* Retry only safe GET requests after a TLS handshake failure, not a
+	 * certificate rejection or POST. TLS 1.2 retains CA and hostname checks. */
+	if(res==CURLE_SSL_CONNECT_ERROR && (!request->method||strcmp(request->method,"GET")==0) && !plus_vita_request_cancelled()){
+		free(body_buf.data);body_buf=(GrowBuffer){0};
+		free(header_buf.data);header_buf=(GrowBuffer){0};
+		CURLcode option=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)(CURL_SSLVERSION_TLSv1_2|CURL_SSLVERSION_MAX_TLSv1_2));
+		if(option==CURLE_OK)option=curl_easy_setopt(curl,CURLOPT_FRESH_CONNECT,1L);
+		if(option==CURLE_OK)res=curl_easy_perform(curl);
+	}
+	if(native_code)*native_code=(int)res;
+]=])
+string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PV_CURL_PERFORM_OLD}" PV_CURL_PERFORM_POS)
+if(PV_CURL_PERFORM_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux curl perform patch point missing")
+endif()
+string(REPLACE "${PV_CURL_PERFORM_OLD}" "${PV_CURL_PERFORM_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
 # Preserve safe transport classification without logging URLs or response bodies.
 set(PLUS_VITA_CURL_ERROR_OLD [=[
 		err = CHIAKI_ERR_NETWORK;

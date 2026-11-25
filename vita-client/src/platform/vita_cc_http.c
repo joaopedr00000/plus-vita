@@ -144,11 +144,12 @@ static __attribute__((unused)) ChiakiErrorCode add_request_header(int request_id
 	return result < 0 ? CHIAKI_ERR_INVALID_DATA : CHIAKI_ERR_SUCCESS;
 }
 
-ChiakiErrorCode cc_http_perform(ChiakiLog *log, const CCHttpRequest *request,
-	CCHttpResponse *response)
+ChiakiErrorCode plus_vita_http_perform_detailed(ChiakiLog *log, const CCHttpRequest *request,
+	CCHttpResponse *response,int *native_code)
 {
-	extern ChiakiErrorCode plus_vita_curl_http_perform(ChiakiLog *,
-		const CCHttpRequest *, CCHttpResponse *);
+	extern ChiakiErrorCode plus_vita_curl_http_perform_detail(ChiakiLog *,
+		const CCHttpRequest *, CCHttpResponse *,int *);
+	if(native_code)*native_code=0;
 	if(!request || !request->url || !response)
 		return CHIAKI_ERR_INVALID_DATA;
 	memset(response, 0, sizeof(*response));
@@ -169,12 +170,16 @@ ChiakiErrorCode cc_http_perform(ChiakiLog *log, const CCHttpRequest *request,
 	{
 		test_last_stage = "curl-init";
 		test_last_native_result = global_result;
+		if(native_code)*native_code=(int)global_result;
 		test_last_error = CHIAKI_ERR_NETWORK;
 		if(network_owned) plus_vita_network_fini();
 		return CHIAKI_ERR_NETWORK;
 	}
 
-	ChiakiErrorCode error = plus_vita_curl_http_perform(log, request, response);
+	int raw=0;
+	ChiakiErrorCode error = plus_vita_curl_http_perform_detail(log, request, response,&raw);
+	if(native_code)*native_code=raw;
+	test_last_native_result=raw;
 	test_last_stage = error == CHIAKI_ERR_SUCCESS ? "curl-complete" : "curl-perform";
 	test_last_error = error;
 	test_last_status = (int)response->status_code;
@@ -345,6 +350,10 @@ cleanup:
 		cc_http_response_fini(response);
 	return error;
 #endif
+}
+ChiakiErrorCode cc_http_perform(ChiakiLog *log,const CCHttpRequest *request,CCHttpResponse *response)
+{
+	return plus_vita_http_perform_detailed(log,request,response,NULL);
 }
 #else
 ChiakiErrorCode cc_http_perform(ChiakiLog *log, const CCHttpRequest *request,
