@@ -245,6 +245,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          branch_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.1" --jq '.object.sha')
+          if [ "$branch_sha" != "$GITHUB_SHA" ]; then
+            echo "A newer release revision exists; skipping superseded commit."
+            exit 0
+          fi
           if gh release view v0.0.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release already exists; refusing to replace published assets"
             exit 1

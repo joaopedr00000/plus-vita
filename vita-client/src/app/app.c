@@ -282,7 +282,7 @@ static void reporting_view(PlusVitaApp *app)
 	snprintf(app->reporting_status, sizeof(app->reporting_status), "Log: %s\n"
 		"Copy with VitaShell before Play, Retry or app restart.\n"
 		"Review it, then attach it yourself at:\n"
-		"github.com/Calligula87/plus-vita/issues/new\n"
+		"github.com/joaopedr00000/plus-vita/issues/new\n"
 		"Include steps, expected/actual result and version %s.\n"
 		"Never share sign-in JSON, account files or private screenshots.",
 		app->log_available ? PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable; report without a log",
