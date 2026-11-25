@@ -41,7 +41,7 @@ typedef enum {
 	PLUS_VITA_ACTION_BIND_ACTION, PLUS_VITA_ACTION_FRONT_MOTION, PLUS_VITA_ACTION_CONTROL_DEFAULTS,
 	PLUS_VITA_ACTION_SAVE_CONTROLS, PLUS_VITA_ACTION_CANCEL_CONTROLS,
 	PLUS_VITA_ACTION_BIND_PREVIOUS, PLUS_VITA_ACTION_BIND_NEXT,
-	PLUS_VITA_ACTION_DATACENTER, PLUS_VITA_ACTION_DC_PREVIOUS, PLUS_VITA_ACTION_DC_NEXT, PLUS_VITA_ACTION_BITRATE, PLUS_VITA_ACTION_QR_PAIR, PLUS_VITA_ACTION_HUD, PLUS_VITA_ACTION_REGION, PLUS_VITA_ACTION_SONY_LOGIN, PLUS_VITA_ACTION_TOKEN_LOGIN, PLUS_VITA_ACTION_REVERSE_QR, PLUS_VITA_ACTION_LAN_LOGIN
+	PLUS_VITA_ACTION_DATACENTER, PLUS_VITA_ACTION_DC_PREVIOUS, PLUS_VITA_ACTION_DC_NEXT, PLUS_VITA_ACTION_BITRATE, PLUS_VITA_ACTION_QR_PAIR, PLUS_VITA_ACTION_HUD, PLUS_VITA_ACTION_REGION, PLUS_VITA_ACTION_SONY_LOGIN, PLUS_VITA_ACTION_TOKEN_LOGIN, PLUS_VITA_ACTION_REVERSE_QR, PLUS_VITA_ACTION_LAN_LOGIN, PLUS_VITA_ACTION_LANGUAGE
 } PlusVitaAppAction;
 typedef struct {
 	PlusVitaAppAction id;
@@ -71,6 +71,7 @@ typedef struct {
 	unsigned stream_profile;
 	bool stream_hud;
 	unsigned region_mode;
+	unsigned ui_language;
 } PlusVitaAppView;
 typedef enum {
 	PLUS_VITA_EVENT_PAD,
@@ -127,6 +128,7 @@ typedef struct {
 	unsigned stream_profile;
 	bool stream_hud;
 	unsigned region_mode;
+	unsigned ui_language;
 	bool log_available;
 	unsigned play_stage;
 	unsigned auth_stage;
@@ -158,6 +160,7 @@ typedef struct {
 	unsigned profile_kbps;
 	bool hud;
 	unsigned region_mode;
+	unsigned ui_language;
 	char store_country[8], store_language[8], language[8];
 	PlusVitaControlLayout controls;
 } PlusVitaAppEffect;

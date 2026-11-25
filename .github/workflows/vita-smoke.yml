@@ -69,6 +69,11 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
+      - name: Test 19 locale tables
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_i18n.c -o /tmp/pv-i18n
+          /tmp/pv-i18n
       - name: Test local QR login HTTP validation
         if: github.ref == 'refs/heads/beta3'
         run: |

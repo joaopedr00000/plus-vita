@@ -216,18 +216,19 @@ static int menu_read(PlusVitaController *controller,SceCtrlData *pad)
 
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "../platform/region_policy.h"
+#include "i18n.h"
 #define PV_STREAM_PREFS "ux0:data/plus-vita-stream.cfg"
 static void stream_prefs_load(PlusVitaApp *app)
 {
-	unsigned profile=15000,hud=0,region=0;char extra=0;
+	unsigned profile=15000,hud=0,region=0,lang=0;char extra=0;
 	FILE *f=fopen(PV_STREAM_PREFS,"rb");
-	if(f){unsigned p=0,h=0,r=0;int n=fscanf(f,"%u %u %u %c",&p,&h,&r,&extra);if((n==2||n==3)&&pv_profile_cap(p)==p&&h<=1&&pv_region_mode(r)==r){profile=p;hud=h;region=r;}fclose(f);}
-	plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_SETTINGS,.stream_profile=profile,.stream_hud=hud!=0,.region_mode=region});
+	if(f){unsigned p=0,h=0,r=0,l=0;int n=fscanf(f,"%u %u %u %u %c",&p,&h,&r,&l,&extra);if((n>=2&&n<=4)&&pv_profile_cap(p)==p&&h<=1&&pv_region_mode(r)==r&&pv_language(l)==l){profile=p;hud=h;region=r;lang=l;}fclose(f);}
+	plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_SETTINGS,.stream_profile=profile,.stream_hud=hud!=0,.region_mode=region,.ui_language=lang});
 }
-static void stream_prefs_save(unsigned profile,bool hud,unsigned region)
+static void stream_prefs_save(unsigned profile,bool hud,unsigned region,unsigned lang)
 {
 	FILE *f=fopen(PV_STREAM_PREFS ".tmp","wb");if(!f)return;
-	bool ok=fprintf(f,"%u %u %u\n",profile,(unsigned)hud,region)>0;
+	bool ok=fprintf(f,"%u %u %u %u\n",profile,(unsigned)hud,region,lang)>0;
 	if(fclose(f)!=0)ok=false;
 	if(!ok||rename(PV_STREAM_PREFS ".tmp",PV_STREAM_PREFS)!=0)remove(PV_STREAM_PREFS ".tmp");
 }
@@ -282,7 +283,7 @@ int plus_vita_app_run(void)
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	stream_prefs_load(app);
 	PlusVitaAppView saved_prefs=plus_vita_app_view(app);
-	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode;bool saved_hud=saved_prefs.stream_hud;
+	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
 #endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
 	int result = 0;
@@ -291,8 +292,8 @@ int plus_vita_app_run(void)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
 		PlusVitaAppView prefs=plus_vita_app_view(app);
-		if(prefs.stream_profile!=saved_profile||prefs.stream_hud!=saved_hud||prefs.region_mode!=saved_region){
-			saved_profile=prefs.stream_profile;saved_hud=prefs.stream_hud;saved_region=prefs.region_mode;stream_prefs_save(saved_profile,saved_hud,saved_region);
+		if(prefs.stream_profile!=saved_profile||prefs.stream_hud!=saved_hud||prefs.region_mode!=saved_region||prefs.ui_language!=saved_lang){
+			saved_profile=prefs.stream_profile;saved_hud=prefs.stream_hud;saved_region=prefs.region_mode;saved_lang=prefs.ui_language;stream_prefs_save(saved_profile,saved_hud,saved_region,saved_lang);
 		}
 #endif
 		plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());

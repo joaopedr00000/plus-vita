@@ -10,6 +10,9 @@
 #include <json_tokener.h>
 #include "../platform/cloud_experimental.h"
 #include "../platform/region_policy.h"
+#if PLUS_VITA_ADAPTIVE_STREAM
+#include "i18n.h"
+#endif
 
 #ifndef PLUS_VITA_APP_VERSION
 #define PLUS_VITA_APP_VERSION "v000"
@@ -56,8 +59,9 @@ struct plus_vita_app_t {
 	char selected_dc[128];
 	unsigned requested_kbps;
 #endif
-	unsigned region_mode;
+	unsigned region_mode,ui_language;
 	bool regional_catalogue;
+	char locale_label[128];
 };
 
 static void welcome(PlusVitaApp *app)
@@ -122,8 +126,11 @@ static void settings_view(PlusVitaApp *app)
 #if PLUS_VITA_ADAPTIVE_STREAM
 	app->view.actions[5]=app->view.actions[4];
 	app->view.actions[4]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,36};
-	app->view.action_count=6;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=244+(int)i*42;app->view.actions[i].height=36;}
+	app->view.action_count=7;
+	app->view.actions[6]=app->view.actions[5];
+	snprintf(app->locale_label,sizeof(app->locale_label),"%s: %s",pv_translate(app->ui_language,"Language"),pv_locale_names[pv_language(app->ui_language)]);
+	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_LANGUAGE,app->locale_label,64,0,832,34};
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
 	app->view.body="Regional hints apply at next sign-in. No IP or PSN region changes. Cloud eligibility remains server controlled.";
 #endif
 }
@@ -315,7 +322,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	memcpy(view.artwork_metadata,app->artwork_metadata,sizeof(view.artwork_metadata));
 	view.account_connected=app->connected;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;
+	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
 #endif
 	if(!view.list_total && view.action_count) {
 		view.list_total=view.action_count;view.focus=view.selected;
@@ -337,6 +344,11 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		const PlusVitaAppButton *last=&view.actions[view.action_count-1];
 		view.list_height=last->y+last->height-view.list_y;
 	}
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	if(view.screen!=PLUS_VITA_APP_DETAILS&&view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)view.title=pv_translate(app->ui_language,view.title);
+	view.body=pv_translate(app->ui_language,view.body);
+	for(size_t i=0;i<view.action_count;i++)if(view.actions[i].id!=PLUS_VITA_ACTION_GAME&&view.actions[i].id!=PLUS_VITA_ACTION_DATACENTER)view.actions[i].label=pv_translate(app->ui_language,view.actions[i].label);
+	#endif
 	return view;
 }
 
@@ -857,7 +869,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	PlusVitaAppEffect effect = { .kind = PLUS_VITA_EFFECT_NONE };
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
-		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);return effect;
+		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);app->ui_language=pv_language(event.ui_language);return effect;
 	}
 #endif
 	if(event.kind==PLUS_VITA_EVENT_CONTROLS_LOADED) {
@@ -1398,6 +1410,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(action == PLUS_VITA_ACTION_ACCOUNT) { app->account_from_settings = view->screen == PLUS_VITA_APP_SETTINGS; account_view(app); }
 		else if(action == PLUS_VITA_ACTION_SETTINGS) { app->welcome_selection = view->selected; settings_view(app); }
 #if PLUS_VITA_ADAPTIVE_STREAM
+		else if(action==PLUS_VITA_ACTION_LANGUAGE&&view->screen==PLUS_VITA_APP_SETTINGS){
+			app->ui_language=(pv_language(app->ui_language)+1)%PV_LANG_COUNT;settings_view(app);view->selected=5;
+		}
 		else if(action==PLUS_VITA_ACTION_REGION&&(view->screen==PLUS_VITA_APP_SETUP||view->screen==PLUS_VITA_APP_SETTINGS)){
 			app->region_mode=(pv_region_mode(app->region_mode)+1)%4;
 			if(view->screen==PLUS_VITA_APP_SETUP)setup_view(app);else settings_view(app);
