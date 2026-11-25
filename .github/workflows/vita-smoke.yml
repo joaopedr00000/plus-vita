@@ -251,7 +251,17 @@ jobs:
             exit 0
           fi
           if gh release view v0.0.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release already exists; refusing to replace published assets"
-            exit 1
+            # Only the known in-flight initial release may be corrected. Do not
+            # replace any unrelated release or move an unexpected tag.
+            old_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.0.1" --jq '.object.sha')
+            if [ "$old_sha" != "f16c17bd298507f72d066e94d68f444493a61c81" ]; then
+              echo "Release already exists with an unexpected tag; refusing replacement"
+              exit 1
+            fi
+            gh release edit v0.0.1 --repo "$GITHUB_REPOSITORY" --draft=true
+            gh release upload v0.0.1 dist/plus-vita-v0.0.1.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v0.0.1" -X PATCH -f sha="$GITHUB_SHA" -F force=true --jq '.object.sha' | grep -Fx "$GITHUB_SHA"
+            gh release edit v0.0.1 --repo "$GITHUB_REPOSITORY" --title "Plus-Vita v0.0.1" --notes-file release/v0.0.1.md --draft=false --latest
+          else
+            gh release create v0.0.1 dist/plus-vita-v0.0.1.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Plus-Vita v0.0.1" --notes-file release/v0.0.1.md --latest
           fi
-          gh release create v0.0.1 dist/plus-vita-v0.0.1.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Plus-Vita v0.0.1" --notes-file release/v0.0.1.md --latest
