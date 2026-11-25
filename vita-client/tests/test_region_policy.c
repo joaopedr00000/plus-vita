@@ -7,6 +7,9 @@ int main(void){
     assert(pv_region_mode(1)==1&&pv_region_mode(2)==1&&pv_region_mode(3)==1);
     assert(pv_region_account_locale_valid("BR","pt"));
     assert(pv_region_account_locale_valid("US","en"));
+    assert(pv_region_account_locale_valid("CH","de-CH"));
+    assert(pv_region_account_locale_valid("BR","pt-BR"));
+    assert(!pv_region_account_locale_valid("US","en/US"));
     assert(!pv_region_account_locale_valid("USA","en"));
     assert(!pv_region_account_locale_valid("US","e/"));
     assert(!pv_region_account_locale_valid("","en"));
