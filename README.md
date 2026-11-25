@@ -8,6 +8,8 @@
 
 An experimental fork of Plus-Vita. The visual update does not introduce new streaming functionality.
 
+**v0.0.3 development candidate:** verified encrypted-save cleanup and account-region-only discovery. See [release notes](release/v0.0.3.md) and [roadmap](docs/ROADMAP.md). The v0.0.2 download remains the previous release; v0.0.3 is not yet hardware-validated.
+
 ## Beta 1 — PS5 Cloud experimental
 
 [Release notes (English / Português)](release/v0.1.0-beta.1.md) · [Build instructions](release/BETA1_BUILD.md)
