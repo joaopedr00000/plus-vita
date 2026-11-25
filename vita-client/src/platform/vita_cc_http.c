@@ -164,7 +164,7 @@ ChiakiErrorCode plus_vita_http_perform_detailed(ChiakiLog *log, const CCHttpRequ
 		test_last_error = CHIAKI_ERR_NETWORK;
 		return CHIAKI_ERR_NETWORK;
 	}
-	setenv("CHIAKI_CA_BUNDLE", "app0:cacert.pem", 1);
+	/* The generated transport supplies the immutable embedded CA bundle. */
 	CURLcode global_result = curl_global_init(CURL_GLOBAL_DEFAULT);
 	if(global_result != CURLE_OK)
 	{

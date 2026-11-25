@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 #include "curl_resolve.h"
+#include "pv_embedded_ca.h"
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -114,8 +115,8 @@ CURLcode plus_vita_curl_prepare_resolve(CURL *curl, const char *url,
 	return result;
 }
 
-/* Read the bundled trust store through newlib, not the TLS backend's
- * filesystem adapter. Never use an unverified connection. */
+/* Same public roots as the packaged PEM, directly in read-only memory.
+ * Include the terminating NUL for mbedTLS PEM parsing. */
 CURLcode plus_vita_curl_secure_options(CURL *curl)
 {
 	if(!curl)return CURLE_BAD_FUNCTION_ARGUMENT;
@@ -124,24 +125,16 @@ CURLcode plus_vita_curl_secure_options(CURL *curl)
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)CURL_SSLVERSION_TLSv1_2);
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_HTTP_VERSION,(long)CURL_HTTP_VERSION_1_1);
 	if(rc!=CURLE_OK)return rc;
-	FILE *f=fopen("app0:cacert.pem","rb");
-	if(!f)return CURLE_SSL_CACERT_BADFILE;
-	if(fseek(f,0,SEEK_END)!=0){fclose(f);return CURLE_SSL_CACERT_BADFILE;}
-	long size=ftell(f);
-	if(size<=0||size>1024*1024||fseek(f,0,SEEK_SET)!=0){fclose(f);return CURLE_SSL_CACERT_BADFILE;}
-	char *pem=malloc((size_t)size+1);
-	if(!pem){fclose(f);return CURLE_OUT_OF_MEMORY;}
-	bool ok=fread(pem,1,(size_t)size,f)==(size_t)size;
-	fclose(f);pem[size]=0;
-	if(!ok||!strstr(pem,"-----BEGIN CERTIFICATE-----")){free(pem);return CURLE_SSL_CACERT_BADFILE;}
 #if LIBCURL_VERSION_NUM >= 0x074d00
-	struct curl_blob blob={.data=pem,.len=(size_t)size,.flags=CURL_BLOB_COPY};
-	rc=curl_easy_setopt(curl,CURLOPT_CAINFO_BLOB,&blob);
+	struct curl_blob blob={.data=(void *)pv_ca_pem,.len=sizeof(pv_ca_pem),.flags=CURL_BLOB_NOCOPY};
+	rc=curl_easy_setopt(curl,CURLOPT_CAINFO,NULL);
+	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_CAPATH,NULL);
+	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_CAINFO_BLOB,&blob);
 	if(rc==CURLE_UNKNOWN_OPTION||rc==CURLE_NOT_BUILT_IN)
 		rc=curl_easy_setopt(curl,CURLOPT_CAINFO,"app0:cacert.pem");
 #else
+	(void)pv_ca_pem;
 	rc=curl_easy_setopt(curl,CURLOPT_CAINFO,"app0:cacert.pem");
 #endif
-	free(pem);
 	return rc;
 }

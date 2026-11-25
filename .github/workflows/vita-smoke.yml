@@ -69,6 +69,12 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
+      - name: Test embedded public CA bundle parsing
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cmake -DPV_CA_INPUT="$PWD/vita-client/cacert.pem" -DPV_CA_OUTPUT=/tmp/pv-ca/pv_embedded_ca.h -P vita-client/cmake/embedded_ca.cmake
+          cc -std=c11 -Wall -Wextra -Werror -I/tmp/pv-ca vita-client/tests/test_embedded_ca.c -lmbedx509 -lmbedcrypto -o /tmp/pv-ca-test
+          /tmp/pv-ca-test
       - name: Test 19 locale tables
         if: github.ref == 'refs/heads/beta3'
         run: |

@@ -634,6 +634,10 @@ file(WRITE "${PLUS_VITA_FEEDBACK_SOURCE}" "${PLUS_VITA_FEEDBACK_TEXT}")
 # Generate a Vita-only curl transport copy which seeds CURLOPT_RESOLVE from a
 # synchronous IPv4 lookup. This avoids VitaSDK libcurl's crashing threaded
 # resolver cleanup while preserving TLS hostname verification.
+set(PV_CA_INPUT "${CMAKE_CURRENT_LIST_DIR}/cacert.pem")
+set(PV_CA_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/pv_embedded_ca.h")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PV_CA_INPUT}")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/embedded_ca.cmake")
 set(PLUS_VITA_CURL_HTTP_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/curl_http_vita.c")
 file(READ "${PYLUX_ROOT}/lib/src/curl_http.c" PLUS_VITA_CURL_HTTP_TEXT)
 string(REPLACE "#include \"curl_http.h\""
@@ -892,6 +896,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   "${PYLUX_ROOT}/lib/src"
   "${NANOPB_ROOT}"
   "${CMAKE_CURRENT_LIST_DIR}/generated"
+  "${CMAKE_CURRENT_BINARY_DIR}/generated"
   "${VITASDK_COMMON}"
 )
 
