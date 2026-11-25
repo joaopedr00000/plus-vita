@@ -148,7 +148,7 @@ static void settings_view(PlusVitaApp *app)
 	snprintf(app->locale_label,sizeof(app->locale_label),"%s: %s",pv_translate(app->ui_language,"Language"),pv_locale_names[pv_language(app->ui_language)]);
 	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_LANGUAGE,app->locale_label,64,0,832,34};
 	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
-	app->view.body="Regional hints apply at next sign-in. No IP or PSN region changes. Cloud eligibility remains server controlled.";
+	app->view.body="Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled.";
 #endif
 }
 
