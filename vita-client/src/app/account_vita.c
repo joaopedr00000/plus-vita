@@ -64,6 +64,8 @@ static void authorize(PlusVitaAccount *account)
 	else if(!result->store_transport_ok) account->result.status = PLUS_VITA_RESULT_NETWORK_ERROR;
 	else if((!result->store_resolved || !result->native_catalog_complete)&&!result->regional_catalog_complete) account->result.status = PLUS_VITA_RESULT_CATALOGUE_ERROR;
 	else account->result.status = PLUS_VITA_RESULT_OK;
+	account->result.auth_stage=result->transport_stage;
+	account->result.auth_transport_error=result->transport_error;
 	account->result.regional_catalogue=result->regional_catalog_complete;
 	account->result.entries = result->native_titles;
 	account->result.entry_count = result->native_titles_count;

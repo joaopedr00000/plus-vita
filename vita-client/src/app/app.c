@@ -37,7 +37,7 @@ struct plus_vita_app_t {
 	PlusVitaAppScreen storage_return;
 	char label[129], online_id[129], account_status[512];
 	char store_country[8], store_language[8], language[8];
-	char settings_status[256], reporting_status[512];
+	char settings_status[256], reporting_status[512], auth_status[256];
 	uint32_t previous_buttons;
 	int previous_direction;
 	uint64_t repeat_at;
@@ -1058,7 +1058,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			{
 				app->retry_account = event.status != PLUS_VITA_RESULT_REJECTED;
 				if(event.status == PLUS_VITA_RESULT_REJECTED) return remove_saved(app, false, true);
-				account_error(app, result_message(event.status));
+				if(event.status==PLUS_VITA_RESULT_NETWORK_ERROR&&event.auth_stage){
+					const char *stage=event.auth_stage==1?"Sony authorization":event.auth_stage==2?"Sony session":"Sony store";
+					const char *reason=event.auth_transport_error==2?"DNS lookup failed":event.auth_transport_error==9?"Connection failed":event.auth_transport_error==15?"Connection timed out":event.auth_transport_error==16?"TLS verification or handshake failed":event.auth_transport_error==14?"Request cancelled":"Network transport failed";
+					snprintf(app->auth_status,sizeof(app->auth_status),"%s: %s (E%d).\nCheck Wi-Fi, DNS and system date/time. Retry keeps your token.",stage,reason,event.auth_transport_error);
+					account_error(app,app->auth_status);
+				}else account_error(app, result_message(event.status));
 				return effect;
 			}
 			if(event.entry_count > 4096 || (event.entry_count && !event.entries))

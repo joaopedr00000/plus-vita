@@ -652,7 +652,7 @@ set(PLUS_VITA_CURL_URL_NEW [=[
 	{
 		if(log)
 			CHIAKI_LOGE(log, "cc_http_perform: synchronous DNS failed: %s", curl_easy_strerror(resolve_result));
-		err = CHIAKI_ERR_NETWORK;
+		err = resolve_result == CURLE_COULDNT_RESOLVE_HOST ? CHIAKI_ERR_PARSE_ADDR : CHIAKI_ERR_NETWORK;
 		goto cleanup;
 	}
 	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
@@ -667,6 +667,35 @@ string(REPLACE "${PLUS_VITA_CURL_URL_OLD}" "${PLUS_VITA_CURL_URL_NEW}"
 string(REPLACE "if(header_list)\n\t\tcurl_slist_free_all(header_list);"
   "if(header_list)\n\t\tcurl_slist_free_all(header_list);\n\tif(resolve_list)\n\t\tcurl_slist_free_all(resolve_list);"
   PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
+# Preserve safe transport classification without logging URLs or response bodies.
+set(PLUS_VITA_CURL_ERROR_OLD [=[
+		err = CHIAKI_ERR_NETWORK;
+		goto cleanup;
+	}
+
+	long status = 0;
+]=])
+set(PLUS_VITA_CURL_ERROR_NEW [=[
+		switch(res) {
+		case CURLE_COULDNT_RESOLVE_HOST: err = CHIAKI_ERR_PARSE_ADDR; break;
+		case CURLE_COULDNT_CONNECT: err = CHIAKI_ERR_HOST_UNREACH; break;
+		case CURLE_OPERATION_TIMEDOUT: err = CHIAKI_ERR_TIMEOUT; break;
+		case CURLE_SSL_CONNECT_ERROR:
+		case CURLE_PEER_FAILED_VERIFICATION:
+		case CURLE_SSL_CACERT_BADFILE: err = CHIAKI_ERR_INVALID_RESPONSE; break;
+		case CURLE_ABORTED_BY_CALLBACK: err = CHIAKI_ERR_CANCELED; break;
+		default: err = CHIAKI_ERR_NETWORK; break;
+		}
+		goto cleanup;
+	}
+
+	long status = 0;
+]=])
+string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PLUS_VITA_CURL_ERROR_OLD}" PLUS_VITA_CURL_ERROR_POS)
+if(PLUS_VITA_CURL_ERROR_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux curl error patch point not found")
+endif()
+string(REPLACE "${PLUS_VITA_CURL_ERROR_OLD}" "${PLUS_VITA_CURL_ERROR_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
 file(WRITE "${PLUS_VITA_CURL_HTTP_SOURCE}" "${PLUS_VITA_CURL_HTTP_TEXT}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/cloudsession_source.cmake")

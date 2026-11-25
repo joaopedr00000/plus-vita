@@ -129,6 +129,8 @@ typedef struct {
 	unsigned region_mode;
 	bool log_available;
 	unsigned play_stage;
+	unsigned auth_stage;
+	int auth_transport_error;
 	char store_country[8], store_language[8], language[8];
 	char account_name[129];
 	PlusVitaControlLayout controls;

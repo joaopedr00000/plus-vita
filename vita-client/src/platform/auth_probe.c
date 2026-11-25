@@ -542,8 +542,13 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse response = { 0 };
 	result->attempted = true;
-	result->transport_ok = cc_http_perform(NULL, &request, &response)
-		== CHIAKI_ERR_SUCCESS;
+	result->transport_stage=1;
+	result->transport_error=cc_http_perform(NULL,&request,&response);
+	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
+		wipe_response(&response);
+		result->transport_error=cc_http_perform(NULL,&request,&response);
+	}
+	result->transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->http_status = response.status_code;
 	char code[1024] = { 0 };
 	result->authorized = result->transport_ok && response.status_code == 302
@@ -583,8 +588,9 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse session_response = { 0 };
 	char jsession[512] = { 0 };
-	result->session_transport_ok = cc_http_perform(NULL, &session_request,
-		&session_response) == CHIAKI_ERR_SUCCESS;
+	result->transport_stage=2;
+	result->transport_error=cc_http_perform(NULL,&session_request,&session_response);
+	result->session_transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->session_http_status = session_response.status_code;
 	result->session_created = result->session_transport_ok
 		&& session_response.status_code == 200
@@ -615,8 +621,13 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse store_response = { 0 };
 	char store_base_url[1024] = { 0 };
-	result->store_transport_ok = cc_http_perform(NULL, &store_request,
-		&store_response) == CHIAKI_ERR_SUCCESS;
+	result->transport_stage=3;
+	result->transport_error=cc_http_perform(NULL,&store_request,&store_response);
+	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
+		wipe_response(&store_response);
+		result->transport_error=cc_http_perform(NULL,&store_request,&store_response);
+	}
+	result->store_transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
 	result->store_http_status = store_response.status_code;
 	result->store_resolved = result->store_transport_ok
 		&& store_response.status_code == 200

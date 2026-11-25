@@ -68,10 +68,18 @@ CURLcode plus_vita_curl_prepare_resolve(CURL *curl, const char *url,
 		return CURLE_COULDNT_RESOLVE_HOST;
 	}
 
-	char address[INET_ADDRSTRLEN];
-	struct sockaddr_in *resolved = (struct sockaddr_in *)addresses->ai_addr;
-	bool converted = inet_ntop(AF_INET, &resolved->sin_addr,
-		address, sizeof(address)) != NULL;
+	char address[INET_ADDRSTRLEN * 8] = {0};
+	size_t used=0; unsigned count=0;
+	for(struct addrinfo *it=addresses;it&&count<8;it=it->ai_next){
+		if(it->ai_family!=AF_INET||!it->ai_addr||it->ai_addrlen<sizeof(struct sockaddr_in))continue;
+		char ip[INET_ADDRSTRLEN];
+		struct sockaddr_in *resolved=(struct sockaddr_in *)it->ai_addr;
+		if(!inet_ntop(AF_INET,&resolved->sin_addr,ip,sizeof(ip)))continue;
+		int n=snprintf(address+used,sizeof(address)-used,"%s%s",count?",":"",ip);
+		if(n<0||(size_t)n>=sizeof(address)-used)break;
+		used+=(size_t)n;count++;
+	}
+	bool converted=count>0;
 	freeaddrinfo(addresses);
 	if(!converted)
 	{

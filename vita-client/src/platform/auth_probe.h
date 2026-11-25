@@ -27,6 +27,8 @@ typedef struct plus_vita_auth_probe_result_t
 	bool attempted;
 	bool format_valid;
 	bool transport_ok;
+	unsigned transport_stage;
+	int transport_error;
 	bool authorized;
 	bool credential_rejected;
 	bool session_transport_ok;
