@@ -55,9 +55,9 @@ struct plus_vita_app_t {
 	bool auto_retry;
 	char selected_dc[128];
 	unsigned requested_kbps;
+#endif
 	unsigned region_mode;
 	bool regional_catalogue;
-#endif
 };
 
 static void welcome(PlusVitaApp *app)
@@ -613,6 +613,7 @@ static void clear_runtime(PlusVitaApp *app)
 	free(app->catalogue);
 	app->catalogue = NULL;
 	app->catalogue_count = app->catalogue_selection = 0; app->catalogue_first=0;
+	app->regional_catalogue=false;
 	memset(app->label, 0, sizeof(app->label));
 	memset(app->online_id, 0, sizeof(app->online_id));
 	memset(app->store_country, 0, sizeof(app->store_country));
