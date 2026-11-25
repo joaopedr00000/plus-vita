@@ -1184,7 +1184,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->retry_save = false;
 #if PLUS_VITA_ACCOUNT_VAULT
 			app->vault_present=event.vault_present;app->vault_legacy=false;app->vault_mode=event.vault_mode;
-			if(app->storage_return==PLUS_VITA_APP_SECURITY){security_view(app,event.import_cleanup_failed?"Vault saved, but imported JSON could not be removed.":NULL);return effect;}
+			if(event.import_cleanup_failed||app->storage_return==PLUS_VITA_APP_SECURITY){security_view(app,event.import_cleanup_failed?"Vault saved, but imported JSON could not be removed.":NULL);return effect;}
 #endif
 			if(app->storage_return == PLUS_VITA_APP_ACCOUNT) account_view(app); else catalogue_view(app);
 			return effect;
@@ -1643,7 +1643,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->ui_language=(pv_language(app->ui_language)+1)%PV_LANG_COUNT;settings_view(app);view->selected=5;
 		}
 		else if(action==PLUS_VITA_ACTION_REGION&&(view->screen==PLUS_VITA_APP_SETUP||view->screen==PLUS_VITA_APP_SETTINGS)){
-			app->region_mode=(pv_region_mode(app->region_mode)+1)%4;
+			app->region_mode=(pv_region_mode(app->region_mode)+1)%2;
 			if(view->screen==PLUS_VITA_APP_SETUP)setup_view(app);else settings_view(app);
 		}
 #endif
