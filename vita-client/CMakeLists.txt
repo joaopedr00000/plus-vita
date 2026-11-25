@@ -695,6 +695,65 @@ if(PV_POS EQUAL -1)
   message(FATAL_ERROR "Pylux transport status patch point 3 not found")
 endif()
 string(REPLACE "${PV_HTTP_OLD}" "${PV_HTTP_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+# Vita-only response compatibility: accept service-issued IDs and known DC envelopes.
+set(PV_COMPAT_OLD [=[#include "curl_http.h"]=])
+set(PV_COMPAT_NEW [=[#include "curl_http.h"
+#include "cloud_response.h"
+#include "diagnostic_log.h"]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux response compatibility patch point 1 not found")
+endif()
+string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_COMPAT_OLD [=[	if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } json_object_put(j); }]=])
+set(PV_COMPAT_NEW [=[	if(j) {
+        const char *sid = cc_json_str(j, "sessionId");
+        bool valid = !c->pscloud || vp_cloud_session_ids(j,c->gk_client_id,c->stream_server_client_id);
+        if(valid && *sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); }
+        json_object_put(j);
+    }]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux response compatibility patch point 2 not found")
+endif()
+string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_COMPAT_OLD [=[	struct json_object *dcs = json_tokener_parse(resp.data);
+	cc_http_response_fini(&resp);]=])
+set(PV_COMPAT_NEW [=[	struct json_object *root = json_tokener_parse(resp.data);
+    struct json_object *dcs = vp_cloud_dc_array(root);
+    if(dcs) json_object_get(dcs);
+    if(root) json_object_put(root);
+    cc_http_response_fini(&resp);]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux response compatibility patch point 3 not found")
+endif()
+string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_COMPAT_OLD [=[	ChiakiErrorCode e = cc_http_perform(c->log, &req, resp_out);
+	free(h_ua);]=])
+set(PV_COMPAT_NEW [=[	ChiakiErrorCode e = cc_http_perform(c->log, &req, resp_out);
+    if(resp_out->status_code>=100 && resp_out->status_code<=599)
+        plus_vita_diagnostic_event("allocation.http",(int)resp_out->status_code);
+    if(resp_out->status_code>=400){
+        char *ev = gk_header_value(resp_out->headers,"x-gaikai-event");
+        unsigned code=vp_cloud_event(ev);
+        free(ev);
+        if(!code)code=vp_cloud_event(resp_out->data);
+        plus_vita_diagnostic_event("allocation.reason",(int)code);
+    }
+    free(h_ua);]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux response compatibility patch point 4 not found")
+endif()
+string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_COMPAT_OLD [=[		CHIAKI_LOGE(c->log, "[GAIKAI] step9 authorize http %ld: %s", resp.status_code, resp.data ? resp.data : "");]=])
+set(PV_COMPAT_NEW [=[		CHIAKI_LOGE(c->log, "[GAIKAI] step9 authorize http %ld", resp.status_code);]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux response compatibility patch point 5 not found")
+endif()
+string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
 file(WRITE "${PLUS_VITA_GAIKAI_SOURCE}" "${PLUS_VITA_GAIKAI_TEXT}")
 
 # Preserve a release and a new touch in one update when a contact slot is

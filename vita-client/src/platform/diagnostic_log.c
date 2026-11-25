@@ -372,7 +372,7 @@ bool plus_vita_diagnostic_begin(void)
 
 void plus_vita_diagnostic_event(const char *event, int code)
 {
-	static const char *const names[]={"allocation.begin","allocation.complete","allocation.stage","allocation.phase",
+	static const char *const names[]={"allocation.begin","allocation.complete","allocation.stage","allocation.phase","allocation.http","allocation.reason",
 		"allocation.network.init","allocation.network.release","stream_probe.begin","stream_probe.complete",
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
@@ -384,6 +384,8 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			if(!strcmp(names[i],"ui.stage")) code=code>=0 && code<=17 ? code : 0;
 			else if(!strcmp(names[i],"allocation.stage")) code=code>=0 && code<=5 ? code : 0;
 			else if(!strcmp(names[i],"allocation.phase")) code=code>=0 && code<=11 ? code : 0;
+			else if(!strcmp(names[i],"allocation.http")) code=code>=100 && code<=599 ? code : 0;
+			else if(!strcmp(names[i],"allocation.reason")) code=code>=0 && code<=11 ? code : 0;
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
 			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")||!strcmp(names[i],"catalog.phase")) code=code>=0&&code<=20?code:-1;
 			else code=code>=-1 && code<=21 ? code : -1;
