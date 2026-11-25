@@ -14,6 +14,7 @@ option(PLUS_VITA_PS5_EXPERIMENTAL "Manual datacenter picker and experimental PS5
 option(PLUS_VITA_BETA1 "Build the separately identified PS5 Cloud beta" OFF)
 option(PLUS_VITA_BETA2 "Build Beta 2 with experimental QR pairing" OFF)
 option(PLUS_VITA_BETA3 "Build adaptive streaming beta" OFF)
+option(PLUS_VITA_FINAL_001 "Package the tested r3 profile as v0.0.1" OFF)
 set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
@@ -86,6 +87,15 @@ if(PLUS_VITA_BETA3)
   set(VITA_APP_NAME "Plus-Vita Beta 3")
   set(VITA_VERSION "00.16")
   set(PLUS_VITA_PUBLIC_VERSION "v0.1.0-beta.3")
+endif()
+if(PLUS_VITA_FINAL_001)
+  if(NOT PLUS_VITA_BETA3)
+    message(FATAL_ERROR "v0.0.1 requires the tested catalogue-r3 profile")
+  endif()
+  # Preserve the installed beta title ID and use a monotonic Vita APP_VER.
+  set(VITA_APP_NAME "Plus-Vita")
+  set(VITA_VERSION "00.17")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.0.1")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -989,6 +999,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   PLUS_VITA_LAN_LOGIN=$<BOOL:${PLUS_VITA_BETA3}>
   PLUS_VITA_ADAPTIVE_STREAM=$<BOOL:${PLUS_VITA_BETA3}>
   $<$<BOOL:${PLUS_VITA_BETA3}>:PLUS_VITA_CATALOG_REVISION=\"catalog-r3\">
+  PLUS_VITA_FINAL_001=$<BOOL:${PLUS_VITA_FINAL_001}>
   PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
   PLUS_VITA_PS3_STARTUP_SAMPLE=$<BOOL:${PLUS_VITA_PS3_STARTUP_SAMPLE}>
