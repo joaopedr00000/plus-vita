@@ -106,6 +106,19 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 	wordmark(display,branding);
 #endif
 	text(display, PLUS_VITA_BUILD_LABEL, 712, 32, TEXT_MICRO, 220, 24, false, RGB(195, 211, 239));
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	if(view->screen==PLUS_VITA_APP_CATALOGUE){
+		text(display,view->subtitle,32,64,TEXT_HINT,896,26,false,MENU_ACCENT);
+		rectangle(display,32,150,446,320,RGB(8,32,76));
+		rectangle(display,502,150,426,320,RGB(8,32,76));
+		text(display,view->body,522,166,TEXT_HINT,390,30,false,RGB(195,211,239));
+		if(view->detail){
+			text(display,view->detail->name,522,210,TEXT_HEADING,390,136,true,RGB(243,247,252));
+			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),522,354,TEXT_CONTROL,390,42,false,MENU_ACCENT);
+		}else text(display,localized(display,"No cloud games found."),48,180,TEXT_BODY,408,120,true,RGB(210,224,247));
+		goto draw_actions;
+	}
+#endif
 	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, MENU_ACCENT);
 	text(display, view->title, 64, 128, TEXT_HEADING, 832, 54, false, RGB(243, 247, 252));
 	int body_bottom = view->action_count ? view->actions[0].y - 12 : 480;
@@ -115,7 +128,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 	}
 	if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) body_bottom=view->comparison_page ? 224 : 302;
 	text(display, view->body, 64, 196, (view->screen == PLUS_VITA_APP_ACCOUNT || view->screen==PLUS_VITA_APP_DETAILS) ? TEXT_COMPACT : TEXT_BODY,
-		view->screen == PLUS_VITA_APP_WELCOME ? 520 : view->screen==PLUS_VITA_APP_DETAILS ? 624 : 832, body_bottom - 196, view->screen!=PLUS_VITA_APP_CATALOGUE, RGB(210, 224, 247));
+		view->screen == PLUS_VITA_APP_WELCOME ? 520 : view->screen==PLUS_VITA_APP_DETAILS && !PLUS_VITA_ADAPTIVE_STREAM ? 624 : 832, body_bottom - 196, view->screen!=PLUS_VITA_APP_CATALOGUE, RGB(210, 224, 247));
 	if(view->screen==PLUS_VITA_APP_CATALOGUE && view->detail) {
 		if(view->preview_eligible || !view->detail->cover_url[0]) cover(display,covers,view->detail,744,216);
 		else {
@@ -123,7 +136,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 			text(display,localized(display,"Loading cover"),750,264,TEXT_MICRO,116,58,true,RGB(195,211,239));
 		}
 	}
-	if(view->screen==PLUS_VITA_APP_DETAILS) cover(display,covers,view->detail,744,216);
+	if(!PLUS_VITA_ADAPTIVE_STREAM && view->screen==PLUS_VITA_APP_DETAILS) cover(display,covers,view->detail,744,216);
 	if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) {
 		if(view->comparison_page) {
 			static const PlusVitaCatalogEntry samples[]={
@@ -141,6 +154,9 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 			text(display,"18 px: Agjpqy é Å Müller 日本",64,376,TEXT_COMPACT,832,32,false,RGB(210,224,247));
 		}
 	}
+	#if PLUS_VITA_ADAPTIVE_STREAM
+ draw_actions:
+	#endif
 	if(view->list_total>view->list_count && view->list_count) {
 		int height=view->list_height;
 		int thumb=(int)((size_t)height*view->list_count/view->list_total);

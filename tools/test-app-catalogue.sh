@@ -9,3 +9,6 @@ cc -std=c11 -g -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-
  vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/app_catalogue_test.c \
  -l:libjson-c.so.5 -o "$dir/test"
 "$dir/test"
+
+cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_catalog_filter.c -o "$dir/filter"
+"$dir/filter"

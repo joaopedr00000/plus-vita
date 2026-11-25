@@ -26,6 +26,9 @@ static bool capture_current(const PlusVitaUiFlow *flow,const PlusVitaAppView *vi
 /* All artwork policy lives here so production and controlled-clock journeys agree. */
 static bool artwork_tick(PlusVitaUiFlow *flow)
 {
+#if PLUS_VITA_ADAPTIVE_STREAM
+	(void)flow;return false;
+#else
 	PlusVitaAppView view=plus_vita_app_view(flow->app);
 	bool changed=false;
 	if(!flow->artwork_initialized || view.account_epoch!=flow->artwork_epoch) {
@@ -67,6 +70,7 @@ static bool artwork_tick(PlusVitaUiFlow *flow)
 	}
 	flow->preview_screen=view.screen;flow->preview_dragging=dragging;
 	flow->dirty|=changed;return changed;
+#endif
 }
 
 void plus_vita_ui_flow_start(PlusVitaUiFlow *flow,PlusVitaBranding *branding,uint64_t now_us,bool log_available)

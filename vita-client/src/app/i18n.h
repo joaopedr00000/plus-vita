@@ -72,12 +72,34 @@ static const char *const pv_dynamic[PV_LANG_COUNT][PV_DYNAMIC_COUNT]={
 {"不支援的地區：關閉","不支援的地區：美國","不支援的地區：加拿大","不支援的地區：葡萄牙","效能 HUD：開啟","效能 HUD：關閉","前觸控移動：開啟","前觸控移動：關閉","記住帳戶：開啟（關閉）","記住帳戶：關閉（開啟）","重試移除已儲存帳戶","搜尋：%s","%u / %u 個遊戲","平台：%s","未指定","選擇伺服器。第 %u / %u 頁。不自動切換。","%s：%u Mbps（變更）","Sony 回應無效。請重新掃碼登入。","無法載入目錄。請稍後重試。","記憶體不足，無法載入遊戲。","正在檢查已儲存帳戶。","正在恢復登入並載入遊戲。","已儲存登入可用。準備好後重新連線。","選擇輸入。","目錄遊戲。Sony 在啟動時檢查資格。","遊戲無法使用：缺少啟動資訊。"},
 {"المناطق غير المدعومة: إيقاف","المناطق غير المدعومة: أمريكا","المناطق غير المدعومة: كندا","المناطق غير المدعومة: البرتغال","HUD الأداء: تشغيل","HUD الأداء: إيقاف","الحركة باللمس الأمامي: تشغيل","الحركة باللمس الأمامي: إيقاف","تذكر الحساب: نعم (إيقاف)","تذكر الحساب: لا (تشغيل)","أعد محاولة إزالة الحساب المحفوظ","بحث: %s","%u / %u ألعاب","المنصة: %s","غير محددة","اختر الخادم. الصفحة %u من %u. لا تبديل تلقائي.","%s: %u Mbps (تغيير)","رد Sony غير صالح. سجل الدخول مجدداً عبر QR.","تعذر تحميل الكتالوج. حاول لاحقاً.","الذاكرة غير كافية لتحميل الألعاب.","جار التحقق من الحساب المحفوظ.","استعادة تسجيل الدخول وتحميل الألعاب.","تسجيل الدخول المحفوظ متاح. اتصل عندما تكون جاهزاً.","اختر إدخالاً.","لعبة من الكتالوج. تتحقق Sony من الأهلية عند التشغيل.","اللعبة غير متاحة: بيانات التشغيل ناقصة."}
 };
+static const char *const pv_filter_text[PV_LANG_COUNT][2]={
+{"Filter: %s","Browse / X Play / Triangle Filter / O Back"},
+{"Filter: %s","Browse / X Play / Triangle Filter / O Back"},
+{"Filtro: %s","Navegar / X Jogar / Triângulo Filtro / O Voltar"},
+{"Filtro: %s","Navegar / X Jogar / Triângulo Filtro / O Voltar"},
+{"Filtro: %s","Explorar / X Jugar / Triángulo Filtro / O Atrás"},
+{"Filtro: %s","Explorar / X Jugar / Triángulo Filtro / O Regresar"},
+{"Filter: %s","Blättern / X Spielen / Dreieck Filter / O Zurück"},
+{"Filtre : %s","Parcourir / X Jouer / Triangle Filtre / O Retour"},
+{"Filtro: %s","Sfoglia / X Gioca / Triangolo Filtro / O Indietro"},
+{"Filter: %s","Bladeren / X Spelen / Driehoek Filter / O Terug"},
+{"Filtr: %s","Przeglądaj / X Graj / Trójkąt Filtr / O Wstecz"},
+{"Filter: %s","Bläddra / X Spela / Triangel Filter / O Tillbaka"},
+{"Filtre: %s","Gezin / X Oyna / Üçgen Filtre / O Geri"},
+{"Фильтр: %s","Обзор / X Играть / Треугольник Фильтр / O Назад"},
+{"フィルター：%s","閲覧 / X プレイ / △ フィルター / O 戻る"},
+{"필터: %s","탐색 / X 플레이 / △ 필터 / O 뒤로"},
+{"筛选：%s","浏览 / X 游玩 / △ 筛选 / O 返回"},
+{"篩選：%s","瀏覽 / X 遊玩 / △ 篩選 / O 返回"},
+{"تصفية: %s","تصفح / X لعب / مثلث تصفية / O رجوع"}
+};
 static inline unsigned pv_language(unsigned n){return n<PV_LANG_COUNT?n:0;}
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     for(unsigned i=0;i<PV_TEXT_COUNT;i++)if(!strcmp(pv_text[0][i],s))return pv_text[lang][i];
     for(unsigned i=0;i<PV_EXTRA_COUNT;i++)if(!strcmp(pv_extra[0][i],s))return pv_extra[lang][i];
     for(unsigned i=0;i<PV_DYNAMIC_COUNT;i++)if(!strcmp(pv_dynamic[0][i],s))return pv_dynamic[lang][i];
+    for(unsigned i=0;i<2;i++)if(!strcmp(pv_filter_text[0][i],s))return pv_filter_text[lang][i];
     return s;
 }
 #endif
