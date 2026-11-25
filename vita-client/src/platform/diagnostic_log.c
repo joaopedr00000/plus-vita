@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifndef PLUS_VITA_DEFERRED_LOG
 #define PLUS_VITA_DEFERRED_LOG 0
@@ -47,22 +48,39 @@ static void diagnostic_timestamp(char out[32],uint64_t elapsed_ms)
 }
 static FILE *diagnostic_open(void)
 {
-	FILE *f=fopen(PLUS_VITA_DIAGNOSTIC_PATH,"w");
-#if defined(__vita__) && !PLUS_VITA_PS3_REPLAY
-	/* Only remove known former names, never unrelated log or credential files. */
-	if(f){
-		remove("ux0:data/plus-vita-allocation.log");
-		remove("ux0:data/plus-vita-v0.0.1.log");
-#ifdef PLUS_VITA_CATALOG_REVISION
-		remove("ux0:data/plus-vita-" PLUS_VITA_CATALOG_REVISION ".log");
+	return fopen(PLUS_VITA_DIAGNOSTIC_PATH,"w");
+}
+
+/* Historical filenames verified against the allocation, beta3 r2/r3,
+ * v0.0.1/v0.0.2 and PS3 replay builds. No directory scan or wildcard.
+ * Run only after the new session header is successfully persisted.
+ * The offline replay tool keeps its independent output and does not clean
+ * graphical session logs. Host tests use an isolated working directory. */
+static void diagnostic_remove_legacy(void)
+{
+#if !(defined(__vita__) && PLUS_VITA_PS3_REPLAY)
+#ifdef __vita__
+#define PV_OLD_LOG_PREFIX "ux0:data/"
+#else
+#define PV_OLD_LOG_PREFIX ""
 #endif
-	}
+	static const char *const old_logs[]={
+		PV_OLD_LOG_PREFIX "plus-vita-allocation.log",
+		PV_OLD_LOG_PREFIX "plus-vita-v0.0.1.log",
+		PV_OLD_LOG_PREFIX "plus-vita-catalog-r2.log",
+		PV_OLD_LOG_PREFIX "plus-vita-catalog-r3.log",
+		PV_OLD_LOG_PREFIX "plus-vita-ps3-replay-53.log",
+	};
+	for(size_t i=0;i<sizeof(old_logs)/sizeof(old_logs[0]);i++)
+		(void)unlink(old_logs[i]); /* Missing files are normal. Never remove directories. */
+#undef PV_OLD_LOG_PREFIX
 #endif
-	return f;
 }
 static bool diagnostic_header(FILE *f)
 {
-	return f && fprintf(f,"VitaPlus structured diagnostic v3\nsession_start_utc=%s\nClock: console RTC at launch + monotonic elapsed time. Secrets and HTTP payloads excluded.\n",diagnostic_start_utc)>0 && fflush(f)==0;
+	bool ok=f && fprintf(f,"VitaPlus structured diagnostic v3\nsession_start_utc=%s\nClock: console RTC at launch + monotonic elapsed time. Secrets and HTTP payloads excluded.\n",diagnostic_start_utc)>0 && fflush(f)==0;
+	if(ok)diagnostic_remove_legacy();
+	return ok;
 }
 #define RECORD_SIZE 1024u
 #define TAIL_CAPACITY 64u

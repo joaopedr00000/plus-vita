@@ -27,6 +27,7 @@
 #include "platform/credential_file.h"
 #include "platform/credential_ime.h"
 #include "platform/diagnostic_log.h"
+#include "platform/build_identity.h"
 #include "platform/vita_cc_http_test.h"
 #endif
 
@@ -690,7 +691,7 @@ static void allocation_ui(const PlusVitaAuthProbeResult *result,
 		clear_catalog_screen();
 		printf("PLUS VITA | Audited 720p sample replay\nBuild: %s\n\n", PLUS_VITA_STREAM_PROBE_BUILD);
 		printf("%s\n", replay_err == CHIAKI_ERR_SUCCESS ? "720P SAMPLE REPLAY PASSED" : "720P SAMPLE REPLAY FAILED");
-		printf("Live streaming not tested. See %s\n", ready ? "ux0:data/plus-vita-allocation.log" : "unavailable diagnostic log");
+		printf("Live streaming not tested. See %s\n", ready ? PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable diagnostic log");
 		printf("\nCIRCLE: Back to title details\n");
 		wait_buttons_released();
 		for(;;)
@@ -766,7 +767,7 @@ retry_allocation: ;
 	printf("---------------------------------------------------------------\n\n");
 	printf("%s\n\n", entry->name);
 	printf("Diagnostic: %s\n", diagnostic_ready
-		? "ux0:data/plus-vita-allocation.log"
+		? PLUS_VITA_DIAGNOSTIC_VITA_PATH
 		: "UNAVAILABLE");
 	if(err == CHIAKI_ERR_SUCCESS)
 	{

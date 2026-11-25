@@ -8,6 +8,8 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 static pthread_mutex_t gate = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t changed = PTHREAD_COND_INITIALIZER;
@@ -114,6 +116,33 @@ static void privacy_entrypoints(void)
 	assert(!ferror(f)); fclose(f);
 	assert(complete && next==sizeof(expected)/sizeof(expected[0]));
 }
+static void legacy_cleanup(void)
+{
+	static const char *const old[]={
+		"plus-vita-allocation.log","plus-vita-v0.0.1.log",
+		"plus-vita-catalog-r2.log","plus-vita-catalog-r3.log",
+		"plus-vita-ps3-replay-53.log"
+	};
+	static const char *const keep[]={"other-app.log","plus-vita-custom.log","plus-vita-auth.json","account.json","account.key"};
+	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++){
+		FILE *f=fopen(old[i],"wb");assert(f);assert(fputs("old diagnostic",f)>=0);assert(!fclose(f));
+	}
+	for(size_t i=0;i<sizeof(keep)/sizeof(keep[0]);i++){
+		FILE *f=fopen(keep[i],"wb");assert(f);assert(fputs("untouched",f)>=0);assert(!fclose(f));
+	}
+	/* Failed new file initialization must not delete old evidence. */
+	fail_open=true;assert(plus_vita_diagnostic_begin());plus_vita_diagnostic_end();fail_open=false;
+	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++)assert(access(old[i],F_OK)==0);
+	assert(plus_vita_diagnostic_ui_begin());plus_vita_diagnostic_ui_end();
+	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++)assert(access(old[i],F_OK)!=0&&errno==ENOENT);
+	for(size_t i=0;i<sizeof(keep)/sizeof(keep[0]);i++){
+		FILE *f=fopen(keep[i],"rb");assert(f);char content[32]={0};assert(fread(content,1,sizeof(content)-1,f)==9);assert(!fclose(f));assert(!strcmp(content,"untouched"));assert(!unlink(keep[i]));
+	}
+	/* An empty directory named like an old log must also survive. */
+	assert(!mkdir(old[0],0700));
+	assert(plus_vita_diagnostic_ui_begin());plus_vita_diagnostic_ui_end();
+	struct stat st;assert(!stat(old[0],&st)&&S_ISDIR(st.st_mode));assert(!rmdir(old[0]));
+}
 static void session_reset(void)
 {
 	assert(plus_vita_diagnostic_ui_begin());
@@ -173,6 +202,7 @@ static void bounded_file(void)
 int main(void)
 {
 	privacy_entrypoints();
+	legacy_cleanup();
 	session_reset();
 	bounded_file();
 	assert(plus_vita_diagnostic_begin());

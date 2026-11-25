@@ -8,6 +8,17 @@ Opening the app replaces the previous log; Play and retry actions append to the
 same bounded session log. The offline PS3 replay retains its separate path.
 There is no archive or automatic upload. Copy the log before reopening the app.
 
+After the new header is persisted, normal app startup attempts to unlink these
+exact historical filenames in `ux0:data/` (missing files are harmless):
+
+- `plus-vita-allocation.log` (original, beta1/2 and early beta3)
+- `plus-vita-v0.0.1.log` (v0.0.1, v0.0.2 and PS5 experimental release)
+- `plus-vita-catalog-r2.log` (catalogue r2)
+- `plus-vita-catalog-r3.log` (catalogue r3)
+- `plus-vita-ps3-replay-53.log` (offline PS3 replay diagnostic)
+
+No wildcard, recursive cleanup, account-file removal or unrelated log removal is performed. Failed filesystem operations cannot guarantee deletion. The standalone offline replay build does not perform this cleanup.
+
 The current development identity is `recovery-diagnostics-1`, with the accepted
 720p independent-input/deferred-writer profile. This is an experimental
 candidate; [the stable graphical baseline](STABLE_GRAPHICAL_BASELINE.md) remains
