@@ -800,6 +800,12 @@ string(REPLACE "${PV_CLEANUP_OLD}" "${PV_CLEANUP_NEW}" PLUS_VITA_CURL_HTTP_TEXT 
 file(WRITE "${PLUS_VITA_CURL_HTTP_SOURCE}" "${PLUS_VITA_CURL_HTTP_TEXT}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/cloudsession_source.cmake")
+set(PV_CATALOG_UNIFIED_SOURCE "${PYLUX_ROOT}/lib/src/cloudcatalog_unified.c")
+set(PV_CATALOG_FETCH_SOURCE "${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c")
+set(PV_CATALOG_MERGE_SOURCE "${PYLUX_ROOT}/lib/src/cloudcatalog_merge.c")
+if(PLUS_VITA_BETA3)
+  include("${CMAKE_CURRENT_LIST_DIR}/cmake/catalog_vita.cmake")
+endif()
 
 add_executable(${PROJECT_NAME}
   ${PLUS_VITA_ENTRY_SOURCE}
@@ -816,10 +822,10 @@ add_executable(${PROJECT_NAME}
   "${PLUS_VITA_GKCRYPT_SOURCE}"
   "${PYLUX_ROOT}/lib/src/cloudcatalog_consts.c"
   "${PYLUX_ROOT}/lib/src/cloudcatalog_cache.c"
-  "${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c"
-  "${PYLUX_ROOT}/lib/src/cloudcatalog_merge.c"
+  "${PV_CATALOG_FETCH_SOURCE}"
+  "${PV_CATALOG_MERGE_SOURCE}"
   "${PYLUX_ROOT}/lib/src/cloudcatalog_util.c"
-  "${PYLUX_ROOT}/lib/src/cloudcatalog_unified.c"
+  "${PV_CATALOG_UNIFIED_SOURCE}"
   "${PLUS_VITA_CLOUD_SESSION_SOURCE}"
   "${PLUS_VITA_GAIKAI_SOURCE}"
   "${PYLUX_ROOT}/lib/src/cloudsession_kamaji.c"
@@ -880,14 +886,14 @@ set_source_files_properties("${PYLUX_ROOT}/lib/src/fec.c" PROPERTIES
 set_source_files_properties("${PYLUX_ROOT}/lib/src/log.c" PROPERTIES
   COMPILE_OPTIONS "-Wno-error=sign-compare"
 )
-set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_merge.c" PROPERTIES
+set_source_files_properties("${PV_CATALOG_MERGE_SOURCE}" PROPERTIES
   COMPILE_OPTIONS "-Wno-error=format-truncation"
 )
 if(PLUS_VITA_PS5_EXPERIMENTAL)
-  set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c" PROPERTIES
+  set_source_files_properties("${PV_CATALOG_FETCH_SOURCE}" PROPERTIES
     COMPILE_OPTIONS "-Wno-error=unused-but-set-variable")
 else()
-set_source_files_properties("${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c" PROPERTIES
+set_source_files_properties("${PV_CATALOG_FETCH_SOURCE}" PROPERTIES
   COMPILE_DEFINITIONS
     "cc_fetch_psnow_native=plus_vita_disabled_psnow_native_impl;cc_fetch_imagic=plus_vita_disabled_imagic_impl;cc_imagic_result_fini=plus_vita_disabled_imagic_fini_impl;cc_fetch_owned=plus_vita_disabled_owned_impl"
   COMPILE_OPTIONS "-Wno-error=unused-but-set-variable"

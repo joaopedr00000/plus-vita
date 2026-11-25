@@ -284,9 +284,17 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 	ChiakiLog log;
 	chiaki_log_init(&log,0,NULL,NULL);
 	chiaki_cloudcatalog_invalidate_cache(cache);
+	struct json_object *root=NULL;
+#if defined(__vita__) && PLUS_VITA_ADAPTIVE_STREAM
+	extern ChiakiErrorCode plus_vita_catalog_fetch_direct(const ChiakiCloudCatalogConfig *,ChiakiCloudCatalogResult *,ChiakiLog *,struct json_object **);
+	ChiakiErrorCode err=plus_vita_catalog_fetch_direct(&config,&catalog,&log,&root);
+#else
 	ChiakiErrorCode err=chiaki_cloudcatalog_fetch_unified(&config,&catalog,&log);
-	if(err==CHIAKI_ERR_SUCCESS && catalog.json) {
-		struct json_object *root=json_tokener_parse(catalog.json), *games=NULL;
+	if(err==CHIAKI_ERR_SUCCESS&&catalog.json)root=json_tokener_parse(catalog.json);
+#endif
+	PV_AUTH_PHASE(16);
+	if(err==CHIAKI_ERR_SUCCESS && root) {
+		struct json_object *games=NULL;
 		if(root && json_object_object_get_ex(root,"games",&games) && json_object_is_type(games,json_type_array)) {
 			complete=true;
 			static const char *const service_keys[]={"streamServiceType",NULL};
@@ -312,8 +320,9 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 				snprintf(entry->ps5_stream_id,sizeof(entry->ps5_stream_id),"%s",stream);
 			}
 		}
-		if(root) json_object_put(root);
 	}
+	PV_AUTH_PHASE(17);
+	if(root)json_object_put(root);
 	chiaki_cloudcatalog_result_fini(&catalog);
 	chiaki_cloudcatalog_invalidate_cache(cache);
 	return complete;
