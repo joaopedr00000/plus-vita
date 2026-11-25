@@ -1016,6 +1016,11 @@ target_link_options(${PROJECT_NAME} PRIVATE
   -Wl,--gc-sections
 )
 
+# VitaSDK aligns the next load segment to 64 KiB. Reserve space for the
+# SCE module/import metadata added by vita-elf-create after linking.
+# The embedded CA bundle exposed a gap of less than the required 4196 bytes.
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--defsym=__sce_headroom=16384")
+
 # Some VitaSDK distributions ship an OpenSSL-backed static libcurl, while the
 # accepted Windows SDK uses mbedTLS. Resolve optional curl dependencies only
 # inside the target SDK; never use the host computer's TLS libraries.
