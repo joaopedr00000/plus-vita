@@ -141,7 +141,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		text(display,view->body,744,186,TEXT_MICRO,152,24,false,MENU_BODY);
 	}
 	if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) body_bottom=view->comparison_page ? 224 : 302;
-	text(display, view->body, 64, 196, (view->screen == PLUS_VITA_APP_ACCOUNT || view->screen==PLUS_VITA_APP_DETAILS || (PLUS_VITA_ADAPTIVE_STREAM && (view->screen==PLUS_VITA_APP_ABOUT || view->screen==PLUS_VITA_APP_CONTROLS))) ? TEXT_COMPACT : TEXT_BODY,
+	text(display, view->body, 64, 196, (view->screen == PLUS_VITA_APP_ACCOUNT || view->screen==PLUS_VITA_APP_DETAILS || view->screen==PLUS_VITA_APP_DATACENTERS || view->screen==PLUS_VITA_APP_STREAM_STOPPED || (PLUS_VITA_ADAPTIVE_STREAM && (view->screen==PLUS_VITA_APP_ABOUT || view->screen==PLUS_VITA_APP_CONTROLS))) ? TEXT_COMPACT : TEXT_BODY,
 		view->screen == PLUS_VITA_APP_WELCOME ? 520 : view->screen==PLUS_VITA_APP_DETAILS && !PLUS_VITA_ADAPTIVE_STREAM ? 624 : 832, body_bottom - 196, view->screen!=PLUS_VITA_APP_CATALOGUE, MENU_BODY);
 	if(view->screen==PLUS_VITA_APP_CATALOGUE && view->detail) {
 		if(view->preview_eligible || !view->detail->cover_url[0]) cover(display,covers,view->detail,744,216);

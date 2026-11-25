@@ -504,10 +504,12 @@ int plus_vita_app_run(void)
 					else {
 						plus_vita_recovery_acknowledge();
 						reported_play_stage=0;
+						plus_vita_diagnostic_stream_reset();
 						if(!network_ready || !curl_ready || !recovery_ready || !plus_vita_play_start(play,&effect)) {
 							plus_vita_diagnostic_event("allocation.complete",(int)CHIAKI_ERR_NETWORK);
 							plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
-								.operation=effect.operation,.status=!recovery_ready ? PLUS_VITA_RESULT_SERVICE_ERROR : PLUS_VITA_RESULT_NETWORK_ERROR},0);
+								.operation=effect.operation,.status=!recovery_ready ? PLUS_VITA_RESULT_SERVICE_ERROR : PLUS_VITA_RESULT_NETWORK_ERROR,
+								.stream_diagnostic={.valid=true,.native_error=CHIAKI_ERR_NETWORK}},0);
 							plus_vita_diagnostic_event("attempt.end",0);
 						}
 					}
@@ -559,7 +561,8 @@ int plus_vita_app_run(void)
 				if(allocation_error==CHIAKI_ERR_CANCELED && provision.datacenter_pings
 					&& provision.error_message && !strcmp(provision.error_message,PLUS_VITA_DC_LIST_READY)) {
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
-						.operation=operation,.status=PLUS_VITA_RESULT_DATACENTERS,.data=provision.datacenter_pings},0);
+						.operation=operation,.status=PLUS_VITA_RESULT_DATACENTERS,.data=provision.datacenter_pings,
+						.stream_diagnostic=plus_vita_diagnostic_stream_snapshot()},0);
 					plus_vita_diagnostic_event("attempt.end",0);
 					plus_vita_play_result_clear(&provision);
 					flow.dirty=true;
@@ -586,13 +589,18 @@ int plus_vita_app_run(void)
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_INTERRUPTED,
 						.status=stopped==PLUS_VITA_RECOVERY_SLEEP ? PLUS_VITA_RESULT_SLEEP : PLUS_VITA_RESULT_NETWORK_ERROR},0);
 					plus_vita_recovery_acknowledge();
-				} else plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
-					.operation=operation,.data=allocation_error!=CHIAKI_ERR_SUCCESS ? provision.datacenter_pings : NULL,.playback_started=session_input.playback_started,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
+				} else {
+					PlusVitaStreamDiagnostic diag=plus_vita_diagnostic_stream_snapshot();
+					diag.valid=true;diag.native_error=(int)stream_error;
+					if(allocation_error==CHIAKI_ERR_HTTP_NONOK&&!diag.http)diag.http=401;
+					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
+					.stream_diagnostic=diag,.operation=operation,.data=allocation_error!=CHIAKI_ERR_SUCCESS ? provision.datacenter_pings : NULL,.playback_started=session_input.playback_started,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
 						? PLUS_VITA_RESULT_OK : stream_error==CHIAKI_ERR_CANCELED
 						? PLUS_VITA_RESULT_CANCELLED : allocation_error!=CHIAKI_ERR_SUCCESS
 					? plus_vita_play_failure(allocation_error,&provision) : collecting_sample
 					? (stream_error==CHIAKI_ERR_SUCCESS ? PLUS_VITA_RESULT_SAMPLE_SAVED : PLUS_VITA_RESULT_SAMPLE_INCOMPLETE)
 					: (PLUS_VITA_ADAPTIVE_STREAM && session_input.playback_started && !user_stopped && (stream_error==CHIAKI_ERR_TIMEOUT||stream_error==CHIAKI_ERR_NETWORK||stream_error==CHIAKI_ERR_HOST_UNREACH)) ? PLUS_VITA_RESULT_NETWORK_ERROR : PLUS_VITA_RESULT_STREAM_STOPPED},0);
+				}
 				SceCtrlData released={0};
 				menu_read(&menu_controller,&released);
 				plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,

@@ -166,3 +166,7 @@ displayed 7,632 pictures and processed 16,305 audio frames in 2 minutes
 43 seconds from stream probe start to completion. It consumed neutral input
 on exit, recorded zero feedback send failures and completed with code 0.
 The updated PS3 run remains supported by the maintainer's report.
+
+## On-screen streaming diagnostics
+
+A failed streaming attempt can display the last observed allocation phase (0–11) or video startup stage, most recent HTTP status and allowlisted service reason, native error code, and requested client/video profiles. `N/A` means unavailable. These fields are also available without file persistence; they are reset before each attempt. Only service codes 002.0011, 002.0019 and 002.2001 are shown verbatim from the fixed mapping; R4–R11 identify other bounded reason categories from cloud_response.h. The requested H.264 profile is not proof of the actual server codec. No raw payload, token, session ID or URL is rendered. A screenshot of the technical details can help when a log cannot be attached.

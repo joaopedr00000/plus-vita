@@ -49,6 +49,9 @@ static bool diagnostic_io_ok;
 static uint64_t diagnostic_started_us;
 static time_t diagnostic_wall_start;
 static char diagnostic_start_utc[32];
+static PlusVitaStreamDiagnostic stream_diag;
+void plus_vita_diagnostic_stream_reset(void){pthread_mutex_lock(&diagnostic_write_mutex);stream_diag=(PlusVitaStreamDiagnostic){0};pthread_mutex_unlock(&diagnostic_write_mutex);}
+PlusVitaStreamDiagnostic plus_vita_diagnostic_stream_snapshot(void){pthread_mutex_lock(&diagnostic_write_mutex);PlusVitaStreamDiagnostic s=stream_diag;pthread_mutex_unlock(&diagnostic_write_mutex);return s;}
 
 /* Local RTC wall clock at launch; elapsed monotonic time keeps record ordering
  * meaningful even if the system clock changes during streaming. */
@@ -421,6 +424,7 @@ bool plus_vita_diagnostic_begin(void)
 	diagnostic_wall_start=time(NULL);
 	diagnostic_timestamp(diagnostic_start_utc,0);
 	diagnostic_filename(diagnostic_wall_start);
+	stream_diag=(PlusVitaStreamDiagnostic){0};
 	pthread_mutex_unlock(&diagnostic_write_mutex);
 	/* The deferred writer owns opening as well as subsequent persistence. */
 #if !PLUS_VITA_DEFERRED_LOG
@@ -487,6 +491,12 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
 			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")||!strcmp(names[i],"catalog.phase")) code=code>=0&&code<=20?code:-1;
 			else code=code>=-1 && code<=21 ? code : -1;
+			pthread_mutex_lock(&diagnostic_write_mutex);
+			if(!strcmp(names[i],"allocation.begin")) stream_diag=(PlusVitaStreamDiagnostic){0};
+			else if(!strcmp(names[i],"allocation.phase")) {stream_diag.phase=(unsigned)code;stream_diag.valid=true;}
+			else if(!strcmp(names[i],"allocation.http")) {stream_diag.http=(unsigned)code;stream_diag.reason=0;stream_diag.valid=true;}
+			else if(!strcmp(names[i],"allocation.reason")) stream_diag.reason=(unsigned)code;
+			pthread_mutex_unlock(&diagnostic_write_mutex);
 			write_line("EVENT",names[i],code); return;
 		}
 }
@@ -516,8 +526,12 @@ void plus_vita_diagnostic_stream_startup(PlusVitaStreamStartup status)
 		[PLUS_VITA_STREAM_STARTUP_FIRST_FRAME_TIMEOUT] = "stream.startup.first_frame_timeout",
 		[PLUS_VITA_STREAM_STARTUP_PS3_FEEDBACK] = "stream.startup.ps3_feedback_started",
 	};
-	if((unsigned)status < sizeof(names) / sizeof(names[0]) && names[status])
+	if((unsigned)status < sizeof(names) / sizeof(names[0]) && names[status]){
+		pthread_mutex_lock(&diagnostic_write_mutex);
+		stream_diag.startup=(unsigned)status+1;
+		pthread_mutex_unlock(&diagnostic_write_mutex);
 		write_line("EVENT", names[status], (int)status);
+	}
 }
 
 void plus_vita_diagnostic_progress(const char *stage)

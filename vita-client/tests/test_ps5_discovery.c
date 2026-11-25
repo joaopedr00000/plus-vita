@@ -28,9 +28,11 @@ int main(void){
     PlusVitaApp *app=connected();
     PlusVitaAppEffect discover=click(app,PLUS_VITA_ACTION_GAME);
     assert(!strcmp(discover.datacenter,PLUS_VITA_DC_DISCOVER));
-    ended(app,discover,PLUS_VITA_RESULT_SERVICE_ERROR,NULL);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,.operation=discover.operation,
+        .status=PLUS_VITA_RESULT_SERVICE_ERROR,.stream_diagnostic={.valid=true,.phase=7,.http=403,.reason=1,.native_error=1}});
     PlusVitaAppView v=plus_vita_app_view(app);
     assert(v.screen==PLUS_VITA_APP_DETAILS && strstr(v.body,"Falha antes"));
+    assert(strstr(v.body,"Locking Session (7/11)")&&strstr(v.body,"HTTP: 403")&&strstr(v.body,"Service: 002.0011")&&strstr(v.body,"Portal / H.264"));
     discover=click(app,PLUS_VITA_ACTION_PLAY);
     ended(app,discover,PLUS_VITA_RESULT_DATACENTERS,"[]");
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_DETAILS && strstr(v.body,"não retornou"));
@@ -49,6 +51,7 @@ int main(void){
     discover=click(app,PLUS_VITA_ACTION_PLAY);
     ended(app,discover,PLUS_VITA_RESULT_SERVICE_ERROR,NULL);
     assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_DETAILS);
+    assert(!strstr(plus_vita_app_view(app).body,"HTTP: 403"));
     plus_vita_app_destroy(app);
     puts("PS5 discovery, empty list, retry and manual selection regression passed");return 0;
 }

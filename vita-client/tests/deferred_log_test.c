@@ -116,6 +116,27 @@ static void privacy_entrypoints(void)
 	assert(!ferror(f)); fclose(f);
 	assert(complete && next==sizeof(expected)/sizeof(expected[0]));
 }
+static void stream_snapshot(void)
+{
+	/* Snapshot remains available without a log or successful persistence. */
+	plus_vita_diagnostic_stream_reset();
+	plus_vita_diagnostic_event("allocation.begin",0);
+	plus_vita_diagnostic_event("allocation.phase",7);
+	plus_vita_diagnostic_event("allocation.http",403);
+	plus_vita_diagnostic_event("allocation.reason",1);
+	PlusVitaStreamDiagnostic s=plus_vita_diagnostic_stream_snapshot();
+	assert(s.valid&&s.phase==7&&s.http==403&&s.reason==1&&!s.startup);
+	plus_vita_diagnostic_stream_startup(PLUS_VITA_STREAM_STARTUP_DECODER_INIT_FAILED);
+	s=plus_vita_diagnostic_stream_snapshot();assert(s.startup==PLUS_VITA_STREAM_STARTUP_DECODER_INIT_FAILED+1);
+	plus_vita_diagnostic_event("allocation.http",200);
+	s=plus_vita_diagnostic_stream_snapshot();assert(s.http==200&&!s.reason);
+	plus_vita_diagnostic_event("allocation.begin",0);
+	s=plus_vita_diagnostic_stream_snapshot();assert(!s.valid&&!s.phase&&!s.http&&!s.reason&&!s.startup);
+	plus_vita_diagnostic_event("allocation.http",999);
+	plus_vita_diagnostic_event("allocation.reason",999);
+	s=plus_vita_diagnostic_stream_snapshot();assert(!s.http&&!s.reason);
+	plus_vita_diagnostic_stream_reset();
+}
 static void legacy_cleanup(void)
 {
 	static const char *const old[]={
@@ -211,6 +232,7 @@ static void bounded_file(void)
 int main(void)
 {
 	privacy_entrypoints();
+	stream_snapshot();
 	legacy_cleanup();
 	session_reset();
 	bounded_file();

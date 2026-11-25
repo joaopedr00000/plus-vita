@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "latency_stats.h"
 #include "artwork_status.h"
+#include "stream_diagnostic.h"
 #define PLUS_VITA_DIAGNOSTIC_MAX_BYTES (1024u * 1024u)
 #define PLUS_VITA_PS3_REPLAY_LOG_PATH "ux0:data/plus-vita-ps3-replay-53.log"
 
@@ -18,6 +19,8 @@ extern "C" {
 bool plus_vita_diagnostic_begin(void);
 /* Lifecycle owner reads the name after begin; stable until the next begin. */
 const char *plus_vita_diagnostic_path(void);
+void plus_vita_diagnostic_stream_reset(void);
+PlusVitaStreamDiagnostic plus_vita_diagnostic_stream_snapshot(void);
 void plus_vita_diagnostic_event(const char *event, int code);
 /* Only fixed parser reasons can be persisted. */
 void plus_vita_diagnostic_slice_guard_rejected(const char *reason);

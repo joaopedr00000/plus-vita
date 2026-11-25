@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "../platform/auth_probe.h"
 #include "../platform/control_layout.h"
+#include "../platform/stream_diagnostic.h"
 
 typedef struct plus_vita_app_t PlusVitaApp;
 typedef enum {
@@ -127,6 +128,7 @@ typedef struct {
 	bool legacy_plain, vault_present, import_cleanup_failed;
 	unsigned vault_mode; /* 2 password, 3 automatic */
 	bool playback_started;
+	PlusVitaStreamDiagnostic stream_diagnostic;
 	bool regional_catalogue;
 	unsigned stream_profile;
 	bool stream_hud;

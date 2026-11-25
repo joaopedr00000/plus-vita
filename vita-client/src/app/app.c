@@ -49,6 +49,7 @@ struct plus_vita_app_t {
 	char store_country[8], store_language[8], language[8];
 	char settings_status[256], reporting_status[512], auth_status[256];
 	char streaming_status[256];
+	char stream_diag_text[256],stream_diag_body[768];
 	uint32_t previous_buttons;
 	int previous_direction;
 	uint64_t repeat_at;
@@ -514,6 +515,7 @@ static const char *account_name(const PlusVitaApp *app)
 
 static PlusVitaAppEffect operation(PlusVitaApp *app, PlusVitaAppEffectKind kind, const char *message, bool cancel)
 {
+	if(kind==PLUS_VITA_EFFECT_PLAY||kind==PLUS_VITA_EFFECT_AUTHORIZE) app->stream_diag_text[0]=0;
 	app->waiting_for = kind;
 	app->pending_operation = ++app->next_operation;
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_AUTHORIZING,
@@ -848,6 +850,42 @@ static void catalogue_view(PlusVitaApp *app)
 #endif
 }
 
+/* Technical codes and protocol stage names remain recognizable in issue reports. */
+static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
+{
+	app->stream_diag_text[0]=0;
+	if(!d.valid)return;
+	static const char *const phases[]={"Preflight","Getting Client","Getting Configuration","Starting Session",
+		"Getting Tokens","Getting Server Tokens","Authorizing Session","Locking Session","Getting Datacenters",
+		"Pinging","Selecting Datacenter","Allocating Streaming Slot"};
+	static const char *const startup[]={"Transport","Handshake","STREAMINFO","Decoder","Ready","Transport failed",
+		"Handshake failed","STREAMINFO interrupted","STREAMINFO invalid","Profile unavailable","Audio init failed",
+		"Video header invalid","Header guard rejected","Decoder init failed","STREAMINFO reply failed","Provision invalid",
+		"Media disconnected","Media decrypt failed","Media invalid","First frame timeout","PS3 feedback"};
+	static const char *const reasons[]={"N/A","002.0011","002.0019","002.2001","R4","R5","R6","R7","R8","R9","R10","R11"};
+	char stage[72],http[8],native[8];
+	if(d.startup&&d.startup<=sizeof(startup)/sizeof(startup[0]))
+		snprintf(stage,sizeof(stage),"Video: %s (S%u)",startup[d.startup-1],d.startup-1);
+	else if(d.phase<=11)snprintf(stage,sizeof(stage),"%s (%u/11)",phases[d.phase],d.phase);
+	else snprintf(stage,sizeof(stage),"N/A");
+	if(d.http>=100&&d.http<=599)snprintf(http,sizeof(http),"%u",d.http);else strcpy(http,"N/A");
+	if(d.native_error>=0&&d.native_error<=21)snprintf(native,sizeof(native),"%d",d.native_error);else strcpy(native,"N/A");
+	bool ps5=false;
+#if PLUS_VITA_PS5_EXPERIMENTAL
+	if(app->catalogue_count&&app->matches_count)ps5=app->catalogue[app->matches[app->catalogue_selection]].ps5_stream_id[0]!=0;
+#endif
+	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
+		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
+		stage,http,reasons[d.reason<=11?d.reason:0],native,ps5?"Portal":"PC");
+}
+
+static void attach_stream_diagnostic(PlusVitaApp *app)
+{
+	if(!app->stream_diag_text[0])return;
+	snprintf(app->stream_diag_body,sizeof(app->stream_diag_body),"%s\n%s",app->view.body?app->view.body:"",app->stream_diag_text);
+	app->view.body=app->stream_diag_body;
+}
+
 static void detail_view(PlusVitaApp *app, const char *notice)
 {
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
@@ -863,7 +901,8 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 static void datacenters_view(PlusVitaApp *app)
 {
 	if(!app->bitrate_kbps) app->bitrate_kbps=PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000;
-	if(app->dc_notice) snprintf(app->dc_status,sizeof(app->dc_status),"%s",PV_TR(app->dc_notice));
+	if(app->dc_notice) snprintf(app->dc_status,sizeof(app->dc_status),"%s%s%s",PV_TR(app->dc_notice),
+		app->stream_diag_text[0]?"\n":"",app->stream_diag_text);
 	else snprintf(app->dc_status,sizeof(app->dc_status),PV_TR("Choose a server manually. Page %u of %u. No automatic fallback."),
 		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
 	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? PV_TR("%s: %u Mbps (change)") : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? PV_TR(app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Maximum quality") : "Bitrate: ",app->bitrate_kbps/1000);
@@ -887,8 +926,9 @@ static void datacenters_view(PlusVitaApp *app)
 	n=view.action_count;
 	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,234+(int)n*38,832,32};
 	 #if PLUS_VITA_ADAPTIVE_STREAM
-	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=250+(int)i*32;view.actions[i].height=26;}
-	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,250+(int)view.action_count*32,832,26};view.action_count++;
+	int top=app->dc_notice&&app->stream_diag_text[0]?280:250;
+	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=top+(int)i*30;view.actions[i].height=26;}
+	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,top+(int)view.action_count*30,832,26};view.action_count++;
  #endif
 	app->view=view;
 }
@@ -1163,7 +1203,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->saved = app->remember = false;
 			app->vault_present=app->vault_legacy=false;app->vault_mode=0;
 			app->retry_delete = false;
-			if(app->expired) { app->expired = false; account_error(app, result_message(PLUS_VITA_RESULT_REJECTED)); }
+			if(app->expired) { app->expired = false; account_error(app, result_message(PLUS_VITA_RESULT_REJECTED)); attach_stream_diagnostic(app); }
 			else if(app->forgetting) { app->forgetting = false; app->welcome_selection = 0; setup_view(app); }
 			else if(app->storage_return == PLUS_VITA_APP_SETUP) { setup_view(app); app->view.selected = 1; }
 			else if(app->storage_return == PLUS_VITA_APP_CATALOGUE) catalogue_view(app);
@@ -1277,6 +1317,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	{
 		if(app->waiting_for!=PLUS_VITA_EFFECT_PLAY || !event.operation || event.operation!=app->pending_operation) return effect;
 		app->pending_operation=0; app->waiting_for=PLUS_VITA_EFFECT_NONE;
+		stream_diagnostic_text(app,event.stream_diagnostic);
 		if(event.status==PLUS_VITA_RESULT_REJECTED) return remove_saved(app, false, true);
 #if PLUS_VITA_ADAPTIVE_STREAM
 		if(event.status==PLUS_VITA_RESULT_NETWORK_ERROR&&event.playback_started&&!app->auto_retry&&plus_vita_manual_dc_valid(app->selected_dc)&&app->catalogue_count) {
@@ -1322,6 +1363,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			: event.status==PLUS_VITA_RESULT_BUSY
 			? "The previous connection is still closing.\nTry Play again shortly."
 			: "The cloud session stopped or could not start.\nCheck Wi-Fi and select Play to retry.");
+		if(app->view.screen!=PLUS_VITA_APP_DATACENTERS &&
+			(event.status==PLUS_VITA_RESULT_SERVICE_ERROR||event.status==PLUS_VITA_RESULT_NETWORK_ERROR||
+			event.status==PLUS_VITA_RESULT_UNSUPPORTED||event.status==PLUS_VITA_RESULT_STREAM_STOPPED||
+			(event.status==PLUS_VITA_RESULT_DATACENTERS&&app->view.screen==PLUS_VITA_APP_DETAILS)))
+			attach_stream_diagnostic(app);
 		return effect;
 	}
 	if(event.kind==PLUS_VITA_EVENT_PLAY_PROGRESS)
