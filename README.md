@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/joaopedr00000/plus-vita/release/v0.0.3/vita-client/assets/branding/icon0.png" alt="VitaPlus application icon" width="128">
+  <img src="docs/readme/vitaplus-logo.jpg" alt="VitaPlus README logo" width="128">
 </p>
 
 <h1 align="center">VitaPlus</h1>
