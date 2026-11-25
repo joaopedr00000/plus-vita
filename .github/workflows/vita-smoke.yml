@@ -91,6 +91,11 @@ jobs:
         run: |
           cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-stream-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_ps5_discovery.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/ps5
           /tmp/pv-stream-test/ps5
+      - name: Test authenticated local token vault
+        run: |
+          sudo apt-get install -y libmbedtls-dev
+          cc -std=c11 -O2 -Wall -Wextra -Werror vita-client/tests/test_account_vault.c -lmbedcrypto -o /tmp/vp-stream-test/vault
+          /tmp/vp-stream-test/vault
       - name: Test cloud response interoperability and privacy
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -Iexternal/json-c -I/tmp/pv-stream-test vita-client/tests/test_cloud_response.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/response

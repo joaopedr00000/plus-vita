@@ -8,6 +8,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <json_object.h>
+#if PLUS_VITA_ACCOUNT_VAULT
+#include "../platform/account_vault.h"
+#include <chiaki/random.h>
+#endif
 
 #define IMPORT_FILE "ux0:data/plus-vita-auth.json"
 #define ACCOUNT_DIR "ux0:data/plus-vita"
@@ -78,6 +82,27 @@ static void authorize(PlusVitaAccount *account)
 	}
 }
 
+int plus_vita_account_file_kind(void)
+{
+	FILE *f=fopen(ACCOUNT_FILE,"rb");
+	if(!f)return errno==ENOENT?0:-1;
+	unsigned char prefix[4]={0};size_t n=fread(prefix,1,sizeof(prefix),f);
+	bool bad=ferror(f)!=0;if(fclose(f)!=0)bad=true;
+	if(bad)return -1;
+	/* Only a JSON object can be a legacy file; damaged/unknown vaults fail closed. */
+	if(n && (prefix[0]=='{'||prefix[0]==' '||prefix[0]=='\n'||prefix[0]=='\r'||prefix[0]=='\t'))return 1;
+	return 2;
+}
+#if PLUS_VITA_ACCOUNT_VAULT
+static bool vault_read(FILE *file,const PlusVitaCredential *password,char *out,size_t cap,size_t *size)
+{
+	uint8_t sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD+1]={0};
+	size_t n=fread(sealed,1,sizeof(sealed),file);
+	bool ok=!ferror(file)&&pv_vault_open(password->value,password->length,sealed,n,(uint8_t *)out,cap,size);
+	pv_vault_wipe(sealed,sizeof(sealed));return ok;
+}
+#endif
+
 static void load_account(PlusVitaAccount *account)
 {
 	struct stat status;
@@ -93,6 +118,19 @@ static void load_account(PlusVitaAccount *account)
 		else account->result.status = PLUS_VITA_RESULT_STORAGE_ERROR;
 		return;
 	}
+#if PLUS_VITA_ACCOUNT_VAULT
+	int kind=plus_vita_account_file_kind();
+	account->result.vault_present=kind==2;
+	if(kind==2){
+		size_t size=0;bool ok=vault_read(file,&account->job.vault_password,account->file,sizeof(account->file),&size);
+		if(fclose(file)!=0)ok=false;
+		account->result.status=ok?PLUS_VITA_RESULT_OK:PLUS_VITA_RESULT_VAULT_LOCKED;
+		if(ok){account->result.data=account->file;account->result.data_size=size;}
+		return;
+	}
+	if(kind!=1){fclose(file);account->result.status=PLUS_VITA_RESULT_STORAGE_ERROR;return;}
+	account->result.legacy_plain=true;
+#endif
 	size_t size = fread(account->file, 1, sizeof(account->file), file);
 	bool failed = ferror(file) != 0;
 	if(fclose(file) != 0) failed = true;
@@ -110,6 +148,20 @@ static void save_account(PlusVitaAccount *account)
 {
 	account->result.status = PLUS_VITA_RESULT_STORAGE_ERROR;
 	if(!account_directory()) return;
+#if PLUS_VITA_ACCOUNT_VAULT
+	int kind=plus_vita_account_file_kind();
+	account->result.vault_present=kind==2;
+	if(kind<0||!pv_vault_password(account->job.vault_password.value,account->job.vault_password.length))return;
+	if(kind==2){
+		FILE *old=fopen(ACCOUNT_FILE,"rb");
+		if(!old)return;
+		const PlusVitaCredential *previous=account->job.vault_change?&account->job.vault_previous:&account->job.vault_password;
+		size_t old_size=0;bool unlocked=vault_read(old,previous,account->file,sizeof(account->file),&old_size);
+		if(fclose(old)!=0)unlocked=false;
+		clear_bytes(account->file,sizeof(account->file));
+		if(!unlocked){account->result.status=PLUS_VITA_RESULT_VAULT_LOCKED;return;}
+	}
+#endif
 	struct json_object *root = json_object_new_object();
 	if(!root) return;
 	struct json_object *token = json_object_new_string_len(account->job.credential.value, (int)account->job.credential.length);
@@ -122,18 +174,47 @@ static void save_account(PlusVitaAccount *account)
 		json_object_put(label); json_object_put(root); return;
 	}
 	const char *data = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PLAIN);
-	FILE *file = fopen(ACCOUNT_TEMP, "wb");
 	bool success = false;
+#if PLUS_VITA_ACCOUNT_VAULT
+	uint8_t entropy[28]={0},sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD]={0};
+	size_t sealed_size=0;
+	if(data && chiaki_random_bytes_crypt(entropy,sizeof(entropy))==CHIAKI_ERR_SUCCESS &&
+		pv_vault_seal(account->job.vault_password.value,account->job.vault_password.length,entropy,
+			(const uint8_t *)data,strlen(data),sealed,sizeof(sealed),&sealed_size)){
+		FILE *file=fopen(ACCOUNT_TEMP,"wb");
+		if(file){
+			success=fwrite(sealed,1,sealed_size,file)==sealed_size;
+			if(fclose(file)!=0)success=false;
+		}
+		/* Authenticate the actual staged file before replacing the old account. */
+		if(success){
+			file=fopen(ACCOUNT_TEMP,"rb");size_t verified=0;
+			success=file&&vault_read(file,&account->job.vault_password,account->file,sizeof(account->file),&verified);
+			if(file&&fclose(file)!=0)success=false;
+			if(success)success=verified==strlen(data)&&!memcmp(account->file,data,verified);
+			clear_bytes(account->file,sizeof(account->file));
+		}
+	}
+	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));
+#else
+	FILE *file = fopen(ACCOUNT_TEMP, "wb");
 	if(file)
 	{
 		success = data && fwrite(data, 1, strlen(data), file) == strlen(data);
 		if(fclose(file) != 0) success = false;
 	}
+#endif
 	if(success) success = rename(ACCOUNT_TEMP, ACCOUNT_FILE) == 0;
 	if(success) success = remove(ACCOUNT_BLOCK) == 0 || errno == ENOENT;
 	if(!success) remove(ACCOUNT_TEMP);
 	json_object_put(root);
-	if(success) account->result.status = PLUS_VITA_RESULT_OK;
+	if(success){
+		account->result.status=PLUS_VITA_RESULT_OK;
+#if PLUS_VITA_ACCOUNT_VAULT
+		account->result.vault_present=true;
+		if(account->job.vault_clean_import && remove(IMPORT_FILE)!=0 && errno!=ENOENT)account->result.import_cleanup_failed=true;
+#endif
+	}
 }
 
 static void delete_account(PlusVitaAccount *account)

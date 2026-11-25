@@ -36,6 +36,10 @@ int main(void){
             assert(pv_dc_errors[l][k] && *pv_dc_errors[l][k]);
             assert(!strcmp(pv_translate(l,pv_dc_errors[0][k]),pv_dc_errors[l][k]));
         }
+        for(unsigned k=0;k<PV_SECURITY_COUNT;k++){
+            assert(pv_security[l][k] && *pv_security[l][k]);
+            assert(!strcmp(pv_translate(l,pv_security[0][k]),pv_security[l][k]));
+        }
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));

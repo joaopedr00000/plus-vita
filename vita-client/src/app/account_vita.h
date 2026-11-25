@@ -4,6 +4,8 @@
 #include "app.h"
 typedef struct plus_vita_account_t PlusVitaAccount;
 PlusVitaAccount *plus_vita_account_create(void);
+/* 0 absent, 1 legacy JSON, 2 vault (or malformed vault), -1 I/O error. */
+int plus_vita_account_file_kind(void);
 bool plus_vita_account_start(PlusVitaAccount *account, const PlusVitaAppEffect *effect);
 bool plus_vita_account_idle(const PlusVitaAccount *account);
 /* Poll returns borrowed data. Consume it synchronously, then release_result. */

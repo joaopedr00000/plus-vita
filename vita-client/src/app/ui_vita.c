@@ -2,6 +2,10 @@
 #include "ui_vita.h"
 #include "app.h"
 #include "account_vita.h"
+#if PLUS_VITA_ACCOUNT_VAULT
+#include "i18n.h"
+#include "../platform/account_vault.h"
+#endif
 #include "font_vita.h"
 #include "ui_flow.h"
 #include "play_vita.h"
@@ -179,6 +183,28 @@ static bool handle_input(PlusVitaUiFlow *flow, PlusVitaAccount *account,
 	}
 	return changed;
 }
+#if PLUS_VITA_ACCOUNT_VAULT
+static bool ask_vault(PlusVitaCredential *p,unsigned lang,const char *prompt)
+{
+	PlusVitaCredentialImeResult r={0};
+	plus_vita_vault_password_read(p,&r,pv_translate(lang,prompt));
+	return r.initialized&&r.accepted&&r.validated&&pv_vault_password(p->value,p->length);
+}
+static bool prepare_vault(PlusVitaAppEffect *e,int kind,unsigned lang)
+{
+	if(kind<0)return false;
+	if(e->kind==PLUS_VITA_EFFECT_LOAD_ACCOUNT)return kind!=2||ask_vault(&e->vault_password,lang,"Unlock saved token (local password)");
+	if(e->kind!=PLUS_VITA_EFFECT_SAVE_ACCOUNT)return true;
+	if(kind==2&&!e->vault_change)return ask_vault(&e->vault_password,lang,"Unlock saved token (local password)");
+	if(kind==2&&!ask_vault(&e->vault_previous,lang,"Unlock saved token (local password)"))return false;
+	PlusVitaCredential again={0};
+	bool ok=ask_vault(&e->vault_password,lang,"Create local password (12-64 characters)")
+		&&ask_vault(&again,lang,"Confirm local password")
+		&&again.length==e->vault_password.length&&!memcmp(again.value,e->vault_password.value,again.length);
+	plus_vita_credential_clear(&again);return ok;
+}
+#endif
+
 static bool storage_effect(PlusVitaAppEffectKind kind)
 {
 	return kind == PLUS_VITA_EFFECT_LOAD_ACCOUNT || kind == PLUS_VITA_EFFECT_SAVE_ACCOUNT
@@ -480,6 +506,20 @@ int plus_vita_app_run(void)
 						}
 					}
 				}
+				#if PLUS_VITA_ACCOUNT_VAULT
+				else if(effect.kind==PLUS_VITA_EFFECT_LOAD_ACCOUNT||effect.kind==PLUS_VITA_EFFECT_SAVE_ACCOUNT){
+					int kind=plus_vita_account_file_kind();
+					if(!prepare_vault(&effect,kind,plus_vita_app_view(app).ui_language)){
+						plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=completion(effect.kind),.operation=effect.operation,
+							.status=kind<0?PLUS_VITA_RESULT_STORAGE_ERROR:PLUS_VITA_RESULT_CANCELLED,.vault_present=kind==2,.legacy_plain=kind==1},0);
+					}else if(!plus_vita_account_start(storage,&effect)){
+						plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=completion(effect.kind),.operation=effect.operation,.status=PLUS_VITA_RESULT_STORAGE_ERROR},0);
+					}
+					SceCtrlData after={0};menu_read(&menu_controller,&after);
+					plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.buttons=after.buttons,.left_x=after.lx,.left_y=after.ly,.time_us=sceKernelGetProcessTimeWide()}});
+					touched=true;previous_poll=flow.input_since=0;
+				}
+				#endif
 				else if((!storage_effect(effect.kind) && plus_vita_play_busy(play))
 					|| !plus_vita_account_start(storage_effect(effect.kind) ? storage : account, &effect))
 				{
@@ -489,6 +529,7 @@ int plus_vita_app_run(void)
 				}
 			}
 			plus_vita_credential_clear(&effect.credential);
+			plus_vita_credential_clear(&effect.vault_password);plus_vita_credential_clear(&effect.vault_previous);
 			flow.dirty = true;
 		}
 		PlusVitaAccount *workers[] = {account, storage};

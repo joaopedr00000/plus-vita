@@ -42,6 +42,7 @@ struct plus_vita_app_t {
 	bool log_available;
 	bool account_from_settings;
 	bool remember, saved, started, retry_account, retry_save, retry_delete, forgetting, expired;
+	bool vault_present, vault_legacy;
 	PlusVitaAppScreen storage_return;
 	char label[129], online_id[129], account_status[512];
 	char store_country[8], store_language[8], language[8];
@@ -137,6 +138,11 @@ static void settings_view(PlusVitaApp *app)
 	app->view.actions[7]=app->view.actions[5];
 	app->view.actions[6]=(PlusVitaAppButton){PLUS_VITA_ACTION_STREAM_SETTINGS,"Streaming",64,0,832,34};
 	app->view.action_count=8;
+#if PLUS_VITA_ACCOUNT_VAULT
+	app->view.actions[8]=app->view.actions[7];
+	app->view.actions[7]=(PlusVitaAppButton){PLUS_VITA_ACTION_SECURITY,"Security and privacy",64,0,832,34};
+	app->view.action_count=9;
+#endif
 	snprintf(app->locale_label,sizeof(app->locale_label),"%s: %s",pv_translate(app->ui_language,"Language"),pv_locale_names[pv_language(app->ui_language)]);
 	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_LANGUAGE,app->locale_label,64,0,832,34};
 	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
@@ -158,6 +164,25 @@ static void stream_settings_view(PlusVitaApp *app)
 			{PLUS_VITA_ACTION_STREAM_MAX,"Maximum quality - 15 Mbps",64,362,832,40},
 			{PLUS_VITA_ACTION_BACK,"Back to settings",64,406,832,40}},
 		.action_count=4,.selected=profile==6000?0:profile==10000?1:2};
+}
+#endif
+
+#if PLUS_VITA_ACCOUNT_VAULT
+static void security_view(PlusVitaApp *app,const char *notice)
+{
+	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_SECURITY,.title="Security and privacy",
+		.subtitle="ACCOUNT",.body=notice?notice:app->vault_present?"Saved token protected by AES-256-GCM. Use a strong local password.":"Saved tokens require a local password (12-64 characters). Imported JSON and local HTTP are not encrypted.",
+		.hint="X  Select     O  Back",
+		.actions={{PLUS_VITA_ACTION_VAULT_SAVE,"Protect saved token",64,258,832,40},
+			{PLUS_VITA_ACTION_VAULT_CHANGE,"Change local password",64,302,832,40},
+			{PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT,"Encrypt and remove imported JSON",64,346,832,40},
+			{PLUS_VITA_ACTION_FORGET,"Forget account",64,390,832,40},
+			{PLUS_VITA_ACTION_BACK,"Back to settings",64,434,832,40}},.action_count=5};
+	if(!app->connected){
+		app->view.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_RESTORE,"Restore saved account",64,258,832,40};
+		app->view.actions[1]=app->view.actions[3];app->view.actions[1].y=302;
+		app->view.actions[2]=app->view.actions[4];app->view.actions[2].y=346;app->view.action_count=3;
+	}
 }
 #endif
 
@@ -640,7 +665,11 @@ static int compare_titles(const void *left, const void *right)
 static void account_view(PlusVitaApp *app)
 {
 	snprintf(app->account_status, sizeof(app->account_status),
+		#if PLUS_VITA_ACCOUNT_VAULT
+		PV_TR("Remember: %s. See Security and privacy.\nAccount label (entered by you): %s\nSony account name: %s"),
+#else
 		PV_TR("Remember: %s. Local files are readable with file access.\nAccount label (entered by you): %s\nSony account name: %s"),
+#endif
 		PV_TR(app->saved ? "On" : "Off"), app->label[0] ? app->label : PV_TR("Not set"), app->online_id[0] ? app->online_id : PV_TR("Unavailable"));
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_ACCOUNT, .title = account_name(app),
 		.subtitle = "ACCOUNT", .body = app->account_status, .hint = "Left stick  Move     X  Select     O  Back",
@@ -1062,6 +1091,13 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		}
 		if(event.kind == PLUS_VITA_EVENT_ACCOUNT_LOADED && app->waiting_for == PLUS_VITA_EFFECT_LOAD_ACCOUNT)
 		{
+#if PLUS_VITA_ACCOUNT_VAULT
+			app->vault_present=event.vault_present;app->vault_legacy=event.legacy_plain;
+			if(event.status==PLUS_VITA_RESULT_CANCELLED||event.status==PLUS_VITA_RESULT_VAULT_LOCKED){
+				app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;app->saved=true;
+				security_view(app,event.status==PLUS_VITA_RESULT_CANCELLED?"Saved token remains locked.":"Wrong password or damaged vault. Restore again or forget the account.");return effect;
+			}
+#endif
 			if(event.status == PLUS_VITA_RESULT_MISSING) {
 				app->pending_operation = 0; app->waiting_for = PLUS_VITA_EFFECT_NONE;
 				app->saved = false; app->remember = !event.restore_blocked; clear_runtime(app); welcome(app); return effect;
@@ -1074,12 +1110,22 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				return effect;
 			}
 			app->saved = app->remember = true;
+#if PLUS_VITA_ACCOUNT_VAULT
+			if(event.legacy_plain)app->saved=false; /* migrate only after Sony accepts it */
+#endif
 			return operation(app, PLUS_VITA_EFFECT_AUTHORIZE, "Restoring your saved sign-in and loading cloud games.", true);
 		}
 		if(event.kind == PLUS_VITA_EVENT_ACCOUNT_SAVED && app->waiting_for == PLUS_VITA_EFFECT_SAVE_ACCOUNT)
 		{
 			app->pending_operation = 0;
 			app->waiting_for = PLUS_VITA_EFFECT_NONE;
+			#if PLUS_VITA_ACCOUNT_VAULT
+			if(event.status==PLUS_VITA_RESULT_CANCELLED||event.status==PLUS_VITA_RESULT_VAULT_LOCKED){
+				app->vault_present=event.vault_present;
+				app->saved=app->vault_present||app->vault_legacy;app->remember=app->saved;
+				security_view(app,event.status==PLUS_VITA_RESULT_CANCELLED?"Save cancelled. Previous file unchanged.":"Wrong password or damaged vault. Restore again or forget the account.");return effect;
+			}
+#endif
 			if(event.status != PLUS_VITA_RESULT_OK)
 			{
 				app->retry_save = true;
@@ -1088,6 +1134,10 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			}
 			app->saved = app->remember = true;
 			app->retry_save = false;
+#if PLUS_VITA_ACCOUNT_VAULT
+			app->vault_present=event.vault_present;app->vault_legacy=false;
+			if(app->storage_return==PLUS_VITA_APP_SECURITY){security_view(app,event.import_cleanup_failed?"Vault saved, but imported JSON could not be removed.":"Saved token protected by AES-256-GCM. Use a strong local password.");return effect;}
+#endif
 			if(app->storage_return == PLUS_VITA_APP_ACCOUNT) account_view(app); else catalogue_view(app);
 			return effect;
 		}
@@ -1103,6 +1153,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				return effect;
 			}
 			app->saved = app->remember = false;
+			app->vault_present=app->vault_legacy=false;
 			app->retry_delete = false;
 			if(app->expired) { app->expired = false; account_error(app, result_message(PLUS_VITA_RESULT_REJECTED)); }
 			else if(app->forgetting) { app->forgetting = false; app->welcome_selection = 0; setup_view(app); }
@@ -1384,7 +1435,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(app->waiting_for == PLUS_VITA_EFFECT_SAVE_ACCOUNT || app->waiting_for == PLUS_VITA_EFFECT_DELETE_ACCOUNT
 			|| app->waiting_for == PLUS_VITA_EFFECT_ENABLE_AUTO) return effect;
 		if(view->screen == PLUS_VITA_APP_FORGET_CONFIRM) { account_view(app); return effect; }
-		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING || view->screen == PLUS_VITA_APP_STREAM_SETTINGS
+		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING || view->screen == PLUS_VITA_APP_STREAM_SETTINGS || view->screen == PLUS_VITA_APP_SECURITY
 			|| (view->screen == PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) {
 			settings_view(app); return effect;
 		}
@@ -1498,7 +1549,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				if(app->retry_delete) return remove_saved(app, app->forgetting, app->expired);
 				if(app->saved) return remove_saved(app, false, false);
 				app->storage_return = PLUS_VITA_APP_ACCOUNT;
-				return operation(app, PLUS_VITA_EFFECT_SAVE_ACCOUNT, "Saving sign-in in locally readable files on this Vita.", false);
+				return operation(app, PLUS_VITA_EFFECT_SAVE_ACCOUNT, "Saving sign-in on this Vita.", false);
 			}
 			if(app->remember) {
 				PlusVitaAppEffect disable = remove_saved(app, false, false);
@@ -1518,6 +1569,16 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(action == PLUS_VITA_ACTION_ACCOUNT) { app->account_from_settings = view->screen == PLUS_VITA_APP_SETTINGS; account_view(app); }
 		else if(action == PLUS_VITA_ACTION_SETTINGS) { app->welcome_selection = view->selected; settings_view(app); }
 #if PLUS_VITA_ADAPTIVE_STREAM
+#if PLUS_VITA_ACCOUNT_VAULT
+		else if(action==PLUS_VITA_ACTION_SECURITY && view->screen==PLUS_VITA_APP_SETTINGS)security_view(app,NULL);
+		else if(view->screen==PLUS_VITA_APP_SECURITY && app->connected &&
+			(action==PLUS_VITA_ACTION_VAULT_SAVE||action==PLUS_VITA_ACTION_VAULT_CHANGE||action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT)){
+			app->storage_return=PLUS_VITA_APP_SECURITY;
+			effect=operation(app,PLUS_VITA_EFFECT_SAVE_ACCOUNT,"Choose a local password, not your Sony password.",false);
+			effect.vault_change=action==PLUS_VITA_ACTION_VAULT_CHANGE;
+			effect.vault_clean_import=action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT;return effect;
+		}
+#endif
 		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
 		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){
 			app->bitrate_kbps=action==PLUS_VITA_ACTION_STREAM_LOW?6000:action==PLUS_VITA_ACTION_STREAM_BALANCED?10000:15000;
