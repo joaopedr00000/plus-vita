@@ -53,7 +53,7 @@ struct plus_vita_app_t {
 	PlusVitaControlDevice control_device;
 	unsigned binding_input;
 	size_t binding_focus, binding_first, action_focus, action_first, catalogue_first;
-	char controls_status[256], binding_labels[5][160];
+	char controls_status[256], binding_labels[5][256];
 	char controls_help[1024];
 #if PLUS_VITA_PS5_EXPERIMENTAL
 	char datacenters[64][128], dc_status[160], bitrate_label[64];
@@ -202,12 +202,12 @@ static void bindings_view(PlusVitaApp *app,bool destinations)
 		.hint="D-pad / left stick  Move     X  Select     O  Back",.selected=focus-*first};
 	for(unsigned row=0;row<5 && *first+row<count;row++) {
 		unsigned index=(unsigned)*first+row;
-		if(destinations) snprintf(app->binding_labels[row],sizeof(app->binding_labels[row]),"%s",plus_vita_control_action_name(index));
+		if(destinations) snprintf(app->binding_labels[row],sizeof(app->binding_labels[row]),"%s",PV_TR(plus_vita_control_action_name(index)));
 		else snprintf(app->binding_labels[row],sizeof(app->binding_labels[row]),"%s: %s%s",
-			plus_vita_control_input_name(index,app->control_device),plus_vita_control_action_name(app->controls_draft.bindings[index]),
-			plus_vita_control_input_available(index,app->control_device) ? ""
+			PV_TR(plus_vita_control_input_name(index,app->control_device)),PV_TR(plus_vita_control_action_name(app->controls_draft.bindings[index])),
+			PV_TR(plus_vita_control_input_available(index,app->control_device) ? ""
 			: app->control_device==PLUS_VITA_DEVICE_VITA ? " (PS TV only)"
-			: app->control_device==PLUS_VITA_DEVICE_DISCONNECTED ? " (no controller)" : " (Vita only)");
+			: app->control_device==PLUS_VITA_DEVICE_DISCONNECTED ? " (no controller)" : " (Vita only)"));
 		app->view.actions[app->view.action_count++]=(PlusVitaAppButton){
 			destinations ? PLUS_VITA_ACTION_BIND_ACTION : PLUS_VITA_ACTION_BINDING,
 			app->binding_labels[row],64,248+(int)row*44,812,40};

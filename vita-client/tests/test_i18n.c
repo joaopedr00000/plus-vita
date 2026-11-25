@@ -36,5 +36,7 @@ int main(void){
         while((p=strchr(p,'%'))!=NULL){assert(p[1]=='s');++placeholders;p+=2;}
         assert(placeholders==3);
     }
+    assert(!strcmp(pv_translate(2,"D-pad Up"),"Direcional cima"));
+    assert(!strcmp(pv_translate(2,"Rear touch top-left"),"Toque traseiro sup. esquerdo"));
     puts("19 locale tables validated");return 0;
 }
