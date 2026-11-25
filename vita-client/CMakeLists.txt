@@ -754,6 +754,56 @@ if(PV_POS EQUAL -1)
   message(FATAL_ERROR "Pylux response compatibility patch point 5 not found")
 endif()
 string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+# PS5 authorization interoperability: normalize the service-issued OAuth
+# redirect code and accept an explicit session key from successful responses.
+# PS3/PS4 behavior, entitlements, device identity and codec remain unchanged.
+set(PV_AUTH_OLD [=[
+	char *k = gk_header_value(resp->headers, "x-gaikai-session");
+	if(k && *k) { free(c->config_key); c->config_key = k; }
+	else free(k);
+]=])
+set(PV_AUTH_NEW [=[
+	char *k = gk_header_value(resp->headers, "x-gaikai-session");
+	if(c->pscloud) {
+		char *next = resp->status_code==200 ? vp_cloud_response_key(k,resp->data) : NULL;
+		free(k);
+		if(next) { free(c->config_key); c->config_key = next; }
+	} else if(k && *k) { free(c->config_key); c->config_key = k; }
+	else free(k);
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_AUTH_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux authorization key rotation patch point missing")
+endif()
+string(REPLACE "${PV_AUTH_OLD}" "${PV_AUTH_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_AUTH_OLD [=[
+	char *code = gk_query_param(loc, "code");
+]=])
+set(PV_AUTH_NEW [=[
+	char *code = c->pscloud ? vp_cloud_oauth_code(loc) : gk_query_param(loc, "code");
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_AUTH_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux OAuth redirect patch point missing")
+endif()
+string(REPLACE "${PV_AUTH_OLD}" "${PV_AUTH_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+# Record the HTTP status of the OAuth and pre-authorize calls as well.
+# Do not record any redirect URL, authorization code, session key, or body.
+set(PV_AUTH_OLD [=[
+	ChiakiErrorCode e = cc_http_perform(c->log, &req, &resp);
+	free(h_ua); free(cookie);
+]=])
+set(PV_AUTH_NEW [=[
+	ChiakiErrorCode e = cc_http_perform(c->log, &req, &resp);
+	if(c->pscloud && resp.status_code>=100 && resp.status_code<=599)
+		plus_vita_diagnostic_event("allocation.http",(int)resp.status_code);
+	free(h_ua); free(cookie);
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_AUTH_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux OAuth HTTP diagnostics patch point missing")
+endif()
+string(REPLACE "${PV_AUTH_OLD}" "${PV_AUTH_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
 file(WRITE "${PLUS_VITA_GAIKAI_SOURCE}" "${PLUS_VITA_GAIKAI_TEXT}")
 
 # Preserve a release and a new touch in one update when a contact slot is

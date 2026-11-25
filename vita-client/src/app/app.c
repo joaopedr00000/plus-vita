@@ -862,7 +862,7 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 		"Handshake failed","STREAMINFO interrupted","STREAMINFO invalid","Profile unavailable","Audio init failed",
 		"Video header invalid","Header guard rejected","Decoder init failed","STREAMINFO reply failed","Provision invalid",
 		"Media disconnected","Media decrypt failed","Media invalid","First frame timeout","PS3 feedback"};
-	static const char *const reasons[]={"N/A","002.0011","002.0019","002.2001","R4","R5","R6","R7","R8","R9","R10","R11"};
+	static const char *const reasons[]={"N/A","002.0011","002.0019","002.2001","R4","R5","R6","R7","R8","R9","R10","R11","R12","R13","R14","R15","R16","R17","R18","Bad Request","Unauthorized","Component 002"};
 	char stage[72],http[8],native[8];
 	if(d.startup&&d.startup<=sizeof(startup)/sizeof(startup[0]))
 		snprintf(stage,sizeof(stage),"Video: %s (S%u)",startup[d.startup-1],d.startup-1);
@@ -876,7 +876,7 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 #endif
 	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
 		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
-		stage,http,reasons[d.reason<=11?d.reason:0],native,ps5?"Portal":"PC");
+		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?"Portal":"PC");
 }
 
 static void attach_stream_diagnostic(PlusVitaApp *app)

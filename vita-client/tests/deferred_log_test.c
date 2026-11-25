@@ -130,6 +130,11 @@ static void stream_snapshot(void)
 	s=plus_vita_diagnostic_stream_snapshot();assert(s.startup==PLUS_VITA_STREAM_STARTUP_DECODER_INIT_FAILED+1);
 	plus_vita_diagnostic_event("allocation.http",200);
 	s=plus_vita_diagnostic_stream_snapshot();assert(s.http==200&&!s.reason);
+	plus_vita_diagnostic_event("allocation.phase",8);
+	s=plus_vita_diagnostic_stream_snapshot();assert(s.phase==8&&!s.http&&!s.reason);
+	plus_vita_diagnostic_event("allocation.http",400);
+	plus_vita_diagnostic_event("allocation.reason",21);
+	s=plus_vita_diagnostic_stream_snapshot();assert(s.http==400&&s.reason==21);
 	plus_vita_diagnostic_event("allocation.begin",0);
 	s=plus_vita_diagnostic_stream_snapshot();assert(!s.valid&&!s.phase&&!s.http&&!s.reason&&!s.startup);
 	plus_vita_diagnostic_event("allocation.http",999);

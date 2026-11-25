@@ -487,13 +487,13 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			else if(!strcmp(names[i],"allocation.stage")) code=code>=0 && code<=5 ? code : 0;
 			else if(!strcmp(names[i],"allocation.phase")) code=code>=0 && code<=11 ? code : 0;
 			else if(!strcmp(names[i],"allocation.http")) code=code>=100 && code<=599 ? code : 0;
-			else if(!strcmp(names[i],"allocation.reason")) code=code>=0 && code<=11 ? code : 0;
+			else if(!strcmp(names[i],"allocation.reason")) code=code>=0 && code<=21 ? code : 0;
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
 			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")||!strcmp(names[i],"catalog.phase")) code=code>=0&&code<=20?code:-1;
 			else code=code>=-1 && code<=21 ? code : -1;
 			pthread_mutex_lock(&diagnostic_write_mutex);
 			if(!strcmp(names[i],"allocation.begin")) stream_diag=(PlusVitaStreamDiagnostic){0};
-			else if(!strcmp(names[i],"allocation.phase")) {stream_diag.phase=(unsigned)code;stream_diag.valid=true;}
+			else if(!strcmp(names[i],"allocation.phase")) {stream_diag.phase=(unsigned)code;stream_diag.http=0;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.http")) {stream_diag.http=(unsigned)code;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.reason")) stream_diag.reason=(unsigned)code;
 			pthread_mutex_unlock(&diagnostic_write_mutex);
