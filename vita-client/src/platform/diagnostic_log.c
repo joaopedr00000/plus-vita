@@ -356,8 +356,10 @@ bool plus_vita_diagnostic_begin(void)
 	if(!diagnostic_close()) {
 		pthread_mutex_unlock(&diagnostic_lifecycle_mutex); return false;
 	}
+	pthread_mutex_lock(&diagnostic_write_mutex);
 	diagnostic_wall_start=time(NULL);
 	diagnostic_timestamp(diagnostic_start_utc,0);
+	pthread_mutex_unlock(&diagnostic_write_mutex);
 	/* The deferred writer owns opening as well as subsequent persistence. */
 #if !PLUS_VITA_DEFERRED_LOG
 	FILE *opened = diagnostic_open();

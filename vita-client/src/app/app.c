@@ -334,11 +334,11 @@ static void controls_view(PlusVitaApp *app)
 static void reporting_view(PlusVitaApp *app)
 {
 	snprintf(app->reporting_status, sizeof(app->reporting_status), "Log: %s\n"
-		"Copy with VitaShell before Play, Retry or app restart.\n"
+		"Copy with VitaShell before restarting the app.\n"
 		"Review it, then attach it yourself at:\n"
 		"github.com/joaopedr00000/plus-vita/issues/new\n"
 		"Include steps, expected/actual result and version %s.\n"
-		"Never share sign-in JSON, account files or private screenshots.",
+		"Never share sign-in JSON, account files, keys or private screenshots.",
 		app->log_available ? PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable; report without a log",
 		PLUS_VITA_APP_VERSION);
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_REPORTING,
@@ -923,7 +923,7 @@ static void stream_stopped_view(PlusVitaApp *app)
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_STOPPED,
 		.title="Cloud Play stopped.",.subtitle="SESSION INTERRUPTED",
-		.body="The session stopped unexpectedly before you chose to leave.\nThis could be a connection or app problem.\nCopy " PLUS_VITA_DIAGNOSTIC_VITA_PATH " before retrying; the next Play replaces it.",
+		.body="The session stopped unexpectedly before you chose to leave.\nThis could be a connection or app problem.\nCopy " PLUS_VITA_DIAGNOSTIC_VITA_PATH " before restarting the app.",
 		.hint="X  Select     O  Back",.detail=game,
 		.actions={{PLUS_VITA_ACTION_PLAY,"Try Play again",64,380,832,52},
 			{PLUS_VITA_ACTION_BACK,"Back to catalogue",64,444,832,52}},.action_count=2};
@@ -1044,8 +1044,8 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(playing) {
 			stream_stopped_view(app);
 			view->body = event.status == PLUS_VITA_RESULT_SLEEP
-				? "Play ended for sleep. The old session cannot resume.\nSelect Play for a fresh cloud session when ready.\nCopy the log before retrying."
-				: "Wi-Fi was lost. The old session cannot resume.\nReconnect Wi-Fi and select Play for a fresh session.\nCopy the log before retrying.";
+				? "Play ended for sleep. The old session cannot resume.\nSelect Play for a fresh cloud session when ready.\nCopy the log before restarting the app."
+				: "Wi-Fi was lost. The old session cannot resume.\nReconnect Wi-Fi and select Play for a fresh session.\nCopy the log before restarting the app.";
 		} else if(pending) {
 			if(app->connected) {
 				catalogue_view(app);
