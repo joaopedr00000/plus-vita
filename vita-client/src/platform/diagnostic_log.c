@@ -16,7 +16,7 @@
 #if defined(__vita__) && PLUS_VITA_PS3_REPLAY
 #define PLUS_VITA_DIAGNOSTIC_PATH PLUS_VITA_PS3_REPLAY_LOG_PATH
 #elif defined(__vita__)
-#define PLUS_VITA_DIAGNOSTIC_PATH "ux0:data/plus-vita-allocation.log"
+#define PLUS_VITA_DIAGNOSTIC_PATH PLUS_VITA_DIAGNOSTIC_VITA_PATH
 #else
 #define PLUS_VITA_DIAGNOSTIC_PATH "plus-vita-allocation.log"
 #endif

@@ -110,7 +110,7 @@ static void welcome(PlusVitaApp *app)
 static void settings_view(PlusVitaApp *app)
 {
 	snprintf(app->settings_status, sizeof(app->settings_status), "Version %s.\nSession log: %s.\nYour sign-in files stay on this Vita.",
-		PLUS_VITA_APP_VERSION, app->log_available ? "available at ux0:data/plus-vita-allocation.log" : "unavailable");
+		PLUS_VITA_APP_VERSION, app->log_available ? "available at " PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable");
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_SETTINGS,
 		.title = "Settings and help.", .subtitle = "PLUS VITA", .body = app->settings_status,
 		.hint = "Left stick  Move     X  Select     O  Back",
@@ -280,7 +280,7 @@ static void reporting_view(PlusVitaApp *app)
 		"github.com/Calligula87/plus-vita/issues/new\n"
 		"Include steps, expected/actual result and version %s.\n"
 		"Never share sign-in JSON, account files or private screenshots.",
-		app->log_available ? "ux0:data/plus-vita-allocation.log" : "unavailable; report without a log",
+		app->log_available ? PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable; report without a log",
 		PLUS_VITA_APP_VERSION);
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_REPORTING,
 		.title = "Report an issue.", .subtitle = "SETTINGS AND HELP", .body = app->reporting_status,
@@ -810,7 +810,7 @@ static void stream_stopped_view(PlusVitaApp *app)
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_STOPPED,
 		.title="Cloud Play stopped.",.subtitle="SESSION INTERRUPTED",
-		.body="The session stopped unexpectedly before you chose to leave.\nThis could be a connection or app problem.\nCopy ux0:data/plus-vita-allocation.log before retrying; the next Play replaces it.",
+		.body="The session stopped unexpectedly before you chose to leave.\nThis could be a connection or app problem.\nCopy " PLUS_VITA_DIAGNOSTIC_VITA_PATH " before retrying; the next Play replaces it.",
 		.hint="X  Select     O  Back",.detail=game,
 		.actions={{PLUS_VITA_ACTION_PLAY,"Try Play again",64,380,832,52},
 			{PLUS_VITA_ACTION_BACK,"Back to catalogue",64,444,832,52}},.action_count=2};
