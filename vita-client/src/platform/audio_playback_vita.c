@@ -210,7 +210,15 @@ static void *audio_worker(void *user)
 		if(n != 480) { CHIAKI_LOGE(a->log, "Stream probe audio decode failed samples=%d", n); goto failed; }
 		a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(a->audio_fade){for(unsigned i=0;i<240;i++)for(unsigned ch=0;ch<a->channels;ch++)pcm[i*a->channels+ch]=(int16_t)((int32_t)pcm[i*a->channels+ch]*(int)i/240);a->audio_fade=false;}
+		if(a->audio_fade) {
+			for(unsigned i=0;i<240;i++) {
+				for(int ch=0;ch<a->channels;ch++) {
+					size_t index=(size_t)i*(size_t)a->channels+(size_t)ch;
+					pcm[index]=(int16_t)((int32_t)pcm[index]*(int)i/240);
+				}
+			}
+			a->audio_fade=false;
+		}
 #endif
 		audio_measure(a, pcm, (unsigned)n);
 		if(a->decoded == 1 || a->decoded % 1000 == 0) {
