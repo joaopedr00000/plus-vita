@@ -8,7 +8,7 @@
 
 This is AstraPlay-inspired embedded local relay authentication, not Sony's native device-code API or automatic cookie capture. The local HTTP hop is **not encrypted**: anyone able to inspect the LAN may obtain the token. Use a trusted private network, never public Wi-Fi; do not forward the port, publish the QR, paste passwords or share the token. A one-time 128-bit session secret, same-subnet restrictions, bounded requests, Host/Origin checks and 3-minute expiry reduce accidental or unauthorized submissions but do not encrypt the connection. Clear your clipboard. No central relay, telemetry or password collection. Browser local-network access may need permission; HTTPS-only mode may require allowing this local HTTP page. Hardware/browser compatibility is not yet verified.
 
-Remember remains optional. Saved credentials remain locally readable; Forget removes app-managed account data. The Beta 3 build no longer offers manual NPSSO entry, optical pairing, reverse QR or JSON import; legacy files are not automatically imported or deleted. Previously saved app accounts can still restore. Older builds retain their previous behavior.
+Remember remains optional. On v0.0.3, remembered credentials are encrypted; Forget removes app-managed account data. A matching plaintext import is automatically removed only after the encrypted save is verified. See [token protection](TOKEN_VAULT.md). The Beta 3 build no longer offers manual NPSSO entry, optical pairing, reverse QR or JSON import; legacy files are not automatically imported; matching plaintext imports are removed only after a verified encrypted save. Previously saved app accounts can still restore. Older builds retain their previous behavior.
 
 ## Account controls and recovery
 
