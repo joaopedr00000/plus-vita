@@ -83,7 +83,7 @@ static void wordmark(Canvas *display,const PlusVitaBranding *branding)
 {
 	const uint32_t *image=plus_vita_branding_wordmark(branding);
 	if(!image) {
-		text(display,"plus-vita",64,25,TEXT_BRAND,400,38,false,MENU_ACCENT);
+		text(display,"VitaPlus",64,25,TEXT_BRAND,400,38,false,MENU_ACCENT);
 		return;
 	}
 	for(unsigned y=0;y<40;y++) for(unsigned x=0;x<224;x++) {

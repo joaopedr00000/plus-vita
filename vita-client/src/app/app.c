@@ -73,14 +73,14 @@ static void welcome(PlusVitaApp *app)
 {
 	app->view = (PlusVitaAppView){
 		.screen = PLUS_VITA_APP_WELCOME,
-		.title = "Plus-Vita",
-		.subtitle = "WELCOME TO PLUS VITA",
+		.title = "VitaPlus",
+		.subtitle = "WELCOME TO VITAPLUS",
 		.body = "Play your cloud games on the handheld you love.\nConnect your own Sony account to get started.",
 		.hint = "Left stick  Move     X  Select     O  Back",
 		.actions = {
 			{ PLUS_VITA_ACTION_SETUP, "Get started", 64, 300, 500, 44 },
 			{ PLUS_VITA_ACTION_SETTINGS, "Settings and help", 64, 350, 500, 44 },
-			{ PLUS_VITA_ACTION_ABOUT, "About Plus Vita", 64, 400, 500, 44 },
+			{ PLUS_VITA_ACTION_ABOUT, "About VitaPlus", 64, 400, 500, 44 },
 			{ PLUS_VITA_ACTION_EXIT, "Exit", 64, 450, 500, 44 }
 		},
 		.action_count = 4, .selected = app->welcome_selection
@@ -104,7 +104,7 @@ static void welcome(PlusVitaApp *app)
 		app->view.actions[0].y = 264;
 		app->view.actions[1] = (PlusVitaAppButton){ PLUS_VITA_ACTION_ACCOUNT, "Account", 64, 310, 500, 40 };
 		app->view.actions[2] = (PlusVitaAppButton){ PLUS_VITA_ACTION_SETTINGS, "Settings and help", 64, 356, 500, 40 };
-		app->view.actions[3] = (PlusVitaAppButton){ PLUS_VITA_ACTION_ABOUT, "About Plus Vita", 64, 402, 500, 40 };
+		app->view.actions[3] = (PlusVitaAppButton){ PLUS_VITA_ACTION_ABOUT, "About VitaPlus", 64, 402, 500, 40 };
 		app->view.actions[4] = (PlusVitaAppButton){ PLUS_VITA_ACTION_EXIT, "Exit", 64, 448, 500, 40 };
 		app->view.actions[0].height = 40;
 		app->view.action_count = 5;
@@ -117,7 +117,7 @@ static void settings_view(PlusVitaApp *app)
 	snprintf(app->settings_status, sizeof(app->settings_status), "Version %s.\nSession log: %s.\nYour sign-in files stay on this Vita.",
 		PLUS_VITA_APP_VERSION, app->log_available ? "available at " PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable");
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_SETTINGS,
-		.title = "Settings and help.", .subtitle = "PLUS VITA", .body = app->settings_status,
+		.title = "Settings and help.", .subtitle = "VITAPLUS", .body = app->settings_status,
 		.hint = "Left stick  Move     X  Select     O  Back",
 		.actions = {
 			{ app->connected || app->saved ? PLUS_VITA_ACTION_ACCOUNT : PLUS_VITA_ACTION_SETUP,
@@ -296,7 +296,7 @@ static void reporting_view(PlusVitaApp *app)
 static void about_view(PlusVitaApp *app)
 {
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_ABOUT,
-		.title="Made for your handheld.",.subtitle="ABOUT PLUS VITA",
+		.title="Made for your handheld.",.subtitle="ABOUT VITAPLUS",
 		.body="Use your own Sony account and eligible subscription.\n\n" PLUS_VITA_ABOUT_STATUS,
 		.hint="X  Select     O  Back",.actions={{PLUS_VITA_ACTION_BACK,"Back",64,444,500,52}},.action_count=1};
 #if PLUS_VITA_FONT_COMPARISON
@@ -380,7 +380,7 @@ static void setup_view(PlusVitaApp *app)
 	app->view.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_LAN_LOGIN,"Sign in with QR code",64,0,832,44};
 #elif PLUS_VITA_QR_PAIRING
 	app->view.title="Connect your Sony account.";
-	app->view.body="Sign in only on Sony. No password is requested by Plus-Vita.\nChoose browser login, encrypted QR pairing, or JSON import.";
+	app->view.body="Sign in only on Sony. No password is requested by VitaPlus.\nChoose browser login, encrypted QR pairing, or JSON import.";
 	app->view.actions[0].y=284;app->view.actions[0].height=48;
 	app->view.actions[1].y=336;app->view.actions[1].height=48;
 	app->view.actions[3]=app->view.actions[2];
@@ -898,14 +898,14 @@ static void confirm_exit(PlusVitaApp *app)
 {
 	app->view = (PlusVitaAppView){
 		.screen = PLUS_VITA_APP_EXIT_CONFIRM,
-		.title = "See you next time?", .subtitle = "EXIT PLUS VITA",
+		.title = "See you next time?", .subtitle = "EXIT VITAPLUS",
 		.body = app->saved ? "Your sign-in is remembered on this Vita.\nThe app will validate it again next time you open it."
 			: app->connected ? "Exiting ends this sign-in.\nTurn on Remember in Account to keep it for the next launch."
 			: "You can come back whenever you are ready to play.",
 		.hint = "X  Select     O  Back",
 		.actions = {
 			{ PLUS_VITA_ACTION_BACK, "Stay here", 64, 380, 500, 52 },
-			{ PLUS_VITA_ACTION_EXIT, "Exit Plus Vita", 64, 444, 500, 52 }
+			{ PLUS_VITA_ACTION_EXIT, "Exit VitaPlus", 64, 444, 500, 52 }
 		}, .action_count = 2
 	};
 }

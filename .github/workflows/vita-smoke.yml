@@ -174,7 +174,7 @@ jobs:
   beta3-build:
     env:
       PV_VERSION: ${{ github.ref == 'refs/heads/release/v0.0.2' && 'v0.0.2' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'v0.0.1' || 'beta3' }}
-      PV_FILENAME: ${{ github.ref == 'refs/heads/release/v0.0.2' && 'VitaPlus-v0.0.2-base.vpk' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'plus-vita-v0.0.1.vpk' || 'plus-vita-v0.1.0-beta.3.vpk' }}
+      PV_FILENAME: ${{ github.ref == 'refs/heads/release/v0.0.2' && 'VitaPlus-v0.0.2.vpk' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'plus-vita-v0.0.1.vpk' || 'plus-vita-v0.1.0-beta.3.vpk' }}
     if: github.repository == 'joaopedr00000/plus-vita' && (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
@@ -272,7 +272,7 @@ jobs:
           fi
 
 
-  draft-v002:
+  publish-v002:
     if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.2' && github.event_name == 'push'
     needs: [app-workflow, beta3-build]
     runs-on: ubuntu-latest
@@ -285,14 +285,51 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Create release draft for approved visual assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: plus-vita-v0.0.2
+          path: dist
+      - name: Verify release checksum and exact approved artwork
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          import hashlib, zipfile
+          from pathlib import Path
+          expected = {
+              'sce_sys/icon0.png': '8fa1a94ea26a0cceb87c55386916300a8678de746831bc7bac350e7934653899',
+              'sce_sys/livearea/contents/bg.png': '3d1b8d9864297c020ec832c57d3ee4e1935335f075729cc131ff93d8f8bad029',
+              'sce_sys/livearea/contents/startup.png': '355a2f3346f248aba4ad1c0a6f7996e8f440c493e9e7e6d8c1fee47dac21c107',
+              'sce_sys/livearea/contents/template.xml': 'dc99eff7551a5cf7ead9fb9d1f2539756f329c0e794cd24851701627020a361c',
+              'branding/splash.pvi': '32bce6c4b863268d036803b27f2b47bb70d7ee5b3541f209bea4ed55eb03e280',
+              'branding/wordmark.pvi': '3f141884a46787ff669aa4fc3e15e1ef4596423fbd7f3a18f7bc0b34a665138a',
+          }
+          with zipfile.ZipFile('dist/VitaPlus-v0.0.2.vpk') as z:
+              assert z.testzip() is None
+              for name, digest in expected.items():
+                  assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
+          PY
+      - name: Publish validated VitaPlus visual update
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.0.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Existing release left unchanged."
+          branch_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.2" --jq '.object.sha')
+          if [ "$branch_sha" != "$GITHUB_SHA" ]; then
+            echo "Newer release revision exists; skipping."
             exit 0
           fi
-          # The base build still uses the old checked-in external artwork.
-          # Never attach or publish it as the approved visual release.
-          gh release create v0.0.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus v0.0.2 — Visual Update" --notes-file release/v0.0.2.md --draft
+          if gh release view v0.0.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [ "$(gh release view v0.0.2 --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "Existing published release left untouched."
+              exit 1
+            fi
+            gh release edit v0.0.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus v0.0.2 — Visual Update" --notes-file release/v0.0.2.md
+          else
+            gh release create v0.0.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus v0.0.2 — Visual Update" --notes-file release/v0.0.2.md --draft
+          fi
+          # Never replace an already-existing tag pointing at other code.
+          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.0.2" --jq '.object.sha' 2>/dev/null); then
+            test "$tag_sha" = "$GITHUB_SHA"
+          fi
+          gh release upload v0.0.2 dist/VitaPlus-v0.0.2.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.2" --jq '.object.sha')" = "$GITHUB_SHA"
+          gh release edit v0.0.2 --repo "$GITHUB_REPOSITORY" --draft=false --latest

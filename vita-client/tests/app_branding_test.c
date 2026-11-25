@@ -236,7 +236,7 @@ int main(void)
 	bindings_page_journey(font);
 	ordinary_menu_journey(font);
 	PlusVitaAppView view=plus_vita_app_view(app);
-	assert(!strcmp(view.title,"Plus-Vita"));
+	assert(!strcmp(view.title,"VitaPlus"));
 	plus_vita_app_paint_with_resources(font,pixels,1024,&view,NULL,branding);
 	assert(pixels[20*1024+64]==0xff0099ff && pixels[20*1024+65]==0xff6f7780 && pixels[20*1024+66]==0xff443322);
 	assert(pixels[238*1024+674]==0xff443322 && pixels[429*1024+865]==0xff443322);

@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="vita-client/assets/branding/logo-source.png" alt="Plus-Vita logo" width="200">
+  <img src="vita-client/assets/branding/logo-source.png" alt="VitaPlus logo" width="200">
 </p>
 
-<h1 align="center">Plus-Vita</h1>
+<h1 align="center">VitaPlus</h1>
+
+[**VitaPlus v0.0.2 — Visual Update**](https://github.com/joaopedr00000/plus-vita/releases/tag/v0.0.2)
+
+An experimental fork of Plus-Vita. The visual update does not introduce new streaming functionality.
 
 ## Beta 1 — PS5 Cloud experimental
 
