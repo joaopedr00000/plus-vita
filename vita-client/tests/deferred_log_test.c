@@ -43,6 +43,7 @@ static void *produce(void *unused)
 	(void)unused;
 	for(unsigned i = 0; i < 2000; i++)
 		plus_vita_diagnostic_chiaki_log(CHIAKI_LOG_INFO, "Stream probe synthetic queued", NULL);
+	plus_vita_diagnostic_event("allocation.phase",8);
 	plus_vita_diagnostic_event("allocation.complete", -1);
 	plus_vita_diagnostic_chiaki_log(CHIAKI_LOG_INFO, "Stream probe access_token=synthetic-secret", NULL);
 	atomic_store(&produced, true);

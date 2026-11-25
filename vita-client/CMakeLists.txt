@@ -578,11 +578,11 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
 	if(!dcs || json_object_get_type(dcs) != json_type_array || json_object_array_length(dcs) == 0)
 ]=])
   set(PV_EMPTY_NEW [=[
-	if(dcs && json_object_get_type(dcs) == json_type_array && json_object_array_length(dcs) == 0
-		&& c->cfg->forced_datacenter && strcmp(c->cfg->forced_datacenter, "__list__") == 0)
+	if(dcs && json_object_get_type(dcs) == json_type_array && json_object_array_length(dcs) == 0)
 	{
 		c->dc_picker = dcs;
-		return CHIAKI_ERR_CANCELED;
+		return c->cfg->forced_datacenter && strcmp(c->cfg->forced_datacenter, "__list__") == 0
+			? CHIAKI_ERR_CANCELED : CHIAKI_ERR_UNKNOWN;
 	}
 	if(!dcs || json_object_get_type(dcs) != json_type_array || json_object_array_length(dcs) == 0)
 ]=])
@@ -624,6 +624,7 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
 		if(gk_cancelled(c)) { json_object_put(dcs); return CHIAKI_ERR_CANCELED; }
 		if(rtt_us <= 0 || !mtu_in || !mtu_out) {
 			c->ping_timeout = true;
+			c->dc_picker = gk_build_picker(c, dcs);
 			json_object_put(dcs);
 			return CHIAKI_ERR_NETWORK;
 		}
@@ -645,6 +646,55 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     string(REPLACE "${PV_PROFILE}" "hw4.1" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   endforeach()
 endif()
+# Keep transport failures distinct from service rejection. Only the auth preflight
+# can classify a confirmed credential rejection. Never write the server body.
+set(PV_HTTP_OLD [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step0 client_ids http %ld", resp.status_code);
+		cc_http_response_fini(&resp);
+		return CHIAKI_ERR_UNKNOWN;
+]=])
+set(PV_HTTP_NEW [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step0 client_ids http %ld", resp.status_code);
+		cc_http_response_fini(&resp);
+		return e != CHIAKI_ERR_SUCCESS && e != CHIAKI_ERR_HTTP_NONOK ? e : CHIAKI_ERR_UNKNOWN;
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_HTTP_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux transport status patch point 1 not found")
+endif()
+string(REPLACE "${PV_HTTP_OLD}" "${PV_HTTP_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_HTTP_OLD [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step7 config http %ld", resp.status_code);
+		cc_http_response_fini(&resp);
+		return CHIAKI_ERR_UNKNOWN;
+]=])
+set(PV_HTTP_NEW [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step7 config http %ld", resp.status_code);
+		cc_http_response_fini(&resp);
+		return e != CHIAKI_ERR_SUCCESS && e != CHIAKI_ERR_HTTP_NONOK ? e : CHIAKI_ERR_UNKNOWN;
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_HTTP_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux transport status patch point 2 not found")
+endif()
+string(REPLACE "${PV_HTTP_OLD}" "${PV_HTTP_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_HTTP_OLD [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step8 start http %ld: %s", resp.status_code, resp.data ? resp.data : "");
+		if(resp.data) { free(out->error_message); out->error_message = strdup(resp.data); }
+		cc_http_response_fini(&resp);
+		return CHIAKI_ERR_UNKNOWN;
+]=])
+set(PV_HTTP_NEW [=[
+		CHIAKI_LOGE(c->log, "[GAIKAI] step8 start http %ld", resp.status_code);
+		if(resp.data) { free(out->error_message); out->error_message = strdup(resp.data); }
+		cc_http_response_fini(&resp);
+		return e != CHIAKI_ERR_SUCCESS && e != CHIAKI_ERR_HTTP_NONOK ? e : CHIAKI_ERR_UNKNOWN;
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_HTTP_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux transport status patch point 3 not found")
+endif()
+string(REPLACE "${PV_HTTP_OLD}" "${PV_HTTP_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
 file(WRITE "${PLUS_VITA_GAIKAI_SOURCE}" "${PLUS_VITA_GAIKAI_TEXT}")
 
 # Preserve a release and a new touch in one update when a contact slot is

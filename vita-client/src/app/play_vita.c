@@ -13,7 +13,7 @@ struct plus_vita_play_t {
 	pthread_t thread;
 	atomic_bool cancelled;
 	bool running, complete;
-	unsigned stage;
+	unsigned stage, phase;
 	PlusVitaAppEffect job;
 	ChiakiCloudProvisionResult provision;
 	ChiakiErrorCode error;
@@ -65,11 +65,24 @@ static unsigned fixed_stage(const char *stage)
 	return 0;
 }
 
+/* Only fixed phase numbers are emitted; no remote strings or identifiers. */
+static unsigned fixed_phase(const char *stage)
+{
+	if(!stage) return 0;
+	static const char *const names[]={"Getting Client","Getting Configuration","Starting Session",
+		"Getting Tokens","Getting Server Tokens","Authorizing Session","Locking Session",
+		"Getting Datacenters","Pinging","Selecting Datacenter","Allocating Streaming Slot"};
+	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
+		if(!strncmp(stage,names[i],strlen(names[i]))) return i+1;
+	return 0;
+}
+
 static void progress(const char *stage, void *context)
 {
 	PlusVitaPlay *play=context;
-	unsigned next=fixed_stage(stage);
+	unsigned next=fixed_stage(stage), phase=fixed_phase(stage);
 	pthread_mutex_lock(&play->mutex);
+	if(phase && phase!=play->phase) {play->phase=phase;plus_vita_diagnostic_event("allocation.phase",(int)phase);}
 	if(next && next!=play->stage) {
 		play->stage=next;
 		plus_vita_diagnostic_event("allocation.stage",(int)next);
@@ -107,6 +120,7 @@ static void *allocate(void *context)
 	chiaki_log_init(&log,CHIAKI_LOG_INFO | CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR,
 		plus_vita_diagnostic_chiaki_log,NULL);
 	plus_vita_diagnostic_event("allocation.begin",0);
+	plus_vita_diagnostic_event("allocation.phase",0);
 	ChiakiErrorCode error=chiaki_cloud_provision_session(&config,&play->provision,&log);
 	#if PLUS_VITA_PS5_EXPERIMENTAL
 	/* Distinguish intentional discovery from cancellation or a failed allocation. */
@@ -144,7 +158,7 @@ bool plus_vita_play_start(PlusVitaPlay *play,const PlusVitaAppEffect *effect)
 		|| !plus_vita_bitrate_valid(effect->bitrate_kbps)) return false;
 	#endif
 	play->job=*effect;
-	play->stage=0;
+	play->stage=0;play->phase=0;
 	play->complete=false;
 	atomic_store(&play->cancelled,false);
 	plus_vita_request_cancel_set(false);

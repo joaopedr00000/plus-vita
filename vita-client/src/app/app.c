@@ -850,8 +850,8 @@ static void datacenters_view(PlusVitaApp *app)
 	n=view.action_count;
 	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,234+(int)n*38,832,32};
 	 #if PLUS_VITA_ADAPTIVE_STREAM
-	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=250+(int)i*31;view.actions[i].height=28;}
-	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,250+(int)view.action_count*31,832,28};view.action_count++;
+	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=250+(int)i*32;view.actions[i].height=26;}
+	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,250+(int)view.action_count*32,832,26};view.action_count++;
  #endif
 	app->view=view;
 }
