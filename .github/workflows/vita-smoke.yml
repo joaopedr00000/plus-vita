@@ -359,3 +359,57 @@ jobs:
           gh release upload v0.0.2 dist/VitaPlus-v0.0.2.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.2" --jq '.object.sha')" = "$GITHUB_SHA"
           gh release edit v0.0.2 --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+
+  publish-v003-experimental:
+    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.3' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [app-workflow, beta3-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: vitaplus-publish-v003-experimental
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: plus-vita-v0.0.3
+          path: dist
+      - name: Verify release package and checksum
+        run: |
+          test -s dist/VitaPlus-v0.0.3.vpk
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('dist/VitaPlus-v0.0.3.vpk') as z:
+              assert z.testzip() is None
+              assert 'eboot.bin' in z.namelist()
+              assert 'sce_sys/param.sfo' in z.namelist()
+          PY
+      - name: Publish experimental 0.0.3 only after checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag=v0.0.3
+          branch_ref="repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.3"
+          if [ "$(gh api "$branch_ref" --jq '.object.sha')" != "$GITHUB_SHA" ]; then
+            echo "Newer release revision exists; skipping superseded build."
+            exit 0
+          fi
+          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
+            test "$tag_sha" = "$GITHUB_SHA"
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            test "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
+            test "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" = "$GITHUB_SHA"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus v0.0.3 — Experimental" --notes-file release/v0.0.3.md --draft --prerelease --latest=false
+          fi
+          gh release upload "$tag" dist/VitaPlus-v0.0.3.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          test "$(gh api "$branch_ref" --jq '.object.sha')" = "$GITHUB_SHA"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,isDraft,assets
