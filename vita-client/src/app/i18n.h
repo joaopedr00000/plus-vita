@@ -185,6 +185,29 @@ static const char *const pv_stream_settings[PV_LANG_COUNT][PV_STREAM_SETTINGS_CO
 {"串流","最高畫質","低延遲 - 6 Mbps","平衡 - 10 Mbps","最高畫質 - 15 Mbps","目前：%s (%u Mbps)。\n下次工作階段生效；位元率可自適應。"},
 {"البث","أقصى جودة","زمن استجابة منخفض - 6 Mbps","متوازن - 10 Mbps","أقصى جودة - 15 Mbps","نشط: %s (%u Mbps).\nيطبق في الجلسة القادمة؛ قد يتكيف معدل البت."}
 };
+
+#define PV_DC_ERRORS_COUNT 3u
+static const char *const pv_dc_errors[PV_LANG_COUNT][PV_DC_ERRORS_COUNT]={
+{"Server discovery failed before a list was received. Try Play again.","Selected server failed. Choose another server or go back to refresh.","The service returned no eligible servers. Try again later."},
+{"Server discovery failed before a list was received. Try Play again.","Selected server failed. Choose another server or go back to refresh.","The service returned no eligible servers. Try again later."},
+{"Falha antes de receber a lista de servidores. Tente jogar novamente.","Falha no servidor escolhido. Escolha outro ou volte para atualizar.","O serviço não retornou servidores elegíveis. Tente mais tarde."},
+{"Falha antes de receber a lista de servidores. Tente jogar novamente.","Falha no servidor escolhido. Escolha outro ou volte para atualizar.","O serviço não devolveu servidores elegíveis. Tente mais tarde."},
+{"Error antes de recibir la lista de servidores. Intenta jugar de nuevo.","Falló el servidor elegido. Elige otro o vuelve para actualizar.","El servicio no devolvió servidores aptos. Inténtalo más tarde."},
+{"Error antes de recibir la lista de servidores. Intenta jugar de nuevo.","Falló el servidor elegido. Elige otro o regresa para actualizar.","El servicio no devolvió servidores aptos. Inténtalo más tarde."},
+{"Fehler vor Empfang der Serverliste. Versuche es erneut.","Gewählter Server fehlgeschlagen. Wähle einen anderen oder gehe zurück.","Keine geeigneten Server verfügbar. Versuche es später."},
+{"Échec avant réception de la liste des serveurs. Réessayez de jouer.","Échec du serveur choisi. Choisissez-en un autre ou revenez pour actualiser.","Aucun serveur éligible retourné. Réessayez plus tard."},
+{"Errore prima di ricevere la lista dei server. Riprova a giocare.","Server scelto non riuscito. Scegline un altro o torna indietro.","Nessun server idoneo restituito. Riprova più tardi."},
+{"Fout vóór ontvangst van serverlijst. Probeer opnieuw te spelen.","Gekozen server mislukt. Kies een andere of ga terug om te vernieuwen.","Geen geschikte servers ontvangen. Probeer later opnieuw."},
+{"Błąd przed odebraniem listy serwerów. Spróbuj zagrać ponownie.","Wybrany serwer nie działa. Wybierz inny lub wróć, aby odświeżyć.","Brak odpowiednich serwerów. Spróbuj później."},
+{"Fel innan serverlistan mottogs. Försök spela igen.","Vald server misslyckades. Välj en annan eller gå tillbaka för att uppdatera.","Inga behöriga servrar returnerades. Försök senare."},
+{"Sunucu listesi alınmadan hata oluştu. Tekrar oynamayı dene.","Seçilen sunucu başarısız. Başka birini seç veya yenilemek için geri dön.","Uygun sunucu dönmedi. Daha sonra tekrar dene."},
+{"Ошибка до получения списка серверов. Попробуйте снова.","Выбранный сервер недоступен. Выберите другой или вернитесь для обновления.","Подходящие серверы не получены. Повторите позже."},
+{"サーバー一覧取得前に失敗しました。再試行してください。","選択したサーバーに失敗しました。別のサーバーを選ぶか戻って更新。","利用可能なサーバーが返されませんでした。後で再試行。"},
+{"서버 목록 수신 전 실패했습니다. 다시 시도하세요.","선택한 서버 연결 실패. 다른 서버를 선택하거나 돌아가서 갱신하세요.","이용 가능한 서버가 없습니다. 나중에 다시 시도하세요."},
+{"接收服务器列表前失败。请重试。","所选服务器失败。请选择其他服务器或返回刷新。","服务未返回符合条件的服务器。请稍后重试。"},
+{"接收伺服器清單前失敗。請重試。","所選伺服器失敗。請選擇其他伺服器或返回更新。","服務未傳回符合資格的伺服器。請稍後重試。"},
+{"فشل قبل استلام قائمة الخوادم. حاول اللعب مجدداً.","فشل الخادم المحدد. اختر آخر أو ارجع لتحديث القائمة.","لم يرجع الخادم قائمة مؤهلة. حاول لاحقاً."}
+};
 static inline unsigned pv_language(unsigned n){return n<PV_LANG_COUNT?n:0;}
 /* A shared, length-checked lookup avoids the ARM GCC constant-string
  * comparison diagnostic when unrelated literal keys have different sizes.
@@ -210,6 +233,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_about_exit[0],pv_about_exit[lang],PV_ABOUT_EXIT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_control_help[0],pv_control_help[lang],PV_CONTROL_HELP_COUNT);
     if(!v)v=pv_lookup(s,len,pv_stream_settings[0],pv_stream_settings[lang],PV_STREAM_SETTINGS_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_dc_errors[0],pv_dc_errors[lang],PV_DC_ERRORS_COUNT);
     return v?v:s;
 }
 #endif

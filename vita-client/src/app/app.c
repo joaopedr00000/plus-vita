@@ -57,7 +57,8 @@ struct plus_vita_app_t {
 	char controls_status[256], binding_labels[5][256];
 	char controls_help[2048];
 #if PLUS_VITA_PS5_EXPERIMENTAL
-	char datacenters[64][128], dc_status[160], bitrate_label[64];
+	char datacenters[64][128], dc_status[512], bitrate_label[96];
+	const char *dc_notice;
 	size_t dc_count, dc_page;
 	unsigned bitrate_kbps;
 	bool hud;
@@ -661,6 +662,9 @@ static void account_view(PlusVitaApp *app)
 static void clear_runtime(PlusVitaApp *app)
 {
 	app->account_epoch++;
+#if PLUS_VITA_PS5_EXPERIMENTAL
+	app->dc_count=app->dc_page=0;app->dc_notice=NULL;app->selected_dc[0]=0;
+#endif
 	plus_vita_credential_clear(&app->credential);
 	free(app->catalogue);
 	app->catalogue = NULL;
@@ -822,7 +826,8 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 static void datacenters_view(PlusVitaApp *app)
 {
 	if(!app->bitrate_kbps) app->bitrate_kbps=PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000;
-	snprintf(app->dc_status,sizeof(app->dc_status),PV_TR("Choose a server manually. Page %u of %u. No automatic fallback."),
+	if(app->dc_notice) snprintf(app->dc_status,sizeof(app->dc_status),"%s",PV_TR(app->dc_notice));
+	else snprintf(app->dc_status,sizeof(app->dc_status),PV_TR("Choose a server manually. Page %u of %u. No automatic fallback."),
 		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
 	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? PV_TR("%s: %u Mbps (change)") : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? PV_TR(app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Maximum quality") : "Bitrate: ",app->bitrate_kbps/1000);
 	PlusVitaAppView view={.screen=PLUS_VITA_APP_DATACENTERS,.title="Choose cloud server.",
@@ -845,8 +850,8 @@ static void datacenters_view(PlusVitaApp *app)
 	n=view.action_count;
 	view.actions[view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,234+(int)n*38,832,32};
 	 #if PLUS_VITA_ADAPTIVE_STREAM
-	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=228+(int)i*34;view.actions[i].height=32;}
-	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,228+(int)view.action_count*34,832,32};view.action_count++;
+	for(size_t i=0;i<view.action_count;i++){view.actions[i].y=250+(int)i*31;view.actions[i].height=28;}
+	view.actions[view.action_count]=(PlusVitaAppButton){PLUS_VITA_ACTION_HUD,app->hud?"Performance HUD: On":"Performance HUD: Off",64,250+(int)view.action_count*31,832,28};view.action_count++;
  #endif
 	app->view=view;
 }
@@ -1228,8 +1233,16 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(event.status==PLUS_VITA_RESULT_OK) catalogue_view(app);
 		#if PLUS_VITA_PS5_EXPERIMENTAL
 		else if(event.status==PLUS_VITA_RESULT_DATACENTERS) {
+			app->dc_notice=NULL;
 			if(datacenters_read(app,event.data)) datacenters_view(app);
-			else detail_view(app,"No eligible cloud servers were returned. Try Play again.");
+			else detail_view(app,"The service returned no eligible servers. Try again later.");
+		}
+		else if((event.status==PLUS_VITA_RESULT_SERVICE_ERROR || event.status==PLUS_VITA_RESULT_NETWORK_ERROR) && !event.playback_started && plus_vita_manual_dc_valid(app->selected_dc)) {
+			/* Use only the current title's server list. If the service returned
+			 * a fresh list, prefer it to the previous discovery result. */
+			if(event.data) datacenters_read(app,event.data);
+			if(app->dc_count) {app->dc_notice="Selected server failed. Choose another server or go back to refresh.";datacenters_view(app);}
+			else detail_view(app,"The service returned no eligible servers. Try again later.");
 		}
 		#endif
 		else if(event.status==PLUS_VITA_RESULT_SAMPLE_SAVED)
@@ -1238,7 +1251,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			detail_view(app,"PS3 sample incomplete. Reopen FTP to retrieve the diagnostic log.");
 		else if(event.status==PLUS_VITA_RESULT_STREAM_STOPPED) stream_stopped_view(app);
 		else if(event.status==PLUS_VITA_RESULT_SERVICE_ERROR)
-			detail_view(app,"The cloud service could not start this session.\nTry Play again and manually select an available server.");
+			detail_view(app,"Server discovery failed before a list was received. Try Play again.");
 		else if(event.status==PLUS_VITA_RESULT_UNSUPPORTED)
 			detail_view(app,"This title is not supported for cloud Play on this client.\nChoose another game.");
 		else detail_view(app, event.status==PLUS_VITA_RESULT_CANCELLED
@@ -1440,6 +1453,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect=operation(app,PLUS_VITA_EFFECT_PLAY,"Preparing a cloud session. Circle cancels.",true);
 			effect.game=game;effect.controls=app->controls;
 #if PLUS_VITA_PS5_EXPERIMENTAL
+			app->dc_count=app->dc_page=0;app->dc_notice=NULL;app->selected_dc[0]=0;app->auto_retry=false;
 			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",PLUS_VITA_DC_DISCOVER);
 			effect.bitrate_kbps=app->bitrate_kbps ? app->bitrate_kbps : (PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000);
 			effect.profile_kbps=effect.bitrate_kbps;effect.hud=app->hud;

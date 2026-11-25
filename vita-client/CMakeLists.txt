@@ -573,6 +573,31 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     message(FATAL_ERROR "Pylux datacenter discovery patch point not found")
   endif()
   string(REPLACE "${PV_DISCOVER_OLD}" "${PV_DISCOVER_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Empty, valid server lists are discovery results, not transport failures.
+  set(PV_EMPTY_OLD [=[
+	if(!dcs || json_object_get_type(dcs) != json_type_array || json_object_array_length(dcs) == 0)
+]=])
+  set(PV_EMPTY_NEW [=[
+	if(dcs && json_object_get_type(dcs) == json_type_array && json_object_array_length(dcs) == 0
+		&& c->cfg->forced_datacenter && strcmp(c->cfg->forced_datacenter, "__list__") == 0)
+	{
+		c->dc_picker = dcs;
+		return CHIAKI_ERR_CANCELED;
+	}
+	if(!dcs || json_object_get_type(dcs) != json_type_array || json_object_array_length(dcs) == 0)
+]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_EMPTY_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux empty discovery patch point not found")
+  endif()
+  string(REPLACE "${PV_EMPTY_OLD}" "${PV_EMPTY_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  set(PV_MISSING_DC_OLD [=[if(!match) { c->forced_dc_unavailable = true; json_object_put(dcs);]=])
+  set(PV_MISSING_DC_NEW [=[if(!match) { c->forced_dc_unavailable = true; c->dc_picker = gk_build_picker(c, dcs); json_object_put(dcs);]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_MISSING_DC_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux missing selected server patch point not found")
+  endif()
+  string(REPLACE "${PV_MISSING_DC_OLD}" "${PV_MISSING_DC_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   set(PV_FORCE_OLD [=[if(!c->selected_ping) c->selected_ping = json_object_array_get_idx(c->ping_results, 0);]=])
   set(PV_FORCE_NEW [=[if(!c->selected_ping) return CHIAKI_ERR_UNKNOWN;]=])
   string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_FORCE_OLD}" PV_POS)

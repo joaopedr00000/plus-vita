@@ -540,7 +540,7 @@ int plus_vita_app_run(void)
 						.status=stopped==PLUS_VITA_RECOVERY_SLEEP ? PLUS_VITA_RESULT_SLEEP : PLUS_VITA_RESULT_NETWORK_ERROR},0);
 					plus_vita_recovery_acknowledge();
 				} else plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,
-					.operation=operation,.playback_started=session_input.playback_started,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
+					.operation=operation,.data=allocation_error!=CHIAKI_ERR_SUCCESS ? provision.datacenter_pings : NULL,.playback_started=session_input.playback_started,.status=stream_error==CHIAKI_ERR_SUCCESS && user_stopped
 						? PLUS_VITA_RESULT_OK : stream_error==CHIAKI_ERR_CANCELED
 						? PLUS_VITA_RESULT_CANCELLED : allocation_error!=CHIAKI_ERR_SUCCESS
 					? plus_vita_play_failure(allocation_error,&provision) : collecting_sample

@@ -35,6 +35,7 @@ PlusVitaAppResult plus_vita_play_failure(ChiakiErrorCode error, const ChiakiClou
 		|| error==CHIAKI_ERR_HOST_UNREACH) return PLUS_VITA_RESULT_NETWORK_ERROR;
 	const char *detail=result ? result->error_message : NULL;
 	if(detail && (!strcmp(detail,"PS_PLUS_SUBSCRIPTION_REQUIRED")
+		|| strstr(detail,"noGameForEntitlementId")
 		|| !strncmp(detail,"GAME_NOT_FREE:",14) || !strncmp(detail,"Game not found:",15)))
 		return PLUS_VITA_RESULT_UNSUPPORTED;
 	return PLUS_VITA_RESULT_SERVICE_ERROR;
@@ -59,8 +60,8 @@ static unsigned fixed_stage(const char *stage)
 		|| strstr(stage,"Getting Tokens")) return 1;
 	if(strstr(stage,"Resolving Game") || strstr(stage,"License")) return 2;
 	if(strstr(stage,"Datacenter") || strstr(stage,"Pinging")) return 3;
-	if(strstr(stage,"Allocating") || strstr(stage,"Starting Session")
-		|| strstr(stage,"Creating Session")) return 4;
+	if(strstr(stage,"Starting Session") || strstr(stage,"Creating Session") || strstr(stage,"Locking Session")) return 2;
+	if(strstr(stage,"Allocating")) return 4;
 	return 0;
 }
 

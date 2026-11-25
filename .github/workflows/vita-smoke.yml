@@ -87,6 +87,10 @@ jobs:
           printf '#define JSON_C_HAVE_INTTYPES_H 1\n#define JSON_C_HAVE_STDINT_H 1\n' > /tmp/pv-stream-test/json_config.h
           cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-stream-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_stream_settings.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/test
           /tmp/pv-stream-test/test
+      - name: Test PS5 discovery and manual selection recovery
+        run: |
+          cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-stream-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_ps5_discovery.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/ps5
+          /tmp/pv-stream-test/ps5
       - name: Test VitaPlus dark gold renderer and QR theme
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 vita-client/tests/test_vitaplus_theme.c vita-client/src/app/render.c -o /tmp/pv-theme
