@@ -69,6 +69,10 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
+      - name: Test device authorization state machine
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Ivita-client/src/platform vita-client/src/platform/device_auth.c vita-client/tests/test_device_auth.c -o /tmp/pv-device-auth
+          /tmp/pv-device-auth
       - name: Test native application workflow
         run: sh tools/test-app-workflow.sh
       - name: Test saved control layouts through Settings and gameplay input
