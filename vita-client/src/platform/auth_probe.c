@@ -280,7 +280,7 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 	 * user-selected foreign locale. Mode only permits same-region fallback. */
 	(void)mode;
 	if(!pv_region_account_locale_valid(result->country,result->language))return false;
-	snprintf(locale,sizeof(locale),"%s-%s",result->language,result->country);
+	snprintf(locale,sizeof(locale),"%.2s-%s",result->language,result->country);
 	bool complete=false;
 	ChiakiCloudCatalogConfig config={.npsso=credential->value,.locale=locale,.cache_dir=cache,.force_refresh=true};
 	ChiakiCloudCatalogResult catalog={0};
