@@ -8,6 +8,7 @@ on:
       - "external/pylux"
       - "external/freetype"
       - "vita-client/**"
+      - "tools/build-vita-curl-mbedtls.sh"
       - "tools/test-app-workflow.sh"
       - "tools/test-app-controls.sh"
       - "tools/test-app-account-integration.sh"
@@ -182,11 +183,14 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Check source and history
         run: python3 tools/publication_gate.py --version beta3
+      - name: Build isolated Mbed TLS libcurl for Vita
+        run: sh tools/build-vita-curl-mbedtls.sh "$PWD/build/curl-mbedtls"
       - name: Configure beta profile
         run: >-
           cmake -S vita-client -B build/beta3 -DCMAKE_BUILD_TYPE=Release
           -DPLUS_VITA_RELEASE_CANDIDATE=ON -DPLUS_VITA_RELEASE_VERSION=v002
           -DPLUS_VITA_PS5_EXPERIMENTAL=ON -DPLUS_VITA_BETA1=ON -DPLUS_VITA_BETA2=ON -DPLUS_VITA_BETA3=ON
+          -DPLUS_VITA_CURL_ROOT="$PWD/build/curl-mbedtls"
       - name: Build and normalize VPK
         run: |
           cmake --build build/beta3 --parallel

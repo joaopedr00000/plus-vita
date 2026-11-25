@@ -120,6 +120,11 @@ CURLcode plus_vita_curl_prepare_resolve(CURL *curl, const char *url,
 CURLcode plus_vita_curl_secure_options(CURL *curl)
 {
 	if(!curl)return CURLE_BAD_FUNCTION_ARGUMENT;
+#if PLUS_VITA_REQUIRE_MBEDTLS_CURL
+	const curl_version_info_data *version=curl_version_info(CURLVERSION_NOW);
+	if(!version||!version->ssl_version||!strstr(version->ssl_version,"mbedTLS"))
+		return CURLE_NOT_BUILT_IN;
+#endif
 	CURLcode rc=curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1L);
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)CURL_SSLVERSION_TLSv1_2);

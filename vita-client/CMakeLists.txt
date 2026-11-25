@@ -14,6 +14,7 @@ option(PLUS_VITA_PS5_EXPERIMENTAL "Manual datacenter picker and experimental PS5
 option(PLUS_VITA_BETA1 "Build the separately identified PS5 Cloud beta" OFF)
 option(PLUS_VITA_BETA2 "Build Beta 2 with experimental QR pairing" OFF)
 option(PLUS_VITA_BETA3 "Build adaptive streaming beta" OFF)
+set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
   message(FATAL_ERROR "Unsupported Plus-Vita distribution version")
@@ -900,6 +901,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   "${VITASDK_COMMON}"
 )
 
+if(PLUS_VITA_CURL_ROOT)
+  if(NOT EXISTS "${PLUS_VITA_CURL_ROOT}/include/curl/curl.h" OR NOT EXISTS "${PLUS_VITA_CURL_ROOT}/lib/libcurl.a")
+    message(FATAL_ERROR "Explicit Vita Mbed TLS curl installation is incomplete")
+  endif()
+  target_include_directories(${PROJECT_NAME} BEFORE PRIVATE "${PLUS_VITA_CURL_ROOT}/include")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE PLUS_VITA_REQUIRE_MBEDTLS_CURL=1)
+endif()
+
 target_compile_options(${PROJECT_NAME} PRIVATE
   -Wall
   -Wextra
@@ -1029,7 +1038,10 @@ find_library(PLUS_VITA_CURL_SSL_LIBRARY NAMES ssl
 find_library(PLUS_VITA_CURL_CRYPTO_LIBRARY NAMES crypto
   PATHS "$ENV{VITASDK}/arm-vita-eabi/lib" NO_DEFAULT_PATH)
 set(PLUS_VITA_CURL_TLS_LIBRARIES)
-if(PLUS_VITA_CURL_SSL_LIBRARY AND PLUS_VITA_CURL_CRYPTO_LIBRARY)
+set(PLUS_VITA_CURL_LIBRARY curl)
+if(PLUS_VITA_CURL_ROOT)
+  set(PLUS_VITA_CURL_LIBRARY "${PLUS_VITA_CURL_ROOT}/lib/libcurl.a")
+elseif(PLUS_VITA_CURL_SSL_LIBRARY AND PLUS_VITA_CURL_CRYPTO_LIBRARY)
   list(APPEND PLUS_VITA_CURL_TLS_LIBRARIES
     "${PLUS_VITA_CURL_SSL_LIBRARY}" "${PLUS_VITA_CURL_CRYPTO_LIBRARY}")
 endif()
@@ -1039,7 +1051,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 	opus
 	SceAudio_stub
 	json-c
-  curl
+  ${PLUS_VITA_CURL_LIBRARY}
   ${PLUS_VITA_CURL_TLS_LIBRARIES}
   mbedtls
   mbedx509
