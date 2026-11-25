@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <json_object.h>
+#include <json_tokener.h>
 #if PLUS_VITA_ACCOUNT_VAULT
 #include "../platform/account_vault.h"
 #include <chiaki/random.h>
@@ -103,6 +104,35 @@ int plus_vita_account_file_kind(void)
 	return 2;
 }
 #if PLUS_VITA_ACCOUNT_VAULT
+/* Remove only the known import path and only when its token matches the
+ * successfully saved account. Never delete another account's import. */
+static bool cleanup_matching_import(const PlusVitaCredential *credential)
+{
+    char raw[4097]={0};
+    FILE *file=fopen(IMPORT_FILE,"rb");
+    if(!file)return errno==ENOENT;
+    size_t n=fread(raw,1,sizeof(raw)-1,file);
+    int extra=fgetc(file);
+    bool ok=!ferror(file)&&extra==EOF&&n>0&&!memchr(raw,0,n);
+    if(fclose(file)!=0)ok=false;
+    struct json_tokener *tok=ok?json_tokener_new():NULL;
+    struct json_object *root=NULL,*token=NULL;
+    if(tok){
+        json_tokener_set_flags(tok,JSON_TOKENER_STRICT);
+        root=json_tokener_parse_ex(tok,raw,(int)n+1);
+        ok=json_tokener_get_error(tok)==json_tokener_success&&root&&
+            json_object_is_type(root,json_type_object)&&
+            json_object_object_get_ex(root,"npsso",&token)&&
+            json_object_is_type(token,json_type_string)&&
+            (size_t)json_object_get_string_len(token)==credential->length&&
+            !memcmp(json_object_get_string(token),credential->value,credential->length);
+        json_tokener_free(tok);
+    }else ok=false;
+    if(root)json_object_put(root);
+    clear_bytes(raw,sizeof(raw));
+    if(!ok)return false;
+    return remove(IMPORT_FILE)==0||errno==ENOENT;
+}
 static bool key_read(uint8_t key[32]){
 	FILE *f=fopen(KEY_FILE,"rb");if(!f)return false;
 	size_t n=fread(key,1,32,f);int extra=fgetc(f);
@@ -248,7 +278,7 @@ static void save_account(PlusVitaAccount *account)
 			clear_bytes(account->file,sizeof(account->file));
 		}
 	}
-	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));pv_vault_wipe(plain,sizeof(plain));pv_vault_wipe(local_key,sizeof(local_key));
+	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));pv_vault_wipe(local_key,sizeof(local_key));
 #else
 	FILE *file = fopen(ACCOUNT_TEMP, "wb");
 	if(file)
@@ -259,6 +289,18 @@ static void save_account(PlusVitaAccount *account)
 #endif
 	if(success) success = rename(ACCOUNT_TEMP, ACCOUNT_FILE) == 0;
 	if(success) success = remove(ACCOUNT_BLOCK) == 0 || errno == ENOENT;
+#if PLUS_VITA_ACCOUNT_VAULT
+    /* Verify the installed vault (including its separate key) before deleting
+     * any plaintext source. A failure leaves the source untouched. */
+    if(success){
+        FILE *final=fopen(ACCOUNT_FILE,"rb");size_t verified=0;
+        success=final&&vault_read(final,&account->job.vault_password,account->file,sizeof(account->file),&verified);
+        if(final&&fclose(final)!=0)success=false;
+        if(success)success=verified==strlen(data)&&!memcmp(account->file,data,verified);
+        clear_bytes(account->file,sizeof(account->file));
+    }
+    pv_vault_wipe(plain,sizeof(plain));
+#endif
 	if(!success) remove(ACCOUNT_TEMP);
 	json_object_put(root);
 	if(success){
@@ -266,7 +308,7 @@ static void save_account(PlusVitaAccount *account)
 #if PLUS_VITA_ACCOUNT_VAULT
 		account->result.vault_present=true;account->result.vault_mode=target;
 		if(target==2){remove(KEY_FILE);remove(KEY_TEMP);}
-		if(account->job.vault_clean_import && remove(IMPORT_FILE)!=0 && errno!=ENOENT)account->result.import_cleanup_failed=true;
+		if(!cleanup_matching_import(&account->job.credential))account->result.import_cleanup_failed=true;
 #endif
 	}
 }
