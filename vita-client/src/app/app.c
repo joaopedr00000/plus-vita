@@ -297,7 +297,11 @@ static void about_view(PlusVitaApp *app)
 {
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_ABOUT,
 		.title="Made for your handheld.",.subtitle="ABOUT VITAPLUS",
+#if PLUS_VITA_ADAPTIVE_STREAM
+		.body="VitaPlus was born from a young man's \"greed\": to play GTA VI via streaming on his PS Vita. This dream led him to fork Plus-Vita, adding new features and experimental PS5 cloud streaming. GTA VI compatibility is not yet verified.\nCredits: Calligula87, tertiumndatur, Pylux and Chiaki.",
+#else
 		.body="Use your own Sony account and eligible subscription.\n\n" PLUS_VITA_ABOUT_STATUS,
+#endif
 		.hint="X  Select     O  Back",.actions={{PLUS_VITA_ACTION_BACK,"Back",64,444,500,52}},.action_count=1};
 #if PLUS_VITA_FONT_COMPARISON
 	app->view.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_FONT_COMPARISON,"Compare text rendering",64,380,832,52};
@@ -899,9 +903,9 @@ static void confirm_exit(PlusVitaApp *app)
 	app->view = (PlusVitaAppView){
 		.screen = PLUS_VITA_APP_EXIT_CONFIRM,
 		.title = "See you next time?", .subtitle = "EXIT VITAPLUS",
-		.body = app->saved ? "Your sign-in is remembered on this Vita.\nThe app will validate it again next time you open it."
-			: app->connected ? "Exiting ends this sign-in.\nTurn on Remember in Account to keep it for the next launch."
-			: "You can come back whenever you are ready to play.",
+		.body = app->saved ? "Your saved sign-in will be checked next time you open VitaPlus."
+			: app->connected ? "Exiting ends this sign-in. Enable Remember in Account to keep it for next launch."
+			: "Come back whenever you are ready to play.",
 		.hint = "X  Select     O  Back",
 		.actions = {
 			{ PLUS_VITA_ACTION_BACK, "Stay here", 64, 380, 500, 52 },

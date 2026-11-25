@@ -14,6 +14,13 @@ int main(void){
             assert(pv_session_text[l][k]&&*pv_session_text[l][k]);
             assert(!strcmp(pv_translate(l,pv_session_text[0][k]),pv_session_text[l][k]));
         }
+        for(unsigned k=0;k<PV_ABOUT_EXIT_COUNT;k++){
+            assert(pv_about_exit[l][k] && *pv_about_exit[l][k]);
+            assert(!strcmp(pv_translate(l,pv_about_exit[0][k]),pv_about_exit[l][k]));
+        }
+        assert(strstr(pv_about_exit[l][0],"GTA VI") && strstr(pv_about_exit[l][0],"Plus-Vita"));
+        assert(!strstr(pv_translate(l,"ABOUT VITAPLUS"),"PLUS-VITA"));
+        assert(!strstr(pv_translate(l,"EXIT VITAPLUS"),"PLUS-VITA"));
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
@@ -38,5 +45,8 @@ int main(void){
     }
     assert(!strcmp(pv_translate(2,"D-pad Up"),"Direcional cima"));
     assert(!strcmp(pv_translate(2,"Rear touch top-left"),"Toque traseiro sup. esquerdo"));
+    assert(!strcmp(pv_translate(2,"ABOUT VITAPLUS"),"SOBRE O VITAPLUS"));
+    assert(!strcmp(pv_translate(2,"EXIT VITAPLUS"),"SAIR DO VITAPLUS"));
+    assert(strstr(pv_translate(2,pv_about_exit[0][0]),"ganância"));
     puts("19 locale tables validated");return 0;
 }
