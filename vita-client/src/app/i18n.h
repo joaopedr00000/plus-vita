@@ -231,6 +231,28 @@ static const char *const pv_security[PV_LANG_COUNT][PV_SECURITY_COUNT]={
 {"安全與隱私","保護已儲存權杖","變更本機密碼","加密並刪除匯入JSON","還原已儲存帳戶","權杖使用AES-256-GCM保護。請使用強本機密碼。","儲存權杖需要本機密碼（12-64字元）。匯入JSON和本機HTTP未加密。","解鎖權杖（本機密碼）","建立本機密碼（12-64字元）","確認本機密碼","權杖仍鎖定。","密碼錯誤或保險庫損毀。重試或忘記帳戶。","取消儲存。舊檔未變更。","保險庫已儲存，但無法刪除匯入JSON。","請選擇本機密碼，不要使用Sony密碼。","記住：%s。查看安全與隱私。\n帳戶標籤：%s\nSony名稱：%s","正在儲存Vita登入。"},
 {"الأمان والخصوصية","حماية الرمز المحفوظ","تغيير كلمة المرور المحلية","تشفير وحذف JSON المستورد","استعادة الحساب المحفوظ","الرمز محمي بـ AES-256-GCM. استخدم كلمة مرور محلية قوية.","يتطلب حفظ الرمز كلمة مرور محلية (12-64 حرفًا). JSON المستورد وHTTP المحلي غير مشفرين.","فتح الرمز (كلمة المرور المحلية)","إنشاء كلمة مرور محلية (12-64 حرفًا)","تأكيد كلمة المرور المحلية","الرمز لا يزال مقفلاً.","كلمة مرور خاطئة أو ملف تالف. أعد المحاولة أو انس الحساب.","ألغي الحفظ. الملف السابق لم يتغير.","تم حفظ الخزنة لكن تعذر حذف JSON المستورد.","اختر كلمة مرور محلية، لا كلمة مرور Sony.","تذكر: %s. راجع الأمان والخصوصية.\nتسمية الحساب: %s\nاسم Sony: %s","جار حفظ الدخول على Vita."}
 };
+#define PV_AUTO_VAULT_COUNT 3u
+static const char *const pv_auto_vault[PV_LANG_COUNT][PV_AUTO_VAULT_COUNT]={
+{"Automatic unlock: encrypted token, separate local key. Full console access can expose both.","Startup password: On (turn off)","Startup password: Off (turn on)"},
+{"Automatic unlock: encrypted token, separate local key. Full console access can expose both.","Startup password: On (turn off)","Startup password: Off (turn on)"},
+{"Desbloqueio automático: token criptografado, chave local separada. Acesso total ao console pode expor ambos.","Senha ao iniciar: Ativada (desativar)","Senha ao iniciar: Desativada (ativar)"},
+{"Desbloqueio automático: token encriptado, chave local separada. Acesso total à consola pode expor ambos.","Palavra-passe ao iniciar: Ativada (desativar)","Palavra-passe ao iniciar: Desativada (ativar)"},
+{"Desbloqueo automático: token cifrado, clave local separada. El acceso total a la consola puede exponer ambos.","Contraseña al iniciar: Activada (desactivar)","Contraseña al iniciar: Desactivada (activar)"},
+{"Desbloqueo automático: token cifrado, clave local separada. El acceso total a la consola puede exponer ambos.","Contraseña al iniciar: Activada (desactivar)","Contraseña al iniciar: Desactivada (activar)"},
+{"Automatisch entsperren: verschlüsseltes Token, separater lokaler Schlüssel. Voller Konsolenzugriff kann beide offenlegen.","Startpasswort: Ein (ausschalten)","Startpasswort: Aus (einschalten)"},
+{"Déverrouillage auto : jeton chiffré, clé locale séparée. Un accès complet à la console peut exposer les deux.","Mot de passe au démarrage : Activé (désactiver)","Mot de passe au démarrage : Désactivé (activer)"},
+{"Sblocco automatico: token cifrato, chiave locale separata. L'accesso completo alla console può esporli entrambi.","Password all'avvio: Attiva (disattiva)","Password all'avvio: Disattiva (attiva)"},
+{"Automatisch ontgrendelen: versleuteld token, aparte lokale sleutel. Volledige consoletoegang kan beide blootleggen.","Opstartwachtwoord: Aan (uitzetten)","Opstartwachtwoord: Uit (aanzetten)"},
+{"Automatyczne odblokowanie: zaszyfrowany token, osobny klucz lokalny. Pełny dostęp do konsoli może ujawnić oba.","Hasło przy uruchomieniu: Wł. (wyłącz)","Hasło przy uruchomieniu: Wył. (włącz)"},
+{"Automatisk upplåsning: krypterad token, separat lokal nyckel. Full konsolåtkomst kan avslöja båda.","Startlösenord: På (stäng av)","Startlösenord: Av (slå på)"},
+{"Otomatik kilit açma: şifreli belirteç ve ayrı yerel anahtar. Tam konsol erişimi ikisini de açığa çıkarabilir.","Başlangıç parolası: Açık (kapat)","Başlangıç parolası: Kapalı (aç)"},
+{"Авторазблокировка: токен зашифрован, локальный ключ отдельно. Полный доступ к консоли может раскрыть оба.","Пароль при запуске: Вкл. (выкл.)","Пароль при запуске: Выкл. (вкл.)"},
+{"自動解除：暗号化トークンと別のローカル鍵。本体全体へのアクセスで両方が漏れる可能性があります。","起動時パスワード：オン（オフにする）","起動時パスワード：オフ（オンにする）"},
+{"자동 잠금 해제: 암호화 토큰과 별도 로컬 키. 콘솔 전체 접근 시 둘 다 노출될 수 있습니다.","시작 비밀번호: 켜짐 (끄기)","시작 비밀번호: 꺼짐 (켜기)"},
+{"自动解锁：令牌已加密，本地密钥独立保存。完全访问主机可能暴露两者。","启动密码：开启（关闭）","启动密码：关闭（开启）"},
+{"自動解鎖：權杖已加密，本機金鑰分開儲存。完整存取主機可能暴露兩者。","啟動密碼：開啟（關閉）","啟動密碼：關閉（開啟）"},
+{"فتح تلقائي: رمز مشفر ومفتاح محلي منفصل. الوصول الكامل للجهاز قد يكشف كليهما.","كلمة مرور بدء التشغيل: مفعلة (تعطيل)","كلمة مرور بدء التشغيل: معطلة (تفعيل)"}
+};
 static inline unsigned pv_language(unsigned n){return n<PV_LANG_COUNT?n:0;}
 /* A shared, length-checked lookup avoids the ARM GCC constant-string
  * comparison diagnostic when unrelated literal keys have different sizes.
@@ -258,6 +280,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_stream_settings[0],pv_stream_settings[lang],PV_STREAM_SETTINGS_COUNT);
     if(!v)v=pv_lookup(s,len,pv_dc_errors[0],pv_dc_errors[lang],PV_DC_ERRORS_COUNT);
     if(!v)v=pv_lookup(s,len,pv_security[0],pv_security[lang],PV_SECURITY_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_auto_vault[0],pv_auto_vault[lang],PV_AUTO_VAULT_COUNT);
     return v?v:s;
 }
 #endif

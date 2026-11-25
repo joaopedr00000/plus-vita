@@ -18,6 +18,12 @@
 #define ACCOUNT_FILE ACCOUNT_DIR "/account.json"
 #define ACCOUNT_TEMP ACCOUNT_DIR "/account.tmp"
 #define ACCOUNT_BLOCK ACCOUNT_DIR "/account.blocked"
+#if PLUS_VITA_ACCOUNT_VAULT
+/* Separate internal partition, not a fixed key or a key embedded in the JSON. */
+#define KEY_DIR "ur0:data/plus-vita"
+#define KEY_FILE KEY_DIR "/account.key"
+#define KEY_TEMP KEY_DIR "/account.key.tmp"
+#endif
 struct plus_vita_account_t {
 	pthread_mutex_t mutex;
 	pthread_t thread;
@@ -89,16 +95,41 @@ int plus_vita_account_file_kind(void)
 	unsigned char prefix[4]={0};size_t n=fread(prefix,1,sizeof(prefix),f);
 	bool bad=ferror(f)!=0;if(fclose(f)!=0)bad=true;
 	if(bad)return -1;
+#if PLUS_VITA_ACCOUNT_VAULT
+	if(pv_vault_kind(prefix,n)==3)return 3;
+#endif
 	/* Only a JSON object can be a legacy file; damaged/unknown vaults fail closed. */
 	if(n && (prefix[0]=='{'||prefix[0]==' '||prefix[0]=='\n'||prefix[0]=='\r'||prefix[0]=='\t'))return 1;
 	return 2;
 }
 #if PLUS_VITA_ACCOUNT_VAULT
+static bool key_read(uint8_t key[32]){
+	FILE *f=fopen(KEY_FILE,"rb");if(!f)return false;
+	size_t n=fread(key,1,32,f);int extra=fgetc(f);
+	bool ok=n==32&&extra==EOF&&!ferror(f);if(fclose(f)!=0)ok=false;
+	if(!ok)pv_vault_wipe(key,32);
+	return ok;
+}
+static bool key_create(uint8_t key[32]){
+	if(mkdir(KEY_DIR,0700)!=0&&errno!=EEXIST)return false;
+	if(chiaki_random_bytes_crypt(key,32)!=CHIAKI_ERR_SUCCESS)return false;
+	FILE *f=fopen(KEY_TEMP,"wb");bool ok=false;
+	if(f){ok=fwrite(key,1,32,f)==32;if(fclose(f)!=0)ok=false;}
+	if(ok)ok=rename(KEY_TEMP,KEY_FILE)==0;
+	if(!ok)remove(KEY_TEMP);
+	uint8_t check[32]={0};
+	if(ok)ok=key_read(check)&&!memcmp(check,key,32);
+	pv_vault_wipe(check,32);
+	return ok;
+}
 static bool vault_read(FILE *file,const PlusVitaCredential *password,char *out,size_t cap,size_t *size)
 {
 	uint8_t sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD+1]={0};
 	size_t n=fread(sealed,1,sizeof(sealed),file);
-	bool ok=!ferror(file)&&pv_vault_open(password->value,password->length,sealed,n,(uint8_t *)out,cap,size);
+	uint8_t key[32]={0};bool automatic=pv_vault_kind(sealed,n)==3;
+	bool ok=!ferror(file)&&(!automatic||key_read(key))&&
+		pv_vault_open_impl(password->value,password->length,automatic?key:NULL,sealed,n,(uint8_t *)out,cap,size);
+	pv_vault_wipe(key,32);
 	pv_vault_wipe(sealed,sizeof(sealed));return ok;
 }
 #endif
@@ -120,8 +151,8 @@ static void load_account(PlusVitaAccount *account)
 	}
 #if PLUS_VITA_ACCOUNT_VAULT
 	int kind=plus_vita_account_file_kind();
-	account->result.vault_present=kind==2;
-	if(kind==2){
+	account->result.vault_present=kind>=2;account->result.vault_mode=kind>=2?(unsigned)kind:0;
+	if(kind>=2){
 		size_t size=0;bool ok=vault_read(file,&account->job.vault_password,account->file,sizeof(account->file),&size);
 		if(fclose(file)!=0)ok=false;
 		account->result.status=ok?PLUS_VITA_RESULT_OK:PLUS_VITA_RESULT_VAULT_LOCKED;
@@ -150,9 +181,10 @@ static void save_account(PlusVitaAccount *account)
 	if(!account_directory()) return;
 #if PLUS_VITA_ACCOUNT_VAULT
 	int kind=plus_vita_account_file_kind();
-	account->result.vault_present=kind==2;
-	if(kind<0||!pv_vault_password(account->job.vault_password.value,account->job.vault_password.length))return;
-	if(kind==2){
+	account->result.vault_present=kind>=2;account->result.vault_mode=kind>=2?(unsigned)kind:0;
+	unsigned target=account->job.vault_target?account->job.vault_target:kind>=2?(unsigned)kind:3;
+	if(kind<0||(target!=2&&target!=3)||(target==2&&!pv_vault_password(account->job.vault_password.value,account->job.vault_password.length)))return;
+	if(kind>=2){
 		FILE *old=fopen(ACCOUNT_FILE,"rb");
 		if(!old)return;
 		const PlusVitaCredential *previous=account->job.vault_change?&account->job.vault_previous:&account->job.vault_password;
@@ -193,10 +225,14 @@ static void save_account(PlusVitaAccount *account)
 #endif
 	bool success = false;
 #if PLUS_VITA_ACCOUNT_VAULT
-	uint8_t entropy[28]={0},sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD]={0};
+	uint8_t entropy[28]={0},sealed[PV_VAULT_MAX+PV_VAULT_OVERHEAD]={0},local_key[32]={0};
 	size_t sealed_size=0;
-	if(data && chiaki_random_bytes_crypt(entropy,sizeof(entropy))==CHIAKI_ERR_SUCCESS &&
-		pv_vault_seal(account->job.vault_password.value,account->job.vault_password.length,entropy,
+	/* Reuse the key for an existing automatic vault; never replace it before
+	 * committing a new ciphertext. A password vault remains recoverable if
+	 * creation of the separate key or staged file fails. */
+	if(data && (target!=3||(kind==3?key_read(local_key):key_create(local_key))) &&
+		chiaki_random_bytes_crypt(entropy,sizeof(entropy))==CHIAKI_ERR_SUCCESS &&
+		pv_vault_seal_impl(account->job.vault_password.value,account->job.vault_password.length,target==3?local_key:NULL,entropy,
 			(const uint8_t *)data,strlen(data),sealed,sizeof(sealed),&sealed_size)){
 		FILE *file=fopen(ACCOUNT_TEMP,"wb");
 		if(file){
@@ -212,7 +248,7 @@ static void save_account(PlusVitaAccount *account)
 			clear_bytes(account->file,sizeof(account->file));
 		}
 	}
-	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));pv_vault_wipe(plain,sizeof(plain));
+	pv_vault_wipe(entropy,sizeof(entropy));pv_vault_wipe(sealed,sizeof(sealed));pv_vault_wipe(plain,sizeof(plain));pv_vault_wipe(local_key,sizeof(local_key));
 #else
 	FILE *file = fopen(ACCOUNT_TEMP, "wb");
 	if(file)
@@ -228,7 +264,8 @@ static void save_account(PlusVitaAccount *account)
 	if(success){
 		account->result.status=PLUS_VITA_RESULT_OK;
 #if PLUS_VITA_ACCOUNT_VAULT
-		account->result.vault_present=true;
+		account->result.vault_present=true;account->result.vault_mode=target;
+		if(target==2){remove(KEY_FILE);remove(KEY_TEMP);}
 		if(account->job.vault_clean_import && remove(IMPORT_FILE)!=0 && errno!=ENOENT)account->result.import_cleanup_failed=true;
 #endif
 	}
@@ -246,6 +283,10 @@ static void delete_account(PlusVitaAccount *account)
 	account->result.restore_blocked = true;
 	bool success = remove(ACCOUNT_FILE) == 0 || errno == ENOENT;
 	if(remove(ACCOUNT_TEMP) != 0 && errno != ENOENT) success = false;
+#if PLUS_VITA_ACCOUNT_VAULT
+	if(remove(KEY_FILE)!=0&&errno!=ENOENT)success=false;
+	if(remove(KEY_TEMP)!=0&&errno!=ENOENT)success=false;
+#endif
 	account->result.status = success ? PLUS_VITA_RESULT_OK : PLUS_VITA_RESULT_STORAGE_ERROR;
 }
 

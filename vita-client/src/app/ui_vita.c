@@ -195,8 +195,14 @@ static bool prepare_vault(PlusVitaAppEffect *e,int kind,unsigned lang)
 	if(kind<0)return false;
 	if(e->kind==PLUS_VITA_EFFECT_LOAD_ACCOUNT)return kind!=2||ask_vault(&e->vault_password,lang,"Unlock saved token (local password)");
 	if(e->kind!=PLUS_VITA_EFFECT_SAVE_ACCOUNT)return true;
-	if(kind==2&&!e->vault_change)return ask_vault(&e->vault_password,lang,"Unlock saved token (local password)");
-	if(kind==2&&!ask_vault(&e->vault_previous,lang,"Unlock saved token (local password)"))return false;
+	unsigned target=e->vault_target?e->vault_target:kind>=2?(unsigned)kind:3;
+	e->vault_target=target;
+	if(kind==2&&target==2&&!e->vault_change)return ask_vault(&e->vault_password,lang,"Unlock saved token (local password)");
+	if(kind==2){
+		e->vault_change=true;
+		if(!ask_vault(&e->vault_previous,lang,"Unlock saved token (local password)"))return false;
+	}
+	if(target==3)return true;
 	PlusVitaCredential again={0};
 	bool ok=ask_vault(&e->vault_password,lang,"Create local password (12-64 characters)")
 		&&ask_vault(&again,lang,"Confirm local password")
@@ -511,7 +517,7 @@ int plus_vita_app_run(void)
 					int kind=plus_vita_account_file_kind();
 					if(!prepare_vault(&effect,kind,plus_vita_app_view(app).ui_language)){
 						plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=completion(effect.kind),.operation=effect.operation,
-							.status=kind<0?PLUS_VITA_RESULT_STORAGE_ERROR:PLUS_VITA_RESULT_CANCELLED,.vault_present=kind==2,.legacy_plain=kind==1},0);
+							.status=kind<0?PLUS_VITA_RESULT_STORAGE_ERROR:PLUS_VITA_RESULT_CANCELLED,.vault_present=kind>=2,.vault_mode=kind>=2?(unsigned)kind:0,.legacy_plain=kind==1},0);
 					}else if(!plus_vita_account_start(storage,&effect)){
 						plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=completion(effect.kind),.operation=effect.operation,.status=PLUS_VITA_RESULT_STORAGE_ERROR},0);
 					}

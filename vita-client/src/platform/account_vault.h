@@ -21,7 +21,11 @@ static inline bool pv_vault_password(const char *p,size_t n){
     for(size_t j=0;j<n;j++)if((unsigned char)p[j]<33||(unsigned char)p[j]>126)return false;
     return true;
 }
-static inline bool pv_vault_is(const void *p,size_t n){return p&&n>=4&&!memcmp(p,"PVV1",4);}
+/* PVV1 = password-derived key; PVV2 = random local key. */
+static inline int pv_vault_kind(const void *p,size_t n){
+    return p&&n>=4?(!memcmp(p,"PVV1",4)?2:!memcmp(p,"PVV2",4)?3:0):0;
+}
+static inline bool pv_vault_is(const void *p,size_t n){return pv_vault_kind(p,n)!=0;}
 static inline bool pv_vault_key(const char *p,size_t n,const uint8_t salt[16],uint8_t key[32]){
     if(!pv_vault_password(p,n))return false;
 #if MBEDTLS_VERSION_NUMBER >= 0x03030000
@@ -37,31 +41,37 @@ static inline bool pv_vault_key(const char *p,size_t n,const uint8_t salt[16],ui
 /* PVV1 || salt[16] || nonce[12] || encrypted JSON || tag[16].
  * The caller must supply 28 fresh bytes from the system CSPRNG on each save.
  * The version, salt and nonce are authenticated as AAD. */
-static inline bool pv_vault_seal(const char *p,size_t n,const uint8_t entropy[28],
+static inline bool pv_vault_seal_impl(const char *p,size_t n,const uint8_t *local_key,const uint8_t entropy[28],
     const uint8_t *plain,size_t len,uint8_t *out,size_t cap,size_t *written){
     if(written)*written=0;
     if(!out||!written||!entropy||!plain||!len||len>PV_VAULT_MAX||cap<len+PV_VAULT_OVERHEAD)return false;
     uint8_t key[32]={0};bool ok=false;
-    memcpy(out,"PVV1",4);memcpy(out+4,entropy,28);
+    memcpy(out,local_key?"PVV2":"PVV1",4);memcpy(out+4,entropy,28);
     mbedtls_gcm_context g;mbedtls_gcm_init(&g);
-    if(pv_vault_key(p,n,out+4,key)&&!mbedtls_gcm_setkey(&g,MBEDTLS_CIPHER_ID_AES,key,256))
+    if((local_key?(memcpy(key,local_key,32),true):pv_vault_key(p,n,out+4,key))&&!mbedtls_gcm_setkey(&g,MBEDTLS_CIPHER_ID_AES,key,256))
         ok=mbedtls_gcm_crypt_and_tag(&g,MBEDTLS_GCM_ENCRYPT,len,out+20,12,out,PV_VAULT_HEADER,
             plain,out+PV_VAULT_HEADER,PV_VAULT_TAG,out+PV_VAULT_HEADER+len)==0;
     mbedtls_gcm_free(&g);pv_vault_wipe(key,sizeof(key));
     if(ok)*written=len+PV_VAULT_OVERHEAD;else pv_vault_wipe(out,cap);
     return ok;
 }
-static inline bool pv_vault_open(const char *p,size_t n,const uint8_t *in,size_t len,uint8_t *out,size_t cap,size_t *written){
+static inline bool pv_vault_open_impl(const char *p,size_t n,const uint8_t *local_key,const uint8_t *in,size_t len,uint8_t *out,size_t cap,size_t *written){
     if(written)*written=0;
     if(!out||!written)return false;
     pv_vault_wipe(out,cap);
-    if(!pv_vault_is(in,len)||len<=PV_VAULT_OVERHEAD||len>PV_VAULT_MAX+PV_VAULT_OVERHEAD||cap<len-PV_VAULT_OVERHEAD)return false;
+    if(pv_vault_kind(in,len)!=(local_key?3:2)||len<=PV_VAULT_OVERHEAD||len>PV_VAULT_MAX+PV_VAULT_OVERHEAD||cap<len-PV_VAULT_OVERHEAD)return false;
     size_t size=len-PV_VAULT_OVERHEAD;uint8_t key[32]={0};bool ok=false;
     mbedtls_gcm_context g;mbedtls_gcm_init(&g);
-    if(pv_vault_key(p,n,in+4,key)&&!mbedtls_gcm_setkey(&g,MBEDTLS_CIPHER_ID_AES,key,256))
+    if((local_key?(memcpy(key,local_key,32),true):pv_vault_key(p,n,in+4,key))&&!mbedtls_gcm_setkey(&g,MBEDTLS_CIPHER_ID_AES,key,256))
         ok=mbedtls_gcm_auth_decrypt(&g,size,in+20,12,in,PV_VAULT_HEADER,in+PV_VAULT_HEADER+size,PV_VAULT_TAG,in+PV_VAULT_HEADER,out)==0;
     mbedtls_gcm_free(&g);pv_vault_wipe(key,sizeof(key));
     if(ok)*written=size;else pv_vault_wipe(out,cap);
     return ok;
+}
+static inline bool pv_vault_seal(const char *p,size_t n,const uint8_t entropy[28],const uint8_t *plain,size_t len,uint8_t *out,size_t cap,size_t *written){
+    return pv_vault_seal_impl(p,n,NULL,entropy,plain,len,out,cap,written);
+}
+static inline bool pv_vault_open(const char *p,size_t n,const uint8_t *in,size_t len,uint8_t *out,size_t cap,size_t *written){
+    return pv_vault_open_impl(p,n,NULL,in,len,out,cap,written);
 }
 #endif

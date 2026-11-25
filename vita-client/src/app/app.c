@@ -43,6 +43,7 @@ struct plus_vita_app_t {
 	bool account_from_settings;
 	bool remember, saved, started, retry_account, retry_save, retry_delete, forgetting, expired;
 	bool vault_present, vault_legacy;
+	unsigned vault_mode;
 	PlusVitaAppScreen storage_return;
 	char label[129], online_id[129], account_status[512];
 	char store_country[8], store_language[8], language[8];
@@ -171,13 +172,20 @@ static void stream_settings_view(PlusVitaApp *app)
 static void security_view(PlusVitaApp *app,const char *notice)
 {
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_SECURITY,.title="Security and privacy",
-		.subtitle="ACCOUNT",.body=notice?notice:app->vault_present?"Saved token protected by AES-256-GCM. Use a strong local password.":"Saved tokens require a local password (12-64 characters). Imported JSON and local HTTP are not encrypted.",
+		.subtitle="ACCOUNT",.body=notice?notice:app->vault_mode==2?"Saved token protected by AES-256-GCM. Use a strong local password.":"Automatic unlock: encrypted token, separate local key. Full console access can expose both.",
 		.hint="X  Select     O  Back",
 		.actions={{PLUS_VITA_ACTION_VAULT_SAVE,"Protect saved token",64,258,832,40},
-			{PLUS_VITA_ACTION_VAULT_CHANGE,"Change local password",64,302,832,40},
+			{PLUS_VITA_ACTION_VAULT_TOGGLE,app->vault_mode==2?"Startup password: On (turn off)":"Startup password: Off (turn on)",64,302,832,40},
 			{PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT,"Encrypt and remove imported JSON",64,346,832,40},
 			{PLUS_VITA_ACTION_FORGET,"Forget account",64,390,832,40},
 			{PLUS_VITA_ACTION_BACK,"Back to settings",64,434,832,40}},.action_count=5};
+	if(app->connected&&app->vault_mode==2){
+		app->view.actions[5]=app->view.actions[4];app->view.actions[4]=app->view.actions[3];
+		app->view.actions[3]=app->view.actions[2];
+		app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_VAULT_CHANGE,"Change local password",64,0,832,40};
+		app->view.action_count=6;
+		for(size_t j=0;j<6;j++){app->view.actions[j].y=246+(int)j*42;app->view.actions[j].height=36;}
+	}
 	if(!app->connected){
 		app->view.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_RESTORE,"Restore saved account",64,258,832,40};
 		app->view.actions[1]=app->view.actions[3];app->view.actions[1].y=302;
@@ -1092,7 +1100,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(event.kind == PLUS_VITA_EVENT_ACCOUNT_LOADED && app->waiting_for == PLUS_VITA_EFFECT_LOAD_ACCOUNT)
 		{
 #if PLUS_VITA_ACCOUNT_VAULT
-			app->vault_present=event.vault_present;app->vault_legacy=event.legacy_plain;
+			app->vault_present=event.vault_present;app->vault_legacy=event.legacy_plain;app->vault_mode=event.vault_mode;
 			if(event.status==PLUS_VITA_RESULT_CANCELLED||event.status==PLUS_VITA_RESULT_VAULT_LOCKED){
 				app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;app->saved=true;
 				security_view(app,event.status==PLUS_VITA_RESULT_CANCELLED?"Saved token remains locked.":"Wrong password or damaged vault. Restore again or forget the account.");return effect;
@@ -1121,7 +1129,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->waiting_for = PLUS_VITA_EFFECT_NONE;
 			#if PLUS_VITA_ACCOUNT_VAULT
 			if(event.status==PLUS_VITA_RESULT_CANCELLED||event.status==PLUS_VITA_RESULT_VAULT_LOCKED){
-				app->vault_present=event.vault_present;
+				app->vault_present=event.vault_present;app->vault_mode=event.vault_mode;
 				app->saved=app->vault_present||app->vault_legacy;app->remember=app->saved;
 				security_view(app,event.status==PLUS_VITA_RESULT_CANCELLED?"Save cancelled. Previous file unchanged.":"Wrong password or damaged vault. Restore again or forget the account.");return effect;
 			}
@@ -1135,8 +1143,8 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->saved = app->remember = true;
 			app->retry_save = false;
 #if PLUS_VITA_ACCOUNT_VAULT
-			app->vault_present=event.vault_present;app->vault_legacy=false;
-			if(app->storage_return==PLUS_VITA_APP_SECURITY){security_view(app,event.import_cleanup_failed?"Vault saved, but imported JSON could not be removed.":"Saved token protected by AES-256-GCM. Use a strong local password.");return effect;}
+			app->vault_present=event.vault_present;app->vault_legacy=false;app->vault_mode=event.vault_mode;
+			if(app->storage_return==PLUS_VITA_APP_SECURITY){security_view(app,event.import_cleanup_failed?"Vault saved, but imported JSON could not be removed.":NULL);return effect;}
 #endif
 			if(app->storage_return == PLUS_VITA_APP_ACCOUNT) account_view(app); else catalogue_view(app);
 			return effect;
@@ -1153,7 +1161,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				return effect;
 			}
 			app->saved = app->remember = false;
-			app->vault_present=app->vault_legacy=false;
+			app->vault_present=app->vault_legacy=false;app->vault_mode=0;
 			app->retry_delete = false;
 			if(app->expired) { app->expired = false; account_error(app, result_message(PLUS_VITA_RESULT_REJECTED)); }
 			else if(app->forgetting) { app->forgetting = false; app->welcome_selection = 0; setup_view(app); }
@@ -1572,10 +1580,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 #if PLUS_VITA_ACCOUNT_VAULT
 		else if(action==PLUS_VITA_ACTION_SECURITY && view->screen==PLUS_VITA_APP_SETTINGS)security_view(app,NULL);
 		else if(view->screen==PLUS_VITA_APP_SECURITY && app->connected &&
-			(action==PLUS_VITA_ACTION_VAULT_SAVE||action==PLUS_VITA_ACTION_VAULT_CHANGE||action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT)){
+			(action==PLUS_VITA_ACTION_VAULT_SAVE||action==PLUS_VITA_ACTION_VAULT_CHANGE||action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT||action==PLUS_VITA_ACTION_VAULT_TOGGLE)){
 			app->storage_return=PLUS_VITA_APP_SECURITY;
-			effect=operation(app,PLUS_VITA_EFFECT_SAVE_ACCOUNT,"Choose a local password, not your Sony password.",false);
-			effect.vault_change=action==PLUS_VITA_ACTION_VAULT_CHANGE;
+			effect=operation(app,PLUS_VITA_EFFECT_SAVE_ACCOUNT,"Saving sign-in on this Vita.",false);
+			effect.vault_change=action==PLUS_VITA_ACTION_VAULT_CHANGE||action==PLUS_VITA_ACTION_VAULT_TOGGLE;
+			if(action==PLUS_VITA_ACTION_VAULT_TOGGLE)effect.vault_target=app->vault_mode==2?3:2;
 			effect.vault_clean_import=action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT;return effect;
 		}
 #endif
