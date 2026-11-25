@@ -100,13 +100,13 @@ def self_segments(data):
         yield segment
 
 
-RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13', 'beta1': b'00.14', 'beta2': b'00.15', 'beta3': b'00.16', 'v0.0.1': b'00.17'}
+RELEASE_APP_VERSIONS = {'v000': b'00.11', 'v002': b'00.13', 'beta1': b'00.14', 'beta2': b'00.15', 'beta3': b'00.16', 'v0.0.1': b'00.17', 'v0.0.2': b'00.18'}
 
 
 def package_findings(vpk, root, version='v000'):
     errors = collections.Counter()
     resources = dict(RESOURCES)
-    if version in ('beta2','beta3','v0.0.1'):
+    if version in ('beta2','beta3','v0.0.1','v0.0.2'):
         resources.update({'licenses/quirc.txt':'vita-client/third_party/quirc/LICENSE','licenses/qrcodegen.txt':'vita-client/third_party/qrcodegen/LICENSE'})
     allowlist = set(resources) | {'eboot.bin','sce_sys/param.sfo'}
     with zipfile.ZipFile(vpk) as package:
@@ -161,7 +161,7 @@ def package_findings(vpk, root, version='v000'):
                         raise ValueError('invalid_app_identity')
                     name=data[keys+key:data.index(b'\0',keys+key)]
                     identity[name]=data[values+offset:values+offset+length].rstrip(b'\0')
-                title_id, title = (b'PLVTB0001', b'VitaPlus') if version == 'v0.0.1' else (b'PLVTB0001', b'Plus-Vita Beta 3') if version == 'beta3' else (b'PLVTB0001', b'Plus-Vita Beta 2') if version == 'beta2' else ((b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita'))
+                title_id, title = (b'PLVTB0001', b'VitaPlus') if version in ('v0.0.1','v0.0.2') else (b'PLVTB0001', b'Plus-Vita Beta 3') if version == 'beta3' else (b'PLVTB0001', b'Plus-Vita Beta 2') if version == 'beta2' else ((b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita'))
                 if identity.get(b'APP_VER')!=RELEASE_APP_VERSIONS[version] or identity.get(b'TITLE_ID')!=title_id or identity.get(b'TITLE')!=title:
                     errors['package.app_identity'] += 1
     return errors
@@ -253,7 +253,7 @@ def main():
         errors['gate.unreadable_or_unsupported_input'] += 1
     report = {'software_privacy_pass': not errors, 'checks': checks,
               'findings': dict(errors), 'counts': dict(stats),
-              'hardware_release_gate': 'catalogue_completed_streaming_pending' if args.version == 'v0.0.1' else 'pending_beta3_hardware' if args.version == 'beta3' else 'pending_beta2_hardware' if args.version == 'beta2' else 'pending_beta1_hardware' if args.version == 'beta1' else ('pending_54' if args.version == 'v002' else 'pending_23'),
+              'hardware_release_gate': 'catalogue_completed_streaming_pending' if args.version in ('v0.0.1','v0.0.2') else 'pending_beta3_hardware' if args.version == 'beta3' else 'pending_beta2_hardware' if args.version == 'beta2' else 'pending_beta1_hardware' if args.version == 'beta1' else ('pending_54' if args.version == 'v002' else 'pending_23'),
               'publication_authorized': False}
     encoded = json.dumps(report, indent=2) + '\n'
     if args.report:

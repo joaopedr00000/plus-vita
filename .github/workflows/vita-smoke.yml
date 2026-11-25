@@ -48,36 +48,36 @@ jobs:
         with:
           submodules: recursive
       - name: Test experimental datacenter and bitrate helpers
-        if: github.ref == 'refs/heads/beta1' || (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: github.ref == 'refs/heads/beta1' || (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_cloud_experimental.c -o /tmp/plus-vita-cloud-test
           /tmp/plus-vita-cloud-test
       - name: Test offline browser to native encrypted QR interoperability
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           sudo apt-get update
           sudo apt-get install -y libmbedtls-dev
           sh tools/test-qr-pairing.sh
       - name: Test adaptive streaming policy
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_adaptive_stream.c -o /tmp/pv-adaptive
           /tmp/pv-adaptive
           cc -std=c11 -Wall -Wextra -Werror -Ivita-client/src/platform vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
           /tmp/pv-reorder
       - name: Test regional discovery policy
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
       - name: Test embedded public CA bundle parsing
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cmake -DPV_CA_INPUT="$PWD/vita-client/cacert.pem" -DPV_CA_OUTPUT=/tmp/pv-ca/pv_embedded_ca.h -P vita-client/cmake/embedded_ca.cmake
           cc -std=c11 -Wall -Wextra -Werror -I/tmp/pv-ca vita-client/tests/test_embedded_ca.c -lmbedx509 -lmbedcrypto -o /tmp/pv-ca-test
           /tmp/pv-ca-test
       - name: Test 19 locale tables
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -O3 -Wall -Wextra -Werror -Wstring-compare vita-client/tests/test_i18n.c -o /tmp/pv-i18n
           /tmp/pv-i18n
@@ -86,12 +86,12 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 vita-client/tests/test_vitaplus_theme.c vita-client/src/app/render.c -o /tmp/pv-theme
           /tmp/pv-theme
       - name: Test local QR login HTTP validation
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_lan_login_http.c -o /tmp/pv-lan-login
           /tmp/pv-lan-login
       - name: Test reverse QR strict token validation
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_qr_reverse.c -o /tmp/pv-reverse
           /tmp/pv-reverse
@@ -121,7 +121,7 @@ jobs:
         run: sh tools/test-app-freetype.sh
 
   build:
-    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta3' && github.ref != 'refs/heads/release/v0.0.1' && github.ref != 'refs/heads/update/vitaplus-i18n'
+    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta3' && github.ref != 'refs/heads/release/v0.0.1' && github.ref != 'refs/heads/update/vitaplus-i18n' && github.ref != 'refs/heads/release/v0.0.2'
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     strategy:
@@ -173,9 +173,9 @@ jobs:
 
   beta3-build:
     env:
-      PV_VERSION: ${{ (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n') && 'v0.0.1' || 'beta3' }}
-      PV_FILENAME: ${{ (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n') && 'plus-vita-v0.0.1.vpk' || 'plus-vita-v0.1.0-beta.3.vpk' }}
-    if: github.repository == 'joaopedr00000/plus-vita' && (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
+      PV_VERSION: ${{ github.ref == 'refs/heads/release/v0.0.2' && 'v0.0.2' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'v0.0.1' || 'beta3' }}
+      PV_FILENAME: ${{ github.ref == 'refs/heads/release/v0.0.2' && 'VitaPlus-v0.0.2-base.vpk' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'plus-vita-v0.0.1.vpk' || 'plus-vita-v0.1.0-beta.3.vpk' }}
+    if: github.repository == 'joaopedr00000/plus-vita' && (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')))
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     permissions:
@@ -198,7 +198,8 @@ jobs:
           -DPLUS_VITA_RELEASE_CANDIDATE=ON -DPLUS_VITA_RELEASE_VERSION=v002
           -DPLUS_VITA_PS5_EXPERIMENTAL=ON -DPLUS_VITA_BETA1=ON -DPLUS_VITA_BETA2=ON -DPLUS_VITA_BETA3=ON
           -DPLUS_VITA_CURL_ROOT="$PWD/build/curl-mbedtls"
-          -DPLUS_VITA_FINAL_001=${{ (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n') && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_001=${{ (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || github.ref == 'refs/heads/release/v0.0.2')) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_002=${{ github.ref == 'refs/heads/release/v0.0.2' && 'ON' || 'OFF' }}
       - name: Build and normalize VPK
         run: |
           cmake --build build/beta3 --parallel
@@ -269,3 +270,29 @@ jobs:
           else
             gh release create v0.0.1 dist/plus-vita-v0.0.1.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Plus-Vita v0.0.1" --notes-file release/v0.0.1.md --latest
           fi
+
+
+  draft-v002:
+    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.2' && github.event_name == 'push'
+    needs: [app-workflow, beta3-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: vitaplus-draft-v002
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Create release draft for approved visual assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.0.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Existing release left unchanged."
+            exit 0
+          fi
+          # The base build still uses the old checked-in external artwork.
+          # Never attach or publish it as the approved visual release.
+          gh release create v0.0.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus v0.0.2 — Visual Update" --notes-file release/v0.0.2.md --draft
