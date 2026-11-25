@@ -9,7 +9,16 @@ static inline const char *pv_region_label(unsigned value){
     return pv_region_mode(value)?"Regional discovery (account only): On":"Regional discovery (account only): Off";
 }
 static inline bool pv_region_account_locale_valid(const char *country,const char *language){
-    if(!country||!language||strlen(country)!=2||strlen(language)!=2)return false;
+    if(!country||!language||strlen(country)!=2)return false;
+    size_t n=strlen(language);
+    if(n!=2&&n!=5)return false;
+    if(n==5){
+        if(language[2]!='-')return false;
+        for(unsigned i=3;i<5;i++){
+            unsigned char ch=(unsigned char)language[i];
+            if(!((ch>='A'&&ch<='Z')||(ch>='a'&&ch<='z')))return false;
+        }
+    }
     for(unsigned i=0;i<2;i++){
         unsigned char c=(unsigned char)country[i],l=(unsigned char)language[i];
         if(!((c>='A'&&c<='Z')||(c>='a'&&c<='z'))||
