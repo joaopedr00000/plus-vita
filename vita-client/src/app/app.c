@@ -46,6 +46,7 @@ struct plus_vita_app_t {
 	char label[129], online_id[129], account_status[512];
 	char store_country[8], store_language[8], language[8];
 	char settings_status[256], reporting_status[512], auth_status[256];
+	char streaming_status[256];
 	uint32_t previous_buttons;
 	int previous_direction;
 	uint64_t repeat_at;
@@ -132,13 +133,32 @@ static void settings_view(PlusVitaApp *app)
 	app->view.actions[5]=app->view.actions[4];
 	app->view.actions[4]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,36};
 	app->view.action_count=7;
-	app->view.actions[6]=app->view.actions[5];
+	app->view.actions[7]=app->view.actions[5];
+	app->view.actions[6]=(PlusVitaAppButton){PLUS_VITA_ACTION_STREAM_SETTINGS,"Streaming",64,0,832,34};
+	app->view.action_count=8;
 	snprintf(app->locale_label,sizeof(app->locale_label),"%s: %s",pv_translate(app->ui_language,"Language"),pv_locale_names[pv_language(app->ui_language)]);
 	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_LANGUAGE,app->locale_label,64,0,832,34};
 	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
 	app->view.body="Regional hints apply at next sign-in. No IP or PSN region changes. Cloud eligibility remains server controlled.";
 #endif
 }
+
+#if PLUS_VITA_ADAPTIVE_STREAM
+static void stream_settings_view(PlusVitaApp *app)
+{
+	unsigned profile=pv_profile_cap(app->bitrate_kbps);
+	const char *name=profile==6000?"Low latency":profile==10000?"Balanced":"Maximum quality";
+	snprintf(app->streaming_status,sizeof(app->streaming_status),PV_TR("Active: %s (%u Mbps).\nApplies to the next stream; actual bitrate can adapt."),PV_TR(name),profile/1000);
+	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_SETTINGS,
+		.title="Streaming",.subtitle="SETTINGS AND HELP",.body=app->streaming_status,
+		.hint="X  Select     O  Back",
+		.actions={{PLUS_VITA_ACTION_STREAM_LOW,"Low latency - 6 Mbps",64,274,832,40},
+			{PLUS_VITA_ACTION_STREAM_BALANCED,"Balanced - 10 Mbps",64,318,832,40},
+			{PLUS_VITA_ACTION_STREAM_MAX,"Maximum quality - 15 Mbps",64,362,832,40},
+			{PLUS_VITA_ACTION_BACK,"Back to settings",64,406,832,40}},
+		.action_count=4,.selected=profile==6000?0:profile==10000?1:2};
+}
+#endif
 
 static bool controls_screen(PlusVitaAppScreen screen)
 {
@@ -804,7 +824,7 @@ static void datacenters_view(PlusVitaApp *app)
 	if(!app->bitrate_kbps) app->bitrate_kbps=PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000;
 	snprintf(app->dc_status,sizeof(app->dc_status),PV_TR("Choose a server manually. Page %u of %u. No automatic fallback."),
 		(unsigned)(app->dc_page+1),(unsigned)((app->dc_count+2)/3));
-	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? PV_TR("%s: %u Mbps (change)") : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? PV_TR(app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Quality") : "Bitrate: ",app->bitrate_kbps/1000);
+	snprintf(app->bitrate_label,sizeof(app->bitrate_label),PLUS_VITA_ADAPTIVE_STREAM ? PV_TR("%s: %u Mbps (change)") : "%s%u Mbps (change)",PLUS_VITA_ADAPTIVE_STREAM ? PV_TR(app->bitrate_kbps==6000?"Low latency":app->bitrate_kbps==10000?"Balanced":"Maximum quality") : "Bitrate: ",app->bitrate_kbps/1000);
 	PlusVitaAppView view={.screen=PLUS_VITA_APP_DATACENTERS,.title="Choose cloud server.",
 		.subtitle="MANUAL DATACENTER",.body=app->dc_status,.hint="X  Select     O  Back"};
 	size_t first=app->dc_page*3;
@@ -1347,7 +1367,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(app->waiting_for == PLUS_VITA_EFFECT_SAVE_ACCOUNT || app->waiting_for == PLUS_VITA_EFFECT_DELETE_ACCOUNT
 			|| app->waiting_for == PLUS_VITA_EFFECT_ENABLE_AUTO) return effect;
 		if(view->screen == PLUS_VITA_APP_FORGET_CONFIRM) { account_view(app); return effect; }
-		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING
+		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING || view->screen == PLUS_VITA_APP_STREAM_SETTINGS
 			|| (view->screen == PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) {
 			settings_view(app); return effect;
 		}
@@ -1480,6 +1500,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(action == PLUS_VITA_ACTION_ACCOUNT) { app->account_from_settings = view->screen == PLUS_VITA_APP_SETTINGS; account_view(app); }
 		else if(action == PLUS_VITA_ACTION_SETTINGS) { app->welcome_selection = view->selected; settings_view(app); }
 #if PLUS_VITA_ADAPTIVE_STREAM
+		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
+		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){
+			app->bitrate_kbps=action==PLUS_VITA_ACTION_STREAM_LOW?6000:action==PLUS_VITA_ACTION_STREAM_BALANCED?10000:15000;
+			stream_settings_view(app);
+		}
 		else if(action==PLUS_VITA_ACTION_LANGUAGE&&view->screen==PLUS_VITA_APP_SETTINGS){
 			app->ui_language=(pv_language(app->ui_language)+1)%PV_LANG_COUNT;settings_view(app);view->selected=5;
 		}
@@ -1531,7 +1556,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		{
 			if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) { about_view(app); return effect; }
 			if(view->screen==PLUS_VITA_APP_DETAILS || view->screen==PLUS_VITA_APP_STREAM_STOPPED) { catalogue_view(app); return effect; }
-			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING
+			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING || view->screen==PLUS_VITA_APP_STREAM_SETTINGS
 				|| (view->screen==PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) { settings_view(app); return effect; }
 			app->pending_operation = 0;
 			app->waiting_for = PLUS_VITA_EFFECT_NONE;

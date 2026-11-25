@@ -162,6 +162,29 @@ static const char *const pv_control_help[PV_LANG_COUNT][PV_CONTROL_HELP_COUNT]={
 {"選單：方向鍵/左搖桿，X 確認，O 返回。\n觸控：在按鈕上放開，滑出按鈕取消。\n遊戲中用 Vita 按鍵和搖桿控制 PS。\n背面觸控：上 L2/R2，下 L3/R3。\n正面觸控移動觸控板，雙指點擊。\n儲存的按鍵配置下次工作階段生效。\n長按 START + SELECT 2 秒停止。","%s：在 PS TV 設定中透過 USB + PS 配對。\n方向鍵/搖桿，X 確認，O 返回。\n按鍵、搖桿、L1/R1、L2/R2 和 L3/R3 可用。\n為遠端觸控板點擊配置按鍵。\n不支援觸控板移動、動作感應及震動。\n長按 %s 2 秒停止。\n重新連接後放開按鍵再開始遊戲。","未連接受支援的控制器。\n在 PS TV 透過 USB 配對 DualShock 3/4，按 PS 鍵。連接後放開按鍵。\n可為觸控板點擊配置按鍵。","方向鍵 / 搖桿：移動    X 確認    O 返回","方向鍵 / 搖桿：移動    X 確認    O 取消","背面觸控：預設上 L2/R2，下 L3/R3。","未連接控制器。仍可編輯所有按鍵配置。","PS TV 按鍵與 Vita 背面觸控是不同輸入。","控制設定已儲存，下次工作階段生效。","儲存失敗，保留舊設定。請重試或取消。","選項","分享","L2 按鍵","R2 按鍵","L3 按鍵","R3 按鍵","無效"},
 {"القوائم: الاتجاهات/العصا اليسرى؛ X للاختيار وO للرجوع.\nاللمس: ارفع إصبعك فوق الزر؛ اسحب للخارج للإلغاء.\nأزرار وعصي Vita تتحكم بألعاب PS.\nاللمس الخلفي: أعلى L2/R2 وأسفل L3/R3.\nاللمس الأمامي يحرك اللوحة؛ إصبعان للنقر.\nاحفظ التعيين للجلسة القادمة.\nاضغط START + SELECT لمدة ثانيتين للإيقاف.","%s: اقترن من إعدادات PS TV عبر USB + PS.\nالاتجاهات/العصا؛ X للاختيار وO للرجوع.\nالأزرار والعصي وL1/R1 وL2/R2 وL3/R3 تعمل.\nعيّن زرًا للنقر على لوحة اللمس البعيدة.\nحركة اللوحة والحساسات والاهتزاز غير متاحة.\nاضغط %s لمدة ثانيتين للإيقاف.\nأعد الاتصال واترك الأزرار قبل اللعب.","لا توجد وحدة تحكم مدعومة متصلة.\nاقترن بـ DualShock 3 أو 4 على PS TV عبر USB واضغط PS. اترك الأزرار بعد الاتصال.\nعيّن زرًا للنقر على لوحة اللمس.","الاتجاهات / العصا: تحريك    X اختيار    O رجوع","الاتجاهات / العصا: تحريك    X اختيار    O إلغاء","اللمس الخلفي: افتراضيًا أعلى L2/R2 وأسفل L3/R3.","لا وحدة تحكم متصلة. يمكن تعديل جميع التعيينات.","أزرار PS TV ولمس Vita الخلفي مدخلات منفصلة.","تم حفظ التحكم للجلسة القادمة.","تعذر الحفظ. بقي التعيين السابق. أعد المحاولة أو ألغِ.","خيارات","مشاركة","زر L2","زر R2","زر L3","زر R3","غير صالح"}
 };
+
+#define PV_STREAM_SETTINGS_COUNT 6u
+static const char *const pv_stream_settings[PV_LANG_COUNT][PV_STREAM_SETTINGS_COUNT]={
+{"Streaming","Maximum quality","Low latency - 6 Mbps","Balanced - 10 Mbps","Maximum quality - 15 Mbps","Active: %s (%u Mbps).\nApplies to the next stream; actual bitrate can adapt."},
+{"Streaming","Maximum quality","Low latency - 6 Mbps","Balanced - 10 Mbps","Maximum quality - 15 Mbps","Active: %s (%u Mbps).\nApplies to the next stream; actual bitrate can adapt."},
+{"Streaming","Máxima qualidade","Latência baixa - 6 Mbps","Equilibrado - 10 Mbps","Máxima qualidade - 15 Mbps","Ativo: %s (%u Mbps).\nVale na próxima sessão; o bitrate pode se adaptar."},
+{"Streaming","Qualidade máxima","Latência reduzida - 6 Mbps","Equilibrado - 10 Mbps","Qualidade máxima - 15 Mbps","Ativo: %s (%u Mbps).\nAplica-se à próxima sessão; o débito pode adaptar-se."},
+{"Streaming","Máxima calidad","Baja latencia - 6 Mbps","Equilibrado - 10 Mbps","Máxima calidad - 15 Mbps","Activo: %s (%u Mbps).\nSe aplica a la próxima sesión; la tasa puede adaptarse."},
+{"Streaming","Máxima calidad","Baja latencia - 6 Mbps","Equilibrado - 10 Mbps","Máxima calidad - 15 Mbps","Activo: %s (%u Mbps).\nSe aplica a la siguiente sesión; la tasa puede adaptarse."},
+{"Streaming","Maximale Qualität","Niedrige Latenz - 6 Mbps","Ausgewogen - 10 Mbps","Maximale Qualität - 15 Mbps","Aktiv: %s (%u Mbps).\nGilt ab nächster Sitzung; Bitrate kann sich anpassen."},
+{"Streaming","Qualité maximale","Faible latence - 6 Mbps","Équilibré - 10 Mbps","Qualité maximale - 15 Mbps","Actif : %s (%u Mbps).\nProchaine session ; le débit peut s'adapter."},
+{"Streaming","Qualità massima","Bassa latenza - 6 Mbps","Bilanciato - 10 Mbps","Qualità massima - 15 Mbps","Attivo: %s (%u Mbps).\nVale dalla prossima sessione; bitrate adattivo."},
+{"Streaming","Maximale kwaliteit","Lage latentie - 6 Mbps","Gebalanceerd - 10 Mbps","Maximale kwaliteit - 15 Mbps","Actief: %s (%u Mbps).\nGeldt bij volgende sessie; bitrate kan zich aanpassen."},
+{"Streaming","Maksymalna jakość","Niskie opóźnienie - 6 Mbps","Zrównoważony - 10 Mbps","Maksymalna jakość - 15 Mbps","Aktywny: %s (%u Mbps).\nOd następnej sesji; bitrate może się dostosować."},
+{"Streaming","Maximal kvalitet","Låg latens - 6 Mbps","Balanserad - 10 Mbps","Maximal kvalitet - 15 Mbps","Aktiv: %s (%u Mbps).\nGäller nästa session; bithastigheten kan anpassas."},
+{"Akış","En yüksek kalite","Düşük gecikme - 6 Mbps","Dengeli - 10 Mbps","En yüksek kalite - 15 Mbps","Etkin: %s (%u Mbps).\nSonraki oturumda geçerli; bit hızı uyarlanabilir."},
+{"Стриминг","Максимальное качество","Низкая задержка - 6 Mbps","Баланс - 10 Mbps","Максимальное качество - 15 Mbps","Активно: %s (%u Mbps).\nСо следующей сессии; битрейт может меняться."},
+{"ストリーミング","最高画質","低遅延 - 6 Mbps","バランス - 10 Mbps","最高画質 - 15 Mbps","有効：%s (%u Mbps)。\n次回から適用。ビットレートは自動調整可能。"},
+{"스트리밍","최고 화질","낮은 지연 - 6 Mbps","균형 - 10 Mbps","최고 화질 - 15 Mbps","활성: %s (%u Mbps).\n다음 세션에 적용; 비트레이트는 조정될 수 있습니다."},
+{"串流","最高画质","低延迟 - 6 Mbps","均衡 - 10 Mbps","最高画质 - 15 Mbps","当前：%s (%u Mbps)。\n下次会话生效；码率可自适应。"},
+{"串流","最高畫質","低延遲 - 6 Mbps","平衡 - 10 Mbps","最高畫質 - 15 Mbps","目前：%s (%u Mbps)。\n下次工作階段生效；位元率可自適應。"},
+{"البث","أقصى جودة","زمن استجابة منخفض - 6 Mbps","متوازن - 10 Mbps","أقصى جودة - 15 Mbps","نشط: %s (%u Mbps).\nيطبق في الجلسة القادمة؛ قد يتكيف معدل البت."}
+};
 static inline unsigned pv_language(unsigned n){return n<PV_LANG_COUNT?n:0;}
 /* A shared, length-checked lookup avoids the ARM GCC constant-string
  * comparison diagnostic when unrelated literal keys have different sizes.
@@ -186,6 +209,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_session_text[0],pv_session_text[lang],PV_SESSION_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_about_exit[0],pv_about_exit[lang],PV_ABOUT_EXIT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_control_help[0],pv_control_help[lang],PV_CONTROL_HELP_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_stream_settings[0],pv_stream_settings[lang],PV_STREAM_SETTINGS_COUNT);
     return v?v:s;
 }
 #endif

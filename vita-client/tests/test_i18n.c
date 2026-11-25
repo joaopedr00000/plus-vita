@@ -28,6 +28,10 @@ int main(void){
         const char *fmt=pv_control_help[l][1]; unsigned slots=0;
         while((fmt=strchr(fmt,'%'))!=NULL){assert(fmt[1]=='s');++slots;fmt+=2;}
         assert(slots==2);
+        for(unsigned k=0;k<PV_STREAM_SETTINGS_COUNT;k++){
+            assert(pv_stream_settings[l][k] && *pv_stream_settings[l][k]);
+            assert(!strcmp(pv_translate(l,pv_stream_settings[0][k]),pv_stream_settings[l][k]));
+        }
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
