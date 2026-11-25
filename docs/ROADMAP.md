@@ -1,5 +1,19 @@
 # Roadmap
 
+## VitaPlus — next implementations (v0.0.3 onward)
+
+### Automatic datacenter failover (planned, not enabled)
+
+- Offer automatic failover only after actual current country AND authenticated PSN account country are verified to be in Sony-supported cloud regions, the subscription/title/session are eligible, and Sony authorizes the candidate datacenters. Unknown or mismatched eligibility defaults to manual.
+- A supported account locale alone is not proof of physical location. Do not use UI locale, regional discovery, VPN/proxy, a selected server or self-reported country alone as proof; no external IP lookup or location telemetry without a separately reviewed, consented design.
+- Unsupported or unknown countries: retain the manually chosen datacenter. Any permitted reconnect remains on that server.
+- For eligible users who opt in: use only service-authorized datacenters, at most one alternate after a recoverable transport error, with backoff and cancellation. A reconnect starts a fresh session.
+- Never retry authorization, regional, entitlement, subscription, policy or rate-limit refusals; no identity/region spoofing, forced eligibility, or invented servers.
+- Add tests for supported/unsupported/unknown and mismatched regions, denial, retry caps and cancellation, then verify physical Vita playback.
+
+Official requirements: https://www.playstation.com/en-us/support/subscriptions/psportal-cloud-game-streaming/ and https://www.playstation.com/en-us/legal/terms-of-service/.
+
+
 ## Next version - v001 (unreleased)
 
 The maintainer accepted the current Vita-facing development result on 2026-11-04.
