@@ -66,6 +66,15 @@ ChiakiErrorCode plus_vita_catalog_fetch_direct(
 }
 
 CHIAKI_EXPORT void chiaki_cloudcatalog_result_fini(]==])
+pv_catalog_replace(PV_CATALOG_UNIFIED_TEXT [==[	// 6. assemble.]==] [==[	/* Cross-reference returns independent rows. Release inputs no longer
+	 * used by the assembly before allocating its indexes and row objects. */
+	json_object_put(aliases);aliases=NULL;
+	json_object_put(owned);owned=NULL;
+	json_object_put(components);components=NULL;
+	// 6. assemble.]==])
+pv_catalog_replace(PV_CATALOG_UNIFIED_TEXT [==[	ChiakiErrorCode e = finish_ok(out, env, direct);]==] [==[	ChiakiErrorCode e;
+	if(!env){out->err=CHIAKI_ERR_MEMORY;e=out->err;}
+	else e=finish_ok(out,env,direct);]==])
 set(PV_CATALOG_UNIFIED_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/cloudcatalog_unified_vita.c")
 file(WRITE "${PV_CATALOG_UNIFIED_SOURCE}" "${PV_CATALOG_UNIFIED_TEXT}")
 file(READ "${PYLUX_ROOT}/lib/src/cloudcatalog_fetch.c" PV_CATALOG_FETCH_TEXT)
@@ -83,5 +92,63 @@ pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[struct json_object *games = merge_o
 pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	json_object_put(ps5_browse);
 	json_object_put(universe);
 	return out;]==] [==[	return out;]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[#include "cloudcatalog_internal.h"]==] [==[#include "cloudcatalog_internal.h"
+#include "diagnostic_log.h"
+/* During assembly only, the nested values are read-only. Each row owns
+ * its independent top-level fields, while sharing immutable nested JSON.
+ * Never use this helper in the ownership cross-reference mutation stage. */
+static struct json_object *pv_catalog_row_copy(struct json_object *src)
+{
+	if(!src || json_object_get_type(src)!=json_type_object)return NULL;
+	struct json_object *out=json_object_new_object();
+	if(!out)return NULL;
+	json_object_object_foreach(src,key,value){
+		struct json_object *ref=json_object_get(value);
+		if(json_object_object_add(out,key,ref)!=0){
+			json_object_put(ref);
+			json_object_put(out);
+			return NULL;
+		}
+	}
+	return out;
+}]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[struct json_object *g = cc_json_clone(raw);]==] [==[struct json_object *g = pv_catalog_row_copy(raw);]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[struct json_object *g = cc_json_clone(v);
+			const char *existing]==] [==[struct json_object *g = pv_catalog_row_copy(v);
+			if(!g){json_object_put(apollo_norm);json_object_put(apollo_pids);json_object_put(ps5_browse);return NULL;}
+			const char *existing]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[		for(size_t i = 0; i < n; i++)
+			json_object_array_add(games, cc_json_clone(json_object_array_get_idx(browse, i)));]==] [==[		for(size_t i = 0; i < n; i++){
+			struct json_object *row=pv_catalog_row_copy(json_object_array_get_idx(browse,i));
+			if(!row){json_object_put(games);return NULL;}
+			if(json_object_array_add(games,row)!=0){json_object_put(row);json_object_put(games);return NULL;}
+		}]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[struct json_object *entry = cc_json_clone(owned_game);]==] [==[struct json_object *entry = pv_catalog_row_copy(owned_game);
+		if(!entry){
+			json_object_put(fully_owned);json_object_put(ordered);
+			json_object_put(ix.by_product);json_object_put(ix.by_concept);json_object_put(games);
+			return NULL;
+		}]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 1. Normalize apollo rows + collect their productIds.]==] [==[	plus_vita_diagnostic_event("catalog.phase",1);
+	// 1. Normalize apollo rows + collect their productIds.]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 2. PS5 browse rows: device-based filter, skip apollo dups, stamp pscloud.]==] [==[	plus_vita_diagnostic_event("catalog.phase",2);
+	// 2. PS5 browse rows: device-based filter, skip apollo dups, stamp pscloud.]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 3. universe = apollo + ps5Browse]==] [==[	plus_vita_diagnostic_event("catalog.phase",3);
+	// 3. universe = apollo + ps5Browse]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 4. merge owned]==] [==[	plus_vita_diagnostic_event("catalog.phase",4);
+	// 4. merge owned]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 5. streamability gate (native mode only)]==] [==[	if(!games){json_object_put(apollo_norm);json_object_put(apollo_pids);return NULL;}
+	plus_vita_diagnostic_event("catalog.phase",5);
+	// 5. streamability gate (native mode only)]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 6. tag every game with the full contract.]==] [==[	plus_vita_diagnostic_event("catalog.phase",6);
+	// 6. tag every game with the full contract.]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	struct json_object *deduped = dedupe_contract_product_ids(games);]==] [==[	plus_vita_diagnostic_event("catalog.phase",7);
+	struct json_object *deduped = dedupe_contract_product_ids(games);]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	// 7. envelope]==] [==[	plus_vita_diagnostic_event("catalog.phase",8);
+	// 7. envelope]==])
+pv_catalog_replace(PV_CATALOG_MERGE_TEXT [==[	json_object_put(apollo_pids);
+	return out;]==] [==[	json_object_put(apollo_pids);
+	plus_vita_diagnostic_event("catalog.phase",9);
+	return out;]==])
 set(PV_CATALOG_MERGE_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/cloudcatalog_merge_vita.c")
 file(WRITE "${PV_CATALOG_MERGE_SOURCE}" "${PV_CATALOG_MERGE_TEXT}")

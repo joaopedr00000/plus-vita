@@ -377,14 +377,14 @@ void plus_vita_diagnostic_event(const char *event, int code)
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
-		"ui.stage","account.complete","auth.phase","https.phase","https.curl"};
+		"ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {
 			if(!strcmp(names[i],"ui.stage")) code=code>=0 && code<=17 ? code : 0;
 			else if(!strcmp(names[i],"allocation.stage")) code=code>=0 && code<=5 ? code : 0;
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
-			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")) code=code>=0&&code<=20?code:-1;
+			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")||!strcmp(names[i],"catalog.phase")) code=code>=0&&code<=20?code:-1;
 			else code=code>=-1 && code<=21 ? code : -1;
 			write_line("EVENT",names[i],code); return;
 		}
