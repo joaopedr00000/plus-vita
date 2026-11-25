@@ -16,6 +16,8 @@ extern "C" {
 /* Deferred mode: true means a writer was started. Availability stays false
  * until that worker has opened and initialized storage successfully. */
 bool plus_vita_diagnostic_begin(void);
+/* Lifecycle owner reads the name after begin; stable until the next begin. */
+const char *plus_vita_diagnostic_path(void);
 void plus_vita_diagnostic_event(const char *event, int code);
 /* Only fixed parser reasons can be persisted. */
 void plus_vita_diagnostic_slice_guard_rejected(const char *reason);

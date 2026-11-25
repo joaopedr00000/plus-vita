@@ -91,7 +91,7 @@ int main(void)
 	view = plus_vita_app_view(app);
 	assert(view.screen == PLUS_VITA_APP_SETTINGS);
 	assert(view.action_count == 5 && view.actions[0].id == PLUS_VITA_ACTION_SETUP);
-	assert(strstr(view.body, "ux0:data/VitaPlus.log"));
+	assert(strstr(view.body, "ux0:data/VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log"));
 	plus_vita_app_dispatch(app, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_DOWN });
 	plus_vita_app_dispatch(app, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_ACTIVATE });
 	assert(plus_vita_app_view(app).screen == PLUS_VITA_APP_CONTROLS);

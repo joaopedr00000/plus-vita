@@ -3,7 +3,8 @@
 This contract applies to the native Vita app. The desktop reference recorder
 remains memory-only under [diagnostics-policy.md](diagnostics-policy.md).
 
-VitaPlus creates one log per graphical app launch at `ux0:data/VitaPlus.log`.
+VitaPlus creates one log per graphical app launch at `ux0:data/VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log`.
+The name uses the console RTC in UTC (day-month-year-hour-minute). A second launch within the same minute overwrites the same name. If the clock cannot be formatted, the timestamp is all zeroes.
 Opening the app replaces the previous log; Play and retry actions append to the
 same bounded session log. The offline PS3 replay retains its separate path.
 There is no archive or automatic upload. Copy the log before reopening the app.
@@ -17,7 +18,7 @@ exact historical filenames in `ux0:data/` (missing files are harmless):
 - `plus-vita-catalog-r3.log` (catalogue r3)
 - `plus-vita-ps3-replay-53.log` (offline PS3 replay diagnostic)
 
-No wildcard, recursive cleanup, account-file removal or unrelated log removal is performed. Failed filesystem operations cannot guarantee deletion. The standalone offline replay build does not perform this cleanup.
+The former `VitaPlus.log` and previous timestamped `VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log` files are also removed after successful initialization. The current file is excluded. Only the exact prefix, numeric timestamp and `.log` suffix are matched. No recursive cleanup, account-file removal or unrelated log removal is performed. Failed filesystem operations cannot guarantee deletion. The standalone offline replay build does not perform this cleanup.
 
 The current development identity is `recovery-diagnostics-1`, with the accepted
 720p independent-input/deferred-writer profile. This is an experimental

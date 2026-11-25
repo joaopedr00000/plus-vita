@@ -90,7 +90,7 @@ Include the app version, the steps to reproduce it, what you expected and what h
 not be treated as priority.** To provide one:
 
 1. Reproduce the issue, then use VitaShell to copy
-   **ux0:data/VitaPlus.log** to your phone or PC.
+   **ux0:data/VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log** to your phone or PC.
 2. Copy it **before another app launch**, which replaces the log.
 3. Review it privately and attach **only the reviewed log** to your ticket.
 

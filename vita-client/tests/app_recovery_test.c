@@ -109,7 +109,7 @@ static void offline_attempt_log(bool retry)
 	plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_INTERRUPTED,.status=PLUS_VITA_RESULT_NETWORK_ERROR},0);
 	assert(plus_vita_ui_flow_take(&flow).kind==PLUS_VITA_EFFECT_NONE);
 	plus_vita_diagnostic_ui_end();
-	FILE *file=fopen("VitaPlus.log","rb");assert(file);
+	FILE *file=fopen(plus_vita_diagnostic_path(),"rb");assert(file);
 	char line[2048];bool first=false,failed=false,prior=false,attempt=false;
 	while(fgets(line,sizeof(line),file)) {
 		if(strstr(line,"recovery.sleep")) prior=true;
@@ -268,7 +268,7 @@ static void play_startup_attempt_log(PlusVitaStreamStartup status, const char *f
 
 	const char *const expected[]={"code=0 allocation.complete", "code=0 stream_probe.begin",
 		"code=0 stream.startup.transport", failure, "code=16 stream_probe.complete"};
-	FILE *file=fopen("VitaPlus.log","rb");assert(file);
+	FILE *file=fopen(plus_vita_diagnostic_path(),"rb");assert(file);
 	char line[2048];
 	size_t next=0;
 	while(fgets(line,sizeof(line),file)) {

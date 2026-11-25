@@ -6,7 +6,7 @@ Use [GitHub Issues](https://github.com/Calligula87/plus-vita/issues/new/choose) 
 
 ## Copy the current session log
 
-VitaPlus starts a fresh log each time the graphical app launches at `ux0:data/VitaPlus.log`. It records app stages and aggregate timing; it is not a recording of your screen or account. Using VitaShell, copy the log to your PC before another app launch replaces it. Review the copy yourself, then attach only that log to your GitHub issue for priority investigation. The app never uploads it or opens an issue automatically.
+VitaPlus starts a fresh log each time the graphical app launches at `ux0:data/VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log`. The filename uses UTC at launch. It records app stages and aggregate timing; it is not a recording of your screen or account. Using VitaShell, copy the log to your PC before another app launch replaces it. Review the copy yourself, then attach only that log to your GitHub issue for priority investigation. The app never uploads it or opens an issue automatically.
 
 **Never attach** `ux0:data/plus-vita-auth.json`, `ux0:data/plus-vita/account.json`, an entire `ux0:data` folder, Sony browser responses, passwords, tokens, authenticated network captures or private screenshots. Keep all sign-in files and the separate local encryption key private. Logs contain locally generated UTC timestamps; review them before sharing. If Settings says the log is unavailable, describe the steps and result without one.
 

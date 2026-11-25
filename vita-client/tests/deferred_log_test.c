@@ -93,7 +93,7 @@ static void privacy_entrypoints(void)
 	plus_vita_diagnostic_slice_guard_rejected("FRAME_NUM_GAP");
 	plus_vita_diagnostic_slice_guard_rejected("FRAME_NUM_GAP\nNPSSO=synthetic-token-canary");
 	plus_vita_diagnostic_end();
-	FILE *f=fopen("VitaPlus.log","rb"); assert(f);
+	FILE *f=fopen(plus_vita_diagnostic_path(),"rb"); assert(f);
 	char line[2048]; bool complete=false;
 	const char *const expected[]={
 		"code=20 stream.startup.ps3_feedback_started", "final counter=decrypted_video_packets count=0",
@@ -121,9 +121,10 @@ static void legacy_cleanup(void)
 	static const char *const old[]={
 		"plus-vita-allocation.log","plus-vita-v0.0.1.log",
 		"plus-vita-catalog-r2.log","plus-vita-catalog-r3.log",
-		"plus-vita-ps3-replay-53.log"
+		"plus-vita-ps3-replay-53.log","VitaPlus.log",
+		"VitaPlus-Diagnostic-01-01-2000-00-00.log","VitaPlus-Diagnostic-02-02-2001-01-01.log"
 	};
-	static const char *const keep[]={"other-app.log","plus-vita-custom.log","plus-vita-auth.json","account.json","account.key"};
+	static const char *const keep[]={"other-app.log","plus-vita-custom.log","plus-vita-auth.json","account.json","account.key","VitaPlus-Diagnostic-not-a-date.log","VitaPlus-Diagnostic-01-01-2000-00-00.txt","VitaPlus-Diagnostic-01-01-2000-00-00.log.bak"};
 	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++){
 		FILE *f=fopen(old[i],"wb");assert(f);assert(fputs("old diagnostic",f)>=0);assert(!fclose(f));
 	}
@@ -134,14 +135,22 @@ static void legacy_cleanup(void)
 	fail_open=true;assert(plus_vita_diagnostic_begin());plus_vita_diagnostic_end();fail_open=false;
 	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++)assert(access(old[i],F_OK)==0);
 	assert(plus_vita_diagnostic_ui_begin());plus_vita_diagnostic_ui_end();
+	const char *current=plus_vita_diagnostic_path();
+	int day,month,year,hour,minute,used=0;
+	assert(sscanf(current,"VitaPlus-Diagnostic-%2d-%2d-%4d-%2d-%2d.log%n",&day,&month,&year,&hour,&minute,&used)==5);
+	assert(used==(int)strlen(current)&&day>=1&&day<=31&&month>=1&&month<=12&&year>=2000&&hour>=0&&hour<=23&&minute>=0&&minute<=59);
+	assert(access(current,F_OK)==0);
 	for(size_t i=0;i<sizeof(old)/sizeof(old[0]);i++)assert(access(old[i],F_OK)!=0&&errno==ENOENT);
 	for(size_t i=0;i<sizeof(keep)/sizeof(keep[0]);i++){
 		FILE *f=fopen(keep[i],"rb");assert(f);char content[32]={0};assert(fread(content,1,sizeof(content)-1,f)==9);assert(!fclose(f));assert(!strcmp(content,"untouched"));assert(!unlink(keep[i]));
 	}
 	/* An empty directory named like an old log must also survive. */
 	assert(!mkdir(old[0],0700));
+	assert(!mkdir("VitaPlus-Diagnostic-03-03-2002-02-02.log",0700));
 	assert(plus_vita_diagnostic_ui_begin());plus_vita_diagnostic_ui_end();
 	struct stat st;assert(!stat(old[0],&st)&&S_ISDIR(st.st_mode));assert(!rmdir(old[0]));
+	assert(!stat("VitaPlus-Diagnostic-03-03-2002-02-02.log",&st)&&S_ISDIR(st.st_mode));
+	assert(!rmdir("VitaPlus-Diagnostic-03-03-2002-02-02.log"));
 }
 static void session_reset(void)
 {
@@ -152,7 +161,7 @@ static void session_reset(void)
 	plus_vita_diagnostic_event("attempt.begin",0);
 	plus_vita_diagnostic_event("recovery.wifi",0);
 	plus_vita_diagnostic_ui_end();
-	FILE *f=fopen("VitaPlus.log","rb");assert(f);
+	FILE *f=fopen(plus_vita_diagnostic_path(),"rb");assert(f);
 	char line[2048];bool header=false,sleep=false,wifi=false;unsigned attempts=0;
 	while(fgets(line,sizeof(line),f)){
 		if(strstr(line,"session_start_utc=")){header=true;assert(strchr(line,'T')&&strchr(line,'Z'));}
@@ -164,7 +173,7 @@ static void session_reset(void)
 	fclose(f);assert(header&&sleep&&wifi&&attempts==2);
 	assert(plus_vita_diagnostic_ui_begin());
 	plus_vita_diagnostic_event("app.stop",0);plus_vita_diagnostic_ui_end();
-	f=fopen("VitaPlus.log","rb");assert(f);bool stop=false;
+	f=fopen(plus_vita_diagnostic_path(),"rb");assert(f);bool stop=false;
 	while(fgets(line,sizeof(line),f)){
 		assert(!strstr(line,"recovery.sleep")&&!strstr(line,"recovery.wifi")&&!strstr(line,"attempt.begin"));
 		if(strstr(line,"app.stop"))stop=true;
@@ -183,7 +192,7 @@ static void bounded_file(void)
 	plus_vita_diagnostic_metric("decode",&stats);
 	plus_vita_diagnostic_event("stream_probe.complete",6);
 	plus_vita_diagnostic_end();
-	FILE *f=fopen("VitaPlus.log","rb"); assert(f);
+	FILE *f=fopen(plus_vita_diagnostic_path(),"rb"); assert(f);
 	assert(!fseek(f,0,SEEK_END)); long length=ftell(f);
 	assert(length>0 && length<=PLUS_VITA_DIAGNOSTIC_MAX_BYTES);
 	rewind(f); char line[2048]; bool final=false,metric=false,limited=false;
@@ -224,7 +233,7 @@ int main(void)
 	PlusVitaLatencyStats writes, waits;
 	plus_vita_diagnostic_stream_timing_end(&writes, &waits);
 	plus_vita_diagnostic_end();
-	FILE *f = fopen("VitaPlus.log", "r"); assert(f);
+	FILE *f = fopen(plus_vita_diagnostic_path(), "r"); assert(f);
 	char line[2048]; unsigned long last = 0; bool critical = false, redacted = false, overflow = false;
 	while(fgets(line, sizeof(line), f)) {
 		assert(!strstr(line, "synthetic-secret"));
@@ -248,7 +257,7 @@ int main(void)
 		plus_vita_diagnostic_ui_flush();
 	}
 	plus_vita_diagnostic_ui_end();
-	f = fopen("VitaPlus.log", "r"); assert(f);
+	f = fopen(plus_vita_diagnostic_path(), "r"); assert(f);
 	bool ui_build=false, ui_timing=false, artwork_summary=false; size_t bytes=0;
 	while(fgets(line,sizeof(line),f)) {
 		bytes+=strlen(line);
@@ -280,7 +289,7 @@ int main(void)
 	assert(atomic_load(&produced)); assert(!pthread_join(producer, NULL));
 	pthread_mutex_lock(&gate); blocked = false; pthread_cond_broadcast(&changed); pthread_mutex_unlock(&gate);
 	assert(!pthread_join(stopper, NULL));
-	f = fopen("VitaPlus.log", "r"); assert(f);
+	f = fopen(plus_vita_diagnostic_path(), "r"); assert(f);
 	bool latest = false, accounted = false;
 	while(fgets(line, sizeof(line), f)) {
 		if(strstr(line, "stream_probe.complete")) latest = true;
@@ -335,7 +344,7 @@ int main(void)
 	pthread_mutex_lock(&gate);blocked=false;pthread_cond_broadcast(&changed);pthread_mutex_unlock(&gate);
 	plus_vita_diagnostic_end();assert(plus_vita_diagnostic_begin());
 	plus_vita_diagnostic_event("allocation.begin",0);plus_vita_diagnostic_end();
-	f=fopen("VitaPlus.log","rb");assert(f);bool first=false;
+	f=fopen(plus_vita_diagnostic_path(),"rb");assert(f);bool first=false;
 	while(fgets(line,sizeof(line),f)) {
 		assert(!strstr(line,"recovery.sleep"));
 		if(strstr(line,"000001 elapsed_ms=") && strstr(line,"BUILD")) first=true;

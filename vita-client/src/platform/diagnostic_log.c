@@ -9,18 +9,33 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #ifndef PLUS_VITA_DEFERRED_LOG
 #define PLUS_VITA_DEFERRED_LOG 0
 #endif
 
-#if defined(__vita__) && PLUS_VITA_PS3_REPLAY
-#define PLUS_VITA_DIAGNOSTIC_PATH PLUS_VITA_PS3_REPLAY_LOG_PATH
-#elif defined(__vita__)
-#define PLUS_VITA_DIAGNOSTIC_PATH PLUS_VITA_DIAGNOSTIC_VITA_PATH
+#ifdef __vita__
+#define PV_LOG_DIR "ux0:data/"
 #else
-#define PLUS_VITA_DIAGNOSTIC_PATH "VitaPlus.log"
+#define PV_LOG_DIR ""
 #endif
+#define PV_LOG_PREFIX "VitaPlus-Diagnostic-"
+#define PV_LOG_SUFFIX ".log"
+static char diagnostic_path[128];
+const char *plus_vita_diagnostic_path(void){return diagnostic_path;}
+static void diagnostic_filename(time_t stamp)
+{
+#if defined(__vita__) && PLUS_VITA_PS3_REPLAY
+	(void)stamp;
+	snprintf(diagnostic_path,sizeof(diagnostic_path),"%s",PLUS_VITA_PS3_REPLAY_LOG_PATH);
+#else
+	char date[32];struct tm utc;
+	if(stamp==(time_t)-1||!gmtime_r(&stamp,&utc)||!strftime(date,sizeof(date),"%d-%m-%Y-%H-%M",&utc)||strlen(date)!=16)
+		strcpy(date,"00-00-0000-00-00");
+	snprintf(diagnostic_path,sizeof(diagnostic_path),"%s%s%s%s",PV_LOG_DIR,PV_LOG_PREFIX,date,PV_LOG_SUFFIX);
+#endif
+}
 
 static FILE *diagnostic_file;
 static unsigned long diagnostic_sequence;
@@ -48,11 +63,26 @@ static void diagnostic_timestamp(char out[32],uint64_t elapsed_ms)
 }
 static FILE *diagnostic_open(void)
 {
-	return fopen(PLUS_VITA_DIAGNOSTIC_PATH,"w");
+	return fopen(diagnostic_path,"w");
 }
 
+#if !(defined(__vita__) && PLUS_VITA_PS3_REPLAY)
+/* Match only the exact timestamped filename format; never other file types. */
+static bool diagnostic_dated_name(const char *name)
+{
+	size_t p=strlen(PV_LOG_PREFIX);
+	if(strncmp(name,PV_LOG_PREFIX,p)||strlen(name)!=p+16+strlen(PV_LOG_SUFFIX)||strcmp(name+p+16,PV_LOG_SUFFIX))return false;
+	for(unsigned j=0;j<16;j++){
+		char c=name[p+j];
+		if(j==2||j==5||j==10||j==13){if(c!='-')return false;}
+		else if(c<'0'||c>'9')return false;
+	}
+	return true;
+}
+#endif
+
 /* Historical filenames verified against the allocation, beta3 r2/r3,
- * v0.0.1/v0.0.2 and PS3 replay builds. No directory scan or wildcard.
+ * v0.0.1/v0.0.2 and PS3 replay builds. Only exact names or the strict new format.
  * Run only after the new session header is successfully persisted.
  * The offline replay tool keeps its independent output and does not clean
  * graphical session logs. Host tests use an isolated working directory. */
@@ -70,10 +100,23 @@ static void diagnostic_remove_legacy(void)
 		PV_OLD_LOG_PREFIX "plus-vita-catalog-r2.log",
 		PV_OLD_LOG_PREFIX "plus-vita-catalog-r3.log",
 		PV_OLD_LOG_PREFIX "plus-vita-ps3-replay-53.log",
+		PV_OLD_LOG_PREFIX "VitaPlus.log",
 	};
 	for(size_t i=0;i<sizeof(old_logs)/sizeof(old_logs[0]);i++)
 		(void)unlink(old_logs[i]); /* Missing files are normal. Never remove directories. */
 #undef PV_OLD_LOG_PREFIX
+	DIR *dir=opendir(PV_LOG_DIR[0]?PV_LOG_DIR:".");
+	if(dir){
+		struct dirent *entry;
+		while((entry=readdir(dir))!=NULL){
+			if(!diagnostic_dated_name(entry->d_name))continue;
+			char path[128];
+			int n=snprintf(path,sizeof(path),"%s%s",PV_LOG_DIR,entry->d_name);
+			if(n>0&&(size_t)n<sizeof(path)&&strcmp(path,diagnostic_path))
+				(void)unlink(path);
+		}
+		closedir(dir);
+	}
 #endif
 }
 static bool diagnostic_header(FILE *f)
@@ -377,6 +420,7 @@ bool plus_vita_diagnostic_begin(void)
 	pthread_mutex_lock(&diagnostic_write_mutex);
 	diagnostic_wall_start=time(NULL);
 	diagnostic_timestamp(diagnostic_start_utc,0);
+	diagnostic_filename(diagnostic_wall_start);
 	pthread_mutex_unlock(&diagnostic_write_mutex);
 	/* The deferred writer owns opening as well as subsequent persistence. */
 #if !PLUS_VITA_DEFERRED_LOG
