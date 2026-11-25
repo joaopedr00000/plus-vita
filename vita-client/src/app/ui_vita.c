@@ -39,6 +39,7 @@
 #define HEIGHT 544
 #define PITCH 1024
 #define FRAME_BYTES ((PITCH * HEIGHT * 4u + 0x3ffffu) & ~0x3ffffu)
+#include "theme.h"
 #define RGB(r,g,b) (0xff000000u | ((uint32_t)(b)<<16) | ((uint32_t)(g)<<8) | (r))
 
 _Static_assert((unsigned)PLUS_VITA_MENU_CROSS == (unsigned)SCE_CTRL_CROSS, "Menu Cross bit must match VitaSDK");
@@ -141,9 +142,9 @@ static bool draw(UiDisplay *display, PlusVitaUiFlow *flow)
 static bool pair_frame(void *context,const char *heading,const char *message,const unsigned char *qr,int n,const uint32_t *camera)
 {
 	UiDisplay *d=context;uint32_t *p=d->pixels[d->back];
-	for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=RGB(8,25,58);
-	plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,RGB(240,245,255));
-	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,RGB(235,240,255));
+	for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=VP_QR_BG;
+	plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,VP_GOLD);
+	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,VP_BODY);
 	if(qr && n>0 && n<=53) {
 		int scale=340/(n+8),size=(n+8)*scale;
 		for(int y=0;y<size;y++)for(int x=0;x<size;x++){
@@ -164,7 +165,7 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
 static void performance_hud(void *context,uint32_t *pixels,const char *line)
 {
 	UiDisplay *d=context;
-	for(unsigned y=0;y<24;y++)for(unsigned x=0;x<960;x++)pixels[y*1024+x]=RGB(5,15,25);
+	for(unsigned y=0;y<24;y++)for(unsigned x=0;x<960;x++)pixels[y*1024+x]=VP_HUD_BG;
 	plus_vita_font_draw(d->font,pixels,1024,line,(PlusVitaTextBox){6,1,948,22},14,false,RGB(255,255,255));
 }
 #endif

@@ -161,7 +161,7 @@ def package_findings(vpk, root, version='v000'):
                         raise ValueError('invalid_app_identity')
                     name=data[keys+key:data.index(b'\0',keys+key)]
                     identity[name]=data[values+offset:values+offset+length].rstrip(b'\0')
-                title_id, title = (b'PLVTB0001', b'Plus-Vita') if version == 'v0.0.1' else (b'PLVTB0001', b'Plus-Vita Beta 3') if version == 'beta3' else (b'PLVTB0001', b'Plus-Vita Beta 2') if version == 'beta2' else ((b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita'))
+                title_id, title = (b'PLVTB0001', b'VitaPlus') if version == 'v0.0.1' else (b'PLVTB0001', b'Plus-Vita Beta 3') if version == 'beta3' else (b'PLVTB0001', b'Plus-Vita Beta 2') if version == 'beta2' else ((b'PLVTB0001', b'Plus-Vita Beta 1') if version == 'beta1' else (b'PLVT00001', b'Plus-Vita'))
                 if identity.get(b'APP_VER')!=RELEASE_APP_VERSIONS[version] or identity.get(b'TITLE_ID')!=title_id or identity.get(b'TITLE')!=title:
                     errors['package.app_identity'] += 1
     return errors

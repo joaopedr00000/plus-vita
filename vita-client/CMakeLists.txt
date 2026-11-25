@@ -93,7 +93,7 @@ if(PLUS_VITA_FINAL_001)
     message(FATAL_ERROR "v0.0.1 requires the tested catalogue-r3 profile")
   endif()
   # Preserve the installed beta title ID and use a monotonic Vita APP_VER.
-  set(VITA_APP_NAME "Plus-Vita")
+  set(VITA_APP_NAME "VitaPlus")
   set(VITA_VERSION "00.17")
   set(PLUS_VITA_PUBLIC_VERSION "v0.0.1")
 endif()

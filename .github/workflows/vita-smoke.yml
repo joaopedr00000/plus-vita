@@ -81,6 +81,10 @@ jobs:
         run: |
           cc -std=c11 -O3 -Wall -Wextra -Werror -Wstring-compare vita-client/tests/test_i18n.c -o /tmp/pv-i18n
           /tmp/pv-i18n
+      - name: Test VitaPlus dark gold renderer and QR theme
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 vita-client/tests/test_vitaplus_theme.c vita-client/src/app/render.c -o /tmp/pv-theme
+          /tmp/pv-theme
       - name: Test local QR login HTTP validation
         if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || github.ref == 'refs/heads/update/vitaplus-i18n'))
         run: |
