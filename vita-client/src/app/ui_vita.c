@@ -409,9 +409,9 @@ int plus_vita_app_run(void)
 					plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.buttons=after.buttons,.left_x=after.lx,.left_y=after.ly,.time_us=sceKernelGetProcessTimeWide()}});
 					touched=true;previous_poll=flow.input_since=0;
 				}
-				else if(effect.kind==PLUS_VITA_EFFECT_QR_PAIR) {
+				else if(effect.kind==PLUS_VITA_EFFECT_QR_PAIR||effect.kind==PLUS_VITA_EFFECT_REVERSE_QR) {
 					char json[80]={0};
-					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_qr_pair(pair_frame,display,json,sizeof(json)):PLUS_VITA_RESULT_BUSY;
+					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?(effect.kind==PLUS_VITA_EFFECT_REVERSE_QR?plus_vita_qr_reverse(pair_frame,display,json,sizeof(json)):plus_vita_qr_pair(pair_frame,display,json,sizeof(json))):PLUS_VITA_RESULT_BUSY;
 					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_IMPORT_READ,.operation=effect.operation,.status=status,.data=json,.data_size=strlen(json)},0);
 					volatile char *wipe=json;for(size_t i=0;i<sizeof(json);i++)wipe[i]=0;

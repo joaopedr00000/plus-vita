@@ -69,6 +69,11 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
+      - name: Test reverse QR strict token validation
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_qr_reverse.c -o /tmp/pv-reverse
+          /tmp/pv-reverse
       - name: Test native application workflow
         run: sh tools/test-app-workflow.sh
       - name: Test saved control layouts through Settings and gameplay input

@@ -6,6 +6,10 @@ Choose **Sign in on Sony (email / passkey)** to open the real PlayStation websit
 
 Never enter your Sony email or password in a third-party login form. The Plus-Vita screens are not Sony screens. Only enter them on the actual official Sony site.
 
+## Optional reverse QR (no helper or file)
+
+Choose **Scan NPSSO QR (local / unencrypted)**. Sign in on Sony on the phone, copy the official response, and use a trusted offline QR generator (for example a locally configured phone shortcut). The Vita camera accepts only the 64-character token or a single-member JSON response, rejects links and ambiguous inputs, and asks for confirmation before connecting. No network relay or external HTML is used. This QR has no additional encryption, is reusable while the Sony token is valid, and can be identical for the same token; use encrypted pairing for session-bound QR security. Never use an online QR generator. Clear the clipboard and never share the QR. Raw preview is suppressed on Vita. Camera hardware still needs testing.
+
 ## Beta 2: experimental encrypted optical QR pairing
 
 1. Download the [offline pairing helper](../release/qr-pairing.html) as a local HTML file on your phone or PC. Open it in a browser supporting local Web Crypto. It makes no network requests itself.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "qr_pair_vita.h"
 #include "../platform/qr_pair_crypto.h"
+#include "../platform/qr_reverse.h"
 #include <psp2/camera.h>
 #include <psp2/ctrl.h>
 #include <psp2/kernel/sysmem.h>
@@ -63,7 +64,7 @@ PlusVitaAppResult plus_vita_sony_login(PlusVitaPairFrame frame,void *ctx,bool si
 	frame(ctx,"Enter the Sony token","Never enter your Sony password here.",NULL,0,NULL);
 	return PLUS_VITA_RESULT_OK;
 }
-PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap)
+static PlusVitaAppResult pair_camera(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap,bool reverse)
 {
 	PlusVitaAppResult result=PLUS_VITA_RESULT_UNSUPPORTED;
 	uint8_t key[32]={0},entropy[32]={0};SceNetEtherAddr device={0};char code[72]={0},msg[500]={0};uint32_t *pixels=NULL;
@@ -72,6 +73,14 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 	if(!frame||!json||cap<77)return result;
 	plus_vita_pair_clear(json,cap);
 	uint64_t start=sceKernelGetProcessTimeWide();
+	if(reverse){
+		if(!sony_page(frame,ctx,"1 / 2  Sony response","Sign in on your phone at playstation.com first. Scan this link in the same browser. Generate a QR locally from the response using a trusted offline QR tool. Never use an online QR generator. X Next / O Cancel","https://ca.account.sony.com/api/v1/ssocookie"))goto done;
+		if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
+		start=sceKernelGetProcessTimeWide();
+		if(!frame(ctx,"Private QR warning","This QR contains your reusable Sony token without additional encryption. Keep both screens private. Do not screenshot or share. Clear the phone clipboard afterward. X Scan / O Cancel",NULL,0,NULL))goto done;
+		if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
+		start=sceKernelGetProcessTimeWide();
+	}else{
 	if(!frame(ctx,"1 / 3  Sign in to Sony","On your phone, sign in at playstation.com. Open the official Sony response link in the downloaded offline helper. Copy the response privately. X Next / O Cancel",NULL,0,NULL))goto done;
 	if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
 	/* No shared/static QR, clock-derived key or fallback to predictable entropy. */
@@ -82,6 +91,7 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 	start=sceKernelGetProcessTimeWide();
 	if(!qr_screen(frame,ctx,"2 / 3  Pair privately",msg,code))goto done;
 	if(!next_page(start)){result=PLUS_VITA_RESULT_CANCELLED;goto done;}
+	}
 	block=sceKernelAllocMemBlock("PVQrCamera",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,ALLOC,NULL);
 	if(block<0||sceKernelGetMemBlockBase(block,(void **)&pixels)<0)goto done;
 	decoder=quirc_new();q=calloc(1,sizeof(*q));d=calloc(1,sizeof(*d));
@@ -91,7 +101,7 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 	opened=true;
 	if(sceCameraStart(SCE_CAMERA_DEVICE_BACK)<0)goto done;
 	started=true;result=PLUS_VITA_RESULT_CANCELLED;
-	if(!frame(ctx,"3 / 3  Scan encrypted QR","Aim the rear camera at your phone. O  Cancel.",NULL,0,NULL))goto done;
+	if(!frame(ctx,reverse?"2 / 2  Scan private token QR":"3 / 3  Scan encrypted QR","Aim the rear camera at your phone. O  Cancel.",NULL,0,NULL))goto done;
 	while(sceKernelGetProcessTimeWide()-start<DURATION&&!(buttons()&SCE_CTRL_CIRCLE)){
 		SceCameraRead read={.size=sizeof(read),.mode=0};
 		if(sceCameraRead(SCE_CAMERA_DEVICE_BACK,&read)>=0){
@@ -100,10 +110,10 @@ PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json
 			quirc_end(decoder);
 			for(int i=0;i<quirc_count(decoder);i++){
 				quirc_extract(decoder,i,q);
-				if(!quirc_decode(q,d)&&sceKernelGetProcessTimeWide()-start<DURATION&&d->payload_len>0&&plus_vita_pair_decode(key,d->payload,(size_t)d->payload_len,json,cap)){result=PLUS_VITA_RESULT_OK;goto done;}
+				if(!quirc_decode(q,d)&&sceKernelGetProcessTimeWide()-start<DURATION&&d->payload_len>0&&(reverse?pv_qr_reverse_decode(d->payload,(size_t)d->payload_len,json,cap):plus_vita_pair_decode(key,d->payload,(size_t)d->payload_len,json,cap))){result=PLUS_VITA_RESULT_OK;goto done;}
 				plus_vita_pair_clear(d,sizeof(*d));plus_vita_pair_clear(q,sizeof(*q));
 			}
-			if(!frame(ctx,"3 / 3  Scan encrypted QR","Aim the rear camera at the phone. O  Cancel. The key expires after three minutes.",NULL,0,pixels))break;
+			if(!frame(ctx,reverse?"2 / 2  Scan private token QR":"3 / 3  Scan encrypted QR",reverse?"Hold the phone QR in front of the rear camera. No preview of the raw token. O Cancel.":"Aim the rear camera at the phone. O Cancel. The key expires after three minutes.",NULL,0,reverse?NULL:pixels))break;
 		}
 		sceKernelDelayThread(50000);
 	}
@@ -116,8 +126,14 @@ done:
 	if(q){plus_vita_pair_clear(q,sizeof(*q));free(q);}
 	if(d){plus_vita_pair_clear(d,sizeof(*d));free(d);}
 	plus_vita_pair_clear(entropy,sizeof(entropy));plus_vita_pair_clear(&device,sizeof(device));plus_vita_pair_clear(key,sizeof(key));plus_vita_pair_clear(code,sizeof(code));plus_vita_pair_clear(msg,sizeof(msg));
+	if(reverse&&result==PLUS_VITA_RESULT_OK){
+		if(!frame(ctx,"QR received","Use the scanned Sony token to connect? X Connect / O Cancel",NULL,0,NULL)||!next_page(sceKernelGetProcessTimeWide()))result=PLUS_VITA_RESULT_CANCELLED;
+	}
 	if(result!=PLUS_VITA_RESULT_OK)plus_vita_pair_clear(json,cap);
 	frame(ctx,"QR pairing finished","Returning to account setup...",NULL,0,NULL);
 	frame(ctx,"QR pairing finished","Returning to account setup...",NULL,0,NULL);
 	return result;
 }
+
+PlusVitaAppResult plus_vita_qr_pair(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap){return pair_camera(frame,ctx,json,cap,false);}
+PlusVitaAppResult plus_vita_qr_reverse(PlusVitaPairFrame frame,void *ctx,char *json,size_t cap){return pair_camera(frame,ctx,json,cap,true);}

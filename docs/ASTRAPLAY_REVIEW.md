@@ -1,0 +1,4 @@
+# AstraPlay compatibility review
+Source: https://github.com/nileshchakraborty/AstraPlay/tree/36f9e395a26d36d552b2337c6efad028d0ff056f
+
+Android uses WebView/CookieManager to capture the Sony response; Vita does not provide an equivalent Android WebView. The Android/Qt embedded HTTP relay serves a browser helper and exchanges a copied NPSSO using code-based POST/poll endpoints. This is not Sony's native Portal Device Code flow. The ordinary LAN HTTP mode does not provide TLS transport protection for the token, so it is not ported here. A browser helper over plain LAN HTTP also cannot rely on Web Crypto secure-context guarantees. Plus-Vita implements optional reverse optical scanning and preserves encrypted session-bound optical pairing, the existing Sony-page links, JSON import, and manual token entry. No source code from AstraPlay is copied. A future automatic browser integration requires a supported secure browser or an authorized device-flow API.

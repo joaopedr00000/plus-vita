@@ -364,15 +364,16 @@ static void setup_view(PlusVitaApp *app)
 	app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_SONY_LOGIN,"Sign in on Sony (email / passkey)",64,0,832,40};
 	app->view.actions[3]=(PlusVitaAppButton){PLUS_VITA_ACTION_TOKEN_LOGIN,"QR login / enter token (no files)",64,0,832,40};
 	app->view.actions[4]=(PlusVitaAppButton){PLUS_VITA_ACTION_QR_PAIR,"Encrypted QR (offline helper)",64,0,832,40};
-	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,40};
-	app->view.action_count=6;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*40;app->view.actions[i].height=34;}
+	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_REVERSE_QR,"Scan NPSSO QR (local / unencrypted)",64,0,832,34};
+	app->view.actions[6]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
+	app->view.action_count=7;
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=210+(int)i*36;app->view.actions[i].height=32;}
 #endif
 #if PLUS_VITA_ADAPTIVE_STREAM
 	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
 	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,40};
 	app->view.action_count++;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*40;app->view.actions[i].height=34;}
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=210+(int)i*36;app->view.actions[i].height=32;}
 #endif
 }
 
@@ -1332,9 +1333,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect=import_account(app);effect.kind=action==PLUS_VITA_ACTION_SONY_LOGIN?PLUS_VITA_EFFECT_SONY_LOGIN:PLUS_VITA_EFFECT_TOKEN_LOGIN;
 			view->body="Sign in privately in Sony's browser. Circle cancels.";return effect;
 		}
-		else if(action == PLUS_VITA_ACTION_QR_PAIR && view->screen==PLUS_VITA_APP_SETUP) {
+		else if((action == PLUS_VITA_ACTION_QR_PAIR||action==PLUS_VITA_ACTION_REVERSE_QR) && view->screen==PLUS_VITA_APP_SETUP) {
 			effect=import_account(app);
-			effect.kind=PLUS_VITA_EFFECT_QR_PAIR;
+			effect.kind=action==PLUS_VITA_ACTION_REVERSE_QR?PLUS_VITA_EFFECT_REVERSE_QR:PLUS_VITA_EFFECT_QR_PAIR;
 			view->body="Pairing with your phone. Circle cancels.";
 			return effect;
 		}
