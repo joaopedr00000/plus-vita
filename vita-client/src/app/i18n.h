@@ -94,12 +94,26 @@ static const char *const pv_filter_text[PV_LANG_COUNT][2]={
 {"تصفية: %s","تصفح / X لعب / مثلث تصفية / O رجوع"}
 };
 static inline unsigned pv_language(unsigned n){return n<PV_LANG_COUNT?n:0;}
+/* A shared, length-checked lookup avoids the ARM GCC constant-string
+ * comparison diagnostic when unrelated literal keys have different sizes.
+ * Keep the generic helper out of specialized caller clones. */
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline,noclone))
+#endif
+static const char *pv_lookup(const char *s,size_t len,const char *const *keys,
+    const char *const *values,size_t count)
+{
+    for(size_t k=0;k<count;k++)
+        if(strlen(keys[k])==len && memcmp(keys[k],s,len)==0)return values[k];
+    return NULL;
+}
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
-    for(unsigned i=0;i<PV_TEXT_COUNT;i++)if(!strcmp(pv_text[0][i],s))return pv_text[lang][i];
-    for(unsigned i=0;i<PV_EXTRA_COUNT;i++)if(!strcmp(pv_extra[0][i],s))return pv_extra[lang][i];
-    for(unsigned i=0;i<PV_DYNAMIC_COUNT;i++)if(!strcmp(pv_dynamic[0][i],s))return pv_dynamic[lang][i];
-    for(unsigned i=0;i<2;i++)if(!strcmp(pv_filter_text[0][i],s))return pv_filter_text[lang][i];
-    return s;
+    size_t len=strlen(s);
+    const char *v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_dynamic[0],pv_dynamic[lang],PV_DYNAMIC_COUNT);
+    if(!v)v=pv_lookup(s,len,pv_filter_text[0],pv_filter_text[lang],2);
+    return v?v:s;
 }
 #endif

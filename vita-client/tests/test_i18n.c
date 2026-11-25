@@ -17,5 +17,11 @@ int main(void){
     assert(!strcmp(pv_translate(2,"X  Select     O  Back"),"X  Selecionar     O  Voltar"));
     assert(!strcmp(pv_translate(2,"Search: %s"),"Busca: %s"));
     assert(!strcmp(pv_translate(2,"Unsupported regions: Off"),"Regiões sem suporte: Desativado"));
+    assert(!strcmp(pv_translate(2,"Filter: %s"),"Filtro: %s"));
+    assert(!strcmp(pv_translate(2,"Browse / X Play / Triangle Filter / O Back"),"Navegar / X Jogar / Triângulo Filtro / O Voltar"));
+    assert(!strcmp(pv_translate(2,"Cover unavailable"),"Capa indisponível"));
+    assert(!strcmp(pv_translate(2,"No cover"),"Sem capa"));
+    assert(!strcmp(pv_translate(2,""),""));
+    assert(pv_translate(2,NULL)==NULL);
     puts("19 locale tables validated");return 0;
 }
