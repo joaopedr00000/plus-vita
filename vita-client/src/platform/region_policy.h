@@ -3,14 +3,21 @@
 #define PLUS_VITA_REGION_POLICY_H
 #include <stdbool.h>
 #include <string.h>
-/* Locale preferences are discovery hints, not account country or IP claims. */
-static inline unsigned pv_region_mode(unsigned value){return value<=3?value:0;}
-static inline const char *pv_region_hint(unsigned value){
-    switch(pv_region_mode(value)){case 1:return "en-US";case 2:return "en-CA";case 3:return "pt-PT";default:return "";}
-}
+/* Legacy US/CA/PT settings migrate to opt-in same-account discovery only. */
+static inline unsigned pv_region_mode(unsigned value){return value>=1&&value<=3?1:0;}
 static inline const char *pv_region_label(unsigned value){
-    switch(pv_region_mode(value)){case 1:return "Unsupported regions: US hint";case 2:return "Unsupported regions: CA hint";case 3:return "Unsupported regions: PT hint";default:return "Unsupported regions: Off";}
+    return pv_region_mode(value)?"Regional discovery (account only): On":"Regional discovery (account only): Off";
 }
+static inline bool pv_region_account_locale_valid(const char *country,const char *language){
+    if(!country||!language||strlen(country)!=2||strlen(language)!=2)return false;
+    for(unsigned i=0;i<2;i++){
+        unsigned char c=(unsigned char)country[i],l=(unsigned char)language[i];
+        if(!((c>='A'&&c<='Z')||(c>='a'&&c<='z'))||
+           !((l>='A'&&l<='Z')||(l>='a'&&l<='z')))return false;
+    }
+    return true;
+}
+/* A 404 is not an entitlement grant: only query the same actual account locale. */
 static inline bool pv_region_fallback(unsigned mode,bool authorized,bool session,bool store_transport,long status){
     return pv_region_mode(mode)!=0&&authorized&&session&&store_transport&&status==404;
 }
