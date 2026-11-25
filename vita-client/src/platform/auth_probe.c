@@ -4,6 +4,12 @@
 #include "region_policy.h"
 #include "../app/utf8.h"
 #include "cover_policy.h"
+#ifdef __vita__
+#include "diagnostic_log.h"
+#define PV_AUTH_PHASE(n) plus_vita_diagnostic_event("auth.phase",(n))
+#else
+#define PV_AUTH_PHASE(n) ((void)(n))
+#endif
 
 #include <chiaki/random.h>
 #if PLUS_VITA_PS5_EXPERIMENTAL
@@ -553,6 +559,7 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse response = { 0 };
 	result->attempted = true;
+	PV_AUTH_PHASE(1);
 	result->transport_stage=1;
 	result->transport_error=auth_http(&request,&response,&result->curl_error);
 	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
@@ -599,6 +606,7 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse session_response = { 0 };
 	char jsession[512] = { 0 };
+	PV_AUTH_PHASE(2);
 	result->transport_stage=2;
 	result->transport_error=auth_http(&session_request,&session_response,&result->curl_error);
 	result->session_transport_ok=result->transport_error==CHIAKI_ERR_SUCCESS;
@@ -632,6 +640,7 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	};
 	CCHttpResponse store_response = { 0 };
 	char store_base_url[1024] = { 0 };
+	PV_AUTH_PHASE(3);
 	result->transport_stage=3;
 	result->transport_error=auth_http(&store_request,&store_response,&result->curl_error);
 	if(result->transport_error==CHIAKI_ERR_PARSE_ADDR||result->transport_error==CHIAKI_ERR_HOST_UNREACH){
@@ -648,13 +657,16 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	secure_clear(session_cookie, strlen(session_cookie));
 	free(session_cookie);
 	wipe_response(&store_response);
-	if(result->store_resolved)
-		result->native_catalog_complete = fetch_native_catalog(store_base_url,
-			jsession, result);
+	if(result->store_resolved){
+		PV_AUTH_PHASE(4);
+		result->native_catalog_complete = fetch_native_catalog(store_base_url,jsession,result);
+	}
 	secure_clear(store_base_url, sizeof(store_base_url));
 	if(result->native_catalog_complete) {
+		PV_AUTH_PHASE(5);
 		fetch_owned_entitlements(credential, result);
 #if PLUS_VITA_PS5_EXPERIMENTAL
+		PV_AUTH_PHASE(6);
 		(void)append_ps5_catalog(credential,result,mode);
 #endif
 	}
@@ -665,6 +677,7 @@ void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
 	else if(pv_region_fallback(mode,result->authorized,result->session_created,result->store_transport_ok,result->store_http_status)){
 		snprintf(result->store_country,sizeof(result->store_country),"%s",result->country);
 		snprintf(result->store_language,sizeof(result->store_language),"%s",result->language);
+		PV_AUTH_PHASE(6);
 		result->regional_catalog_complete=append_ps5_catalog(credential,result,mode);
 	}
 #endif
@@ -673,6 +686,7 @@ cleanup_session:
 	secure_clear(jsession, sizeof(jsession));
 
 cleanup:
+	PV_AUTH_PHASE(7);
 	secure_clear(code, sizeof(code));
 	secure_clear(duid, sizeof(duid));
 	secure_clear(url, sizeof(url));

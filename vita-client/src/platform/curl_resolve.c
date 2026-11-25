@@ -127,7 +127,13 @@ CURLcode plus_vita_curl_secure_options(CURL *curl)
 #endif
 	CURLcode rc=curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1L);
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
+	#if PLUS_VITA_REQUIRE_MBEDTLS_CURL
+	/* Isolate the first hardware regression from TLS 1.3 negotiation.
+	 * Certificate and hostname verification remain mandatory. */
+	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)(CURL_SSLVERSION_TLSv1_2|CURL_SSLVERSION_MAX_TLSv1_2));
+#else
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)CURL_SSLVERSION_TLSv1_2);
+#endif
 	if(rc==CURLE_OK)rc=curl_easy_setopt(curl,CURLOPT_HTTP_VERSION,(long)CURL_HTTP_VERSION_1_1);
 	if(rc!=CURLE_OK)return rc;
 #if LIBCURL_VERSION_NUM >= 0x074d00

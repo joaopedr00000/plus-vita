@@ -642,7 +642,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/cmake/embedded_ca.cmake")
 set(PLUS_VITA_CURL_HTTP_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/curl_http_vita.c")
 file(READ "${PYLUX_ROOT}/lib/src/curl_http.c" PLUS_VITA_CURL_HTTP_TEXT)
 string(REPLACE "#include \"curl_http.h\""
-  "#include \"curl_http.h\"\n#include \"curl_resolve.h\"\n#include \"request_cancel.h\""
+  "#include \"curl_http.h\"\n#include \"curl_resolve.h\"\n #include \"request_cancel.h\"\n#include \"diagnostic_log.h\""
   PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
 string(REPLACE "GrowBuffer header_buf = { 0 };"
   "GrowBuffer header_buf = { 0 };\n\tstruct curl_slist *resolve_list = NULL;"
@@ -652,12 +652,14 @@ set(PLUS_VITA_CURL_URL_OLD [=[
 ]=])
 set(PLUS_VITA_CURL_URL_NEW [=[
 	curl_easy_setopt(curl, CURLOPT_URL, request->url);
+	plus_vita_diagnostic_event("https.phase",1);
 	CURLcode tls_options=plus_vita_curl_secure_options(curl);
 	if(tls_options!=CURLE_OK){
 		if(native_code)*native_code=(int)tls_options;
 		err=CHIAKI_ERR_INVALID_RESPONSE;
 		goto cleanup;
 	}
+	plus_vita_diagnostic_event("https.phase",2);
 	CURLcode resolve_result = plus_vita_curl_prepare_resolve(curl, request->url, &resolve_list);
 	if(resolve_result != CURLE_OK)
 	{
@@ -667,6 +669,9 @@ set(PLUS_VITA_CURL_URL_NEW [=[
 		err = resolve_result == CURLE_COULDNT_RESOLVE_HOST ? CHIAKI_ERR_PARSE_ADDR : CHIAKI_ERR_NETWORK;
 		goto cleanup;
 	}
+	plus_vita_diagnostic_event("https.phase",3);
+	curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT_MS,12000L);
+	curl_easy_setopt(curl,CURLOPT_SSL_SESSIONID_CACHE,0L);
 	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 	curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, plus_vita_request_progress);
 ]=])
@@ -705,16 +710,10 @@ set(PV_CURL_PERFORM_OLD [=[
 	CURLcode res = curl_easy_perform(curl);
 ]=])
 set(PV_CURL_PERFORM_NEW [=[
+	plus_vita_diagnostic_event("https.phase",4);
 	CURLcode res = curl_easy_perform(curl);
-	/* Retry only safe GET requests after a TLS handshake failure, not a
-	 * certificate rejection or POST. TLS 1.2 retains CA and hostname checks. */
-	if(res==CURLE_SSL_CONNECT_ERROR && (!request->method||strcmp(request->method,"GET")==0) && !plus_vita_request_cancelled()){
-		free(body_buf.data);body_buf=(GrowBuffer){0};
-		free(header_buf.data);header_buf=(GrowBuffer){0};
-		CURLcode option=curl_easy_setopt(curl,CURLOPT_SSLVERSION,(long)(CURL_SSLVERSION_TLSv1_2|CURL_SSLVERSION_MAX_TLSv1_2));
-		if(option==CURLE_OK)option=curl_easy_setopt(curl,CURLOPT_FRESH_CONNECT,1L);
-		if(option==CURLE_OK)res=curl_easy_perform(curl);
-	}
+	plus_vita_diagnostic_event("https.curl",(int)res);
+	plus_vita_diagnostic_event("https.phase",5);
 	if(native_code)*native_code=(int)res;
 ]=])
 string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PV_CURL_PERFORM_OLD}" PV_CURL_PERFORM_POS)
@@ -751,6 +750,53 @@ if(PLUS_VITA_CURL_ERROR_POS EQUAL -1)
   message(FATAL_ERROR "Pylux curl error patch point not found")
 endif()
 string(REPLACE "${PLUS_VITA_CURL_ERROR_OLD}" "${PLUS_VITA_CURL_ERROR_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
+# Limit upstream callback allocations before realloc; fail cleanly on oversized responses.
+set(PV_GROW_OLD [=[
+	size_t realsize = size * nmemb;
+	GrowBuffer *buf = (GrowBuffer *)userdata;
+]=])
+set(PV_GROW_NEW [=[
+	GrowBuffer *buf = (GrowBuffer *)userdata;
+	const size_t limit=8u*1024u*1024u;
+	if(size && nmemb>limit/size)return 0;
+	size_t realsize=size*nmemb;
+	if(buf->size>limit||realsize>limit-buf->size)return 0;
+]=])
+string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PV_GROW_OLD}" PV_GROW_POS)
+if(PV_GROW_POS EQUAL -1)
+  message(FATAL_ERROR "HTTP response limit patch point missing")
+endif()
+string(REPLACE "${PV_GROW_OLD}" "${PV_GROW_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
+# Keep all lists and callback backing data alive through easy-handle cleanup.
+set(PV_CLEANUP_OLD [=[
+cleanup:
+	free(body_buf.data);
+	free(header_buf.data);
+	if(header_list)
+		curl_slist_free_all(header_list);
+	if(resolve_list)
+		curl_slist_free_all(resolve_list);
+	curl_easy_cleanup(curl);
+	return err;
+]=])
+set(PV_CLEANUP_NEW [=[
+cleanup:
+	plus_vita_diagnostic_event("https.phase",6);
+	curl_easy_cleanup(curl);
+	plus_vita_diagnostic_event("https.phase",7);
+	free(body_buf.data);
+	free(header_buf.data);
+	if(header_list)
+		curl_slist_free_all(header_list);
+	if(resolve_list)
+		curl_slist_free_all(resolve_list);
+	return err;
+]=])
+string(FIND "${PLUS_VITA_CURL_HTTP_TEXT}" "${PV_CLEANUP_OLD}" PV_CLEANUP_POS)
+if(PV_CLEANUP_POS EQUAL -1)
+  message(FATAL_ERROR "HTTP cleanup patch point missing")
+endif()
+string(REPLACE "${PV_CLEANUP_OLD}" "${PV_CLEANUP_NEW}" PLUS_VITA_CURL_HTTP_TEXT "${PLUS_VITA_CURL_HTTP_TEXT}")
 file(WRITE "${PLUS_VITA_CURL_HTTP_SOURCE}" "${PLUS_VITA_CURL_HTTP_TEXT}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/cloudsession_source.cmake")

@@ -214,7 +214,10 @@ bool plus_vita_account_start(PlusVitaAccount *account, const PlusVitaAppEffect *
 	if(effect->kind == PLUS_VITA_EFFECT_AUTHORIZE) plus_vita_request_cancel_set(false);
 	pthread_attr_t attr;
 	bool attr_ready = pthread_attr_init(&attr) == 0;
-	int result = attr_ready ? pthread_attr_setstacksize(&attr, 256 * 1024) : -1;
+	/* TLS and catalogue parsing share this worker stack. Reserve additional
+	 * space only for authorization, not for storage jobs. */
+	size_t stack_size=effect->kind==PLUS_VITA_EFFECT_AUTHORIZE?768u*1024u:256u*1024u;
+	int result = attr_ready ? pthread_attr_setstacksize(&attr, stack_size) : -1;
 	if(result == 0) result = pthread_create(&account->thread, &attr, worker, account);
 	if(attr_ready) pthread_attr_destroy(&attr);
 	if(result != 0) { clear_bytes(&account->job, sizeof(account->job)); return false; }

@@ -4,6 +4,7 @@
 #include "secure_http.h"
 #include "network.h"
 #include "request_cancel.h"
+#include "diagnostic_log.h"
 
 #include <curl/curl.h>
 
@@ -177,13 +178,17 @@ ChiakiErrorCode plus_vita_http_perform_detailed(ChiakiLog *log, const CCHttpRequ
 	}
 
 	int raw=0;
+	plus_vita_diagnostic_event("https.phase",8);
 	ChiakiErrorCode error = plus_vita_curl_http_perform_detail(log, request, response,&raw);
+	plus_vita_diagnostic_event("https.phase",9);
 	if(native_code)*native_code=raw;
 	test_last_native_result=raw;
 	test_last_stage = error == CHIAKI_ERR_SUCCESS ? "curl-complete" : "curl-perform";
 	test_last_error = error;
 	test_last_status = (int)response->status_code;
+	plus_vita_diagnostic_event("https.phase",10);
 	curl_global_cleanup();
+	plus_vita_diagnostic_event("https.phase",11);
 	if(network_owned) plus_vita_network_fini();
 	return error;
 
