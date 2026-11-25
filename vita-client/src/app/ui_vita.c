@@ -397,7 +397,7 @@ int plus_vita_app_run(void)
 				#if PLUS_VITA_LAN_LOGIN
 				else if(effect.kind==PLUS_VITA_EFFECT_LAN_LOGIN){
 					char json[80]={0};
-					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_lan_login(pair_frame,display,json,sizeof(json)):PLUS_VITA_RESULT_BUSY;
+					PlusVitaAppResult status=plus_vita_account_idle(account)&&!plus_vita_play_busy(play)?plus_vita_lan_login(pair_frame,display,json,sizeof(json),plus_vita_app_view(app).ui_language):PLUS_VITA_RESULT_BUSY;
 					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
 					plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_IMPORT_READ,.operation=effect.operation,.status=status,.data=json,.data_size=strlen(json)},0);
 					volatile char *wipe=json;for(size_t i=0;i<sizeof(json);i++)wipe[i]=0;

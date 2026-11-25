@@ -345,7 +345,9 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		view.list_height=last->y+last->height-view.list_y;
 	}
 	#if PLUS_VITA_ADAPTIVE_STREAM
-	if(view.screen!=PLUS_VITA_APP_DETAILS&&view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)view.title=pv_translate(app->ui_language,view.title);
+	if(view.screen!=PLUS_VITA_APP_DETAILS && ((view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)||(!app->label[0]&&!app->online_id[0])))view.title=pv_translate(app->ui_language,view.title);
+	view.subtitle=pv_translate(app->ui_language,view.subtitle);
+	view.hint=pv_translate(app->ui_language,view.hint);
 	view.body=pv_translate(app->ui_language,view.body);
 	for(size_t i=0;i<view.action_count;i++)if(view.actions[i].id!=PLUS_VITA_ACTION_GAME&&view.actions[i].id!=PLUS_VITA_ACTION_DATACENTER)view.actions[i].label=pv_translate(app->ui_language,view.actions[i].label);
 	#endif
