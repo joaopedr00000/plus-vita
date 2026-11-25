@@ -44,7 +44,8 @@ int main(void){
     char data[4097]={0};
     PlusVitaAppEvent r=run(a,&e,data,sizeof(data));assert(r.status==PLUS_VITA_RESULT_OK&&r.legacy_plain&&strstr(data,token));
     e.kind=PLUS_VITA_EFFECT_SAVE_ACCOUNT;e.vault_target=2;pass(&e.credential,token);pass(&e.vault_password,"example-local-phrase");strcpy(e.label,"Test");
-    assert(run(a,&e,NULL,0).status==PLUS_VITA_RESULT_OK);sealed(token);assert(access(IMPORT,F_OK)==0);
+    assert(run(a,&e,NULL,0).status==PLUS_VITA_RESULT_OK);sealed(token);assert(access(IMPORT,F_OK)!=0);
+    raw(IMPORT,token); /* Recreate import to prove failed saves preserve it. */
     PlusVitaCredential original=e.vault_password;
     e.kind=PLUS_VITA_EFFECT_LOAD_ACCOUNT;pass(&e.vault_password,"wrong-local-phrase");
     assert(run(a,&e,NULL,0).status==PLUS_VITA_RESULT_VAULT_LOCKED);
@@ -59,11 +60,17 @@ int main(void){
     assert(run(a,&e,NULL,0).status==PLUS_VITA_RESULT_VAULT_LOCKED);
     e.vault_password=changed;
     r=run(a,&e,data,sizeof(data));assert(r.status==PLUS_VITA_RESULT_OK&&r.vault_present&&strstr(data,token));
+    /* A different account's plaintext import must never be removed. */
+    char other[65];memset(other,'B',64);other[64]=0;raw(IMPORT,other);
+    e.kind=PLUS_VITA_EFFECT_SAVE_ACCOUNT;e.vault_change=false;
+    r=run(a,&e,NULL,0);assert(r.status==PLUS_VITA_RESULT_OK&&r.import_cleanup_failed&&access(IMPORT,F_OK)==0);
+    assert(!remove(IMPORT));raw(IMPORT,token);
     /* Switch off prompting once with the old password; then restore with no password. */
     e.kind=PLUS_VITA_EFFECT_SAVE_ACCOUNT;e.vault_target=3;e.vault_change=true;e.vault_previous=changed;
     plus_vita_credential_clear(&e.vault_password);
     r=run(a,&e,NULL,0);assert(r.status==PLUS_VITA_RESULT_OK&&r.vault_mode==3);sealed(token);
     assert(plus_vita_account_file_kind()==3);
+    assert(access(IMPORT,F_OK)!=0);
     assert(access("ur0:data/plus-vita/account.key",F_OK)==0);
     e.kind=PLUS_VITA_EFFECT_LOAD_ACCOUNT;plus_vita_credential_clear(&e.vault_previous);
     r=run(a,&e,data,sizeof(data));assert(r.status==PLUS_VITA_RESULT_OK&&r.vault_mode==3&&strstr(data,token));
@@ -85,12 +92,14 @@ int main(void){
     e.kind=PLUS_VITA_EFFECT_LOAD_ACCOUNT;
     r=run(a,&e,NULL,0);assert(r.status==PLUS_VITA_RESULT_MISSING&&r.restore_blocked);
     /* Fresh account saves automatically by default with no password. */
+    raw(IMPORT,token);
     e.kind=PLUS_VITA_EFFECT_SAVE_ACCOUNT;e.vault_target=0;e.vault_change=false;
     plus_vita_credential_clear(&e.vault_password);plus_vita_credential_clear(&e.vault_previous);
     r=run(a,&e,NULL,0);assert(r.status==PLUS_VITA_RESULT_OK&&r.vault_mode==3);
+    assert(access(IMPORT,F_OK)!=0);
     e.kind=PLUS_VITA_EFFECT_LOAD_ACCOUNT;assert(run(a,&e,data,sizeof(data)).status==PLUS_VITA_RESULT_OK);
     e.kind=PLUS_VITA_EFFECT_DELETE_ACCOUNT;assert(run(a,&e,NULL,0).status==PLUS_VITA_RESULT_OK);
     assert(access("ur0:data/plus-vita/account.key",F_OK)!=0);
     assert(plus_vita_account_close(a));pv_vault_wipe(&e,sizeof(e));pv_vault_wipe(&original,sizeof(original));pv_vault_wipe(&changed,sizeof(changed));pv_vault_wipe(data,sizeof(data));
-    puts("Vault storage migration, authenticated replacement, cleanup consent, password rotation and forget passed");
+    puts("Vault storage migration, authenticated replacement, verified automatic cleanup, password rotation and forget passed");
 }
