@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 #include "auth_probe.h"
+#include "region_policy.h"
 #include "../app/utf8.h"
 #include "cover_policy.h"
 
@@ -265,11 +266,13 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 #if PLUS_VITA_PS5_EXPERIMENTAL
 /* Keep the audited legacy catalogue intact; add only authorized PS5 stream rows.
  * No upstream catalogue logs or account-specific cache survive this request. */
-static void append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAuthProbeResult *result)
+static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAuthProbeResult *result,unsigned mode)
 {
 	const char *cache="ux0:data/plus-vita-ps5-catalog";
 	char locale[24];
-	snprintf(locale,sizeof(locale),"%s-%s",result->store_language,result->store_country);
+	if(pv_region_mode(mode))snprintf(locale,sizeof(locale),"%s",pv_region_hint(mode));
+	else snprintf(locale,sizeof(locale),"%s-%s",result->store_language,result->store_country);
+	bool complete=false;
 	ChiakiCloudCatalogConfig config={.npsso=credential->value,.locale=locale,.cache_dir=cache,.force_refresh=true};
 	ChiakiCloudCatalogResult catalog={0};
 	ChiakiLog log;
@@ -279,6 +282,7 @@ static void append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 	if(err==CHIAKI_ERR_SUCCESS && catalog.json) {
 		struct json_object *root=json_tokener_parse(catalog.json), *games=NULL;
 		if(root && json_object_object_get_ex(root,"games",&games) && json_object_is_type(games,json_type_array)) {
+			complete=true;
 			static const char *const service_keys[]={"streamServiceType",NULL};
 			static const char *const platform_keys[]={"platform",NULL};
 			static const char *const stream_keys[]={"streamIdentifier",NULL};
@@ -295,7 +299,7 @@ static void append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 				for(unsigned n=0;n<result->native_titles_count;n++)
 					if(!strcmp(result->native_titles[n].ps5_stream_id,stream)) duplicate=true;
 				if(duplicate) continue;
-				if(!append_catalog_entry(result,row)) break;
+				if(!append_catalog_entry(result,row)) {complete=false;break;}
 				PlusVitaCatalogEntry *entry=&result->native_titles[result->native_titles_count-1];
 				if(!entry->launch_id_valid) { result->native_titles_count--; continue; }
 				snprintf(entry->platform,sizeof(entry->platform),"PS5");
@@ -306,6 +310,7 @@ static void append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 	}
 	chiaki_cloudcatalog_result_fini(&catalog);
 	chiaki_cloudcatalog_invalidate_cache(cache);
+	return complete;
 }
 #endif
 
@@ -492,9 +497,10 @@ cleanup:
 	secure_clear(token, sizeof(token));
 }
 
-void plus_vita_auth_probe(const PlusVitaCredential *credential,
-	PlusVitaAuthProbeResult *result)
+void plus_vita_auth_probe_region(const PlusVitaCredential *credential,
+	PlusVitaAuthProbeResult *result,unsigned mode)
 {
+	(void)mode;
 	memset(result, 0, sizeof(*result));
 	if(!credential || !credential->length)
 		return;
@@ -627,9 +633,19 @@ void plus_vita_auth_probe(const PlusVitaCredential *credential,
 	if(result->native_catalog_complete) {
 		fetch_owned_entitlements(credential, result);
 #if PLUS_VITA_PS5_EXPERIMENTAL
-		append_ps5_catalog(credential,result);
+		(void)append_ps5_catalog(credential,result,mode);
 #endif
 	}
+#if PLUS_VITA_PS5_EXPERIMENTAL
+	/* The native legacy store may be unavailable, even for a valid account.
+	 * Use Pylux unified discovery only after an explicit 404. Preserve the
+	 * real account country and let Sony authorize every subsequent allocation. */
+	else if(pv_region_fallback(mode,result->authorized,result->session_created,result->store_transport_ok,result->store_http_status)){
+		snprintf(result->store_country,sizeof(result->store_country),"%s",result->country);
+		snprintf(result->store_language,sizeof(result->store_language),"%s",result->language);
+		result->regional_catalog_complete=append_ps5_catalog(credential,result,mode);
+	}
+#endif
 
 cleanup_session:
 	secure_clear(jsession, sizeof(jsession));
@@ -638,6 +654,11 @@ cleanup:
 	secure_clear(code, sizeof(code));
 	secure_clear(duid, sizeof(duid));
 	secure_clear(url, sizeof(url));
+}
+
+void plus_vita_auth_probe(const PlusVitaCredential *credential,PlusVitaAuthProbeResult *result)
+{
+	plus_vita_auth_probe_region(credential,result,0);
 }
 
 void plus_vita_auth_probe_result_fini(PlusVitaAuthProbeResult *result)

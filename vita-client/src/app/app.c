@@ -9,6 +9,7 @@
 #include <json_object.h>
 #include <json_tokener.h>
 #include "../platform/cloud_experimental.h"
+#include "../platform/region_policy.h"
 
 #ifndef PLUS_VITA_APP_VERSION
 #define PLUS_VITA_APP_VERSION "v000"
@@ -54,6 +55,8 @@ struct plus_vita_app_t {
 	bool auto_retry;
 	char selected_dc[128];
 	unsigned requested_kbps;
+	unsigned region_mode;
+	bool regional_catalogue;
 #endif
 };
 
@@ -116,6 +119,13 @@ static void settings_view(PlusVitaApp *app)
 			{ PLUS_VITA_ACTION_BACK, "Back", 64, 450, 832, 40 }
 		}, .action_count = 5 };
 	for(size_t i=0;i<3;i++) { app->view.actions[i].y=274+(int)i*44;app->view.actions[i].height=40; }
+#if PLUS_VITA_ADAPTIVE_STREAM
+	app->view.actions[5]=app->view.actions[4];
+	app->view.actions[4]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,36};
+	app->view.action_count=6;
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=244+(int)i*42;app->view.actions[i].height=36;}
+	app->view.body="Regional hints apply at next sign-in. No IP or PSN region changes. Cloud eligibility remains server controlled.";
+#endif
 }
 
 static bool controls_screen(PlusVitaAppScreen screen)
@@ -305,7 +315,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	memcpy(view.artwork_metadata,app->artwork_metadata,sizeof(view.artwork_metadata));
 	view.account_connected=app->connected;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;
+	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;
 #endif
 	if(!view.list_total && view.action_count) {
 		view.list_total=view.action_count;view.focus=view.selected;
@@ -353,6 +363,12 @@ static void setup_view(PlusVitaApp *app)
 	app->view.actions[3]=app->view.actions[2];
 	app->view.actions[2]=(PlusVitaAppButton){PLUS_VITA_ACTION_QR_PAIR,"Pair with QR code",64,390,832,48};
 	app->view.action_count=4;
+#endif
+#if PLUS_VITA_ADAPTIVE_STREAM
+	app->view.actions[4]=app->view.actions[app->view.action_count-1];
+	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_REGION,pv_region_label(app->region_mode),64,0,832,40};
+	app->view.action_count++;
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=268+(int)i*46;app->view.actions[i].height=40;}
 #endif
 }
 
@@ -420,6 +436,7 @@ static PlusVitaAppEffect operation(PlusVitaApp *app, PlusVitaAppEffectKind kind,
 	memcpy(effect.store_country, app->store_country, sizeof(effect.store_country));
 	memcpy(effect.store_language, app->store_language, sizeof(effect.store_language));
 	memcpy(effect.language, app->language, sizeof(effect.language));
+	effect.region_mode=app->region_mode;
 	return effect;
 }
 
@@ -653,7 +670,7 @@ static void catalogue_view(PlusVitaApp *app)
 {
 	PlusVitaAppView view = {
 		.screen = PLUS_VITA_APP_CATALOGUE, .title = "Choose your next game.",
-		.subtitle = "CLOUD CATALOGUE", .body = app->catalogue_status,
+		.subtitle = app->regional_catalogue ? "REGIONAL DISCOVERY - ACCESS UNCONFIRMED" : "CLOUD CATALOGUE", .body = app->catalogue_status,
 		.hint = "Left stick  Browse     X  Details     Triangle  Search     O  Back"
 	};
 	snprintf(app->catalogue_status, sizeof(app->catalogue_status),
@@ -826,7 +843,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	PlusVitaAppEffect effect = { .kind = PLUS_VITA_EFFECT_NONE };
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
-		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;return effect;
+		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);return effect;
 	}
 #endif
 	if(event.kind==PLUS_VITA_EVENT_CONTROLS_LOADED) {
@@ -1011,7 +1028,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			}
 			app->waiting_for = PLUS_VITA_EFFECT_AUTHORIZE;
 			view->body = "Checking your sign-in and loading cloud games.\nYou can cancel while this is working.";
-			effect = (PlusVitaAppEffect){ .kind = PLUS_VITA_EFFECT_AUTHORIZE, .operation = event.operation, .credential = app->credential };
+			effect = (PlusVitaAppEffect){ .kind = PLUS_VITA_EFFECT_AUTHORIZE, .operation = event.operation, .credential = app->credential,.region_mode=app->region_mode };
 		}
 		else if(event.kind == PLUS_VITA_EVENT_AUTHORIZED && app->waiting_for == PLUS_VITA_EFFECT_AUTHORIZE)
 		{
@@ -1026,6 +1043,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				account_error(app, "The catalogue could not be loaded. Please try again later.");
 			else
 			{
+				app->regional_catalogue=event.regional_catalogue;
 				memcpy(app->store_country,event.store_country,sizeof(app->store_country));
 				memcpy(app->store_language,event.store_language,sizeof(app->store_language));
 				memcpy(app->language,event.language,sizeof(app->language));
@@ -1338,6 +1356,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		}
 		else if(action == PLUS_VITA_ACTION_ACCOUNT) { app->account_from_settings = view->screen == PLUS_VITA_APP_SETTINGS; account_view(app); }
 		else if(action == PLUS_VITA_ACTION_SETTINGS) { app->welcome_selection = view->selected; settings_view(app); }
+#if PLUS_VITA_ADAPTIVE_STREAM
+		else if(action==PLUS_VITA_ACTION_REGION&&(view->screen==PLUS_VITA_APP_SETUP||view->screen==PLUS_VITA_APP_SETTINGS)){
+			app->region_mode=(pv_region_mode(app->region_mode)+1)%4;
+			if(view->screen==PLUS_VITA_APP_SETUP)setup_view(app);else settings_view(app);
+		}
+#endif
 		else if(action == PLUS_VITA_ACTION_CONTROLS) controls_view(app);
 		else if(action == PLUS_VITA_ACTION_REPORTING) reporting_view(app);
 		else if(action == PLUS_VITA_ACTION_LABEL)

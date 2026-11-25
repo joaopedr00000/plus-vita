@@ -64,6 +64,11 @@ jobs:
           /tmp/pv-adaptive
           cc -std=c11 -Wall -Wextra -Werror -Ivita-client/src/platform vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
           /tmp/pv-reorder
+      - name: Test regional discovery policy
+        if: github.ref == 'refs/heads/beta3'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
+          /tmp/pv-region
       - name: Test native application workflow
         run: sh tools/test-app-workflow.sh
       - name: Test saved control layouts through Settings and gameplay input

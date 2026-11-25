@@ -50,7 +50,11 @@ static void read_import(PlusVitaAccount *account)
 
 static void authorize(PlusVitaAccount *account)
 {
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	plus_vita_auth_probe_region(&account->job.credential,&account->catalogue,account->job.region_mode);
+#else
 	plus_vita_auth_probe(&account->job.credential, &account->catalogue);
+#endif
 	PlusVitaAuthProbeResult *result = &account->catalogue;
 	if(!result->transport_ok) account->result.status = PLUS_VITA_RESULT_NETWORK_ERROR;
 	else if(!result->authorized) account->result.status = result->credential_rejected
@@ -58,8 +62,9 @@ static void authorize(PlusVitaAccount *account)
 	else if(!result->session_transport_ok) account->result.status = PLUS_VITA_RESULT_NETWORK_ERROR;
 	else if(!result->session_created) account->result.status = PLUS_VITA_RESULT_CATALOGUE_ERROR;
 	else if(!result->store_transport_ok) account->result.status = PLUS_VITA_RESULT_NETWORK_ERROR;
-	else if(!result->store_resolved || !result->native_catalog_complete) account->result.status = PLUS_VITA_RESULT_CATALOGUE_ERROR;
+	else if((!result->store_resolved || !result->native_catalog_complete)&&!result->regional_catalog_complete) account->result.status = PLUS_VITA_RESULT_CATALOGUE_ERROR;
 	else account->result.status = PLUS_VITA_RESULT_OK;
+	account->result.regional_catalogue=result->regional_catalog_complete;
 	account->result.entries = result->native_titles;
 	account->result.entry_count = result->native_titles_count;
 	if(account->result.status == PLUS_VITA_RESULT_OK) {

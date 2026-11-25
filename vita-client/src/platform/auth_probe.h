@@ -34,6 +34,7 @@ typedef struct plus_vita_auth_probe_result_t
 	bool store_transport_ok;
 	bool store_resolved;
 	bool native_catalog_complete;
+	bool regional_catalog_complete;
 	bool owned_authorized;
 	bool owned_complete;
 	char online_id[129]; /* Runtime-only authenticated identity; never log/persist. */
@@ -55,6 +56,7 @@ typedef struct plus_vita_auth_probe_result_t
 
 void plus_vita_auth_probe(const PlusVitaCredential *credential,
 	PlusVitaAuthProbeResult *result);
+void plus_vita_auth_probe_region(const PlusVitaCredential *credential,PlusVitaAuthProbeResult *result,unsigned mode);
 void plus_vita_auth_probe_result_fini(PlusVitaAuthProbeResult *result);
 
 #endif
