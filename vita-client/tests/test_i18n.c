@@ -29,5 +29,12 @@ int main(void){
     assert(pv_translate(2,NULL)==NULL);
     assert(!strcmp(pv_translate(2,"Finding a cloud server. Circle cancels."),"Buscando servidor. Círculo cancela."));
     assert(!strcmp(pv_translate(2,"On"),"Sim"));
+    assert(!strcmp(pv_translate(2,"Forget saved account"),"Esquecer conta salva"));
+    for(unsigned l=0;l<PV_LANG_COUNT;l++) {
+        const char *p=pv_session_text[l][11];
+        unsigned placeholders=0;
+        while((p=strchr(p,'%'))!=NULL){assert(p[1]=='s');++placeholders;p+=2;}
+        assert(placeholders==3);
+    }
     puts("19 locale tables validated");return 0;
 }
