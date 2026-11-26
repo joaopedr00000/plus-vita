@@ -10,6 +10,8 @@ int main(void){
         assert(pv_catalogue_search_hint[l]&&*pv_catalogue_search_hint[l]);
         assert(pv_ps5_notice[l]&&*pv_ps5_notice[l]);
         assert(pv_ps5_test[l]&&*pv_ps5_test[l]);
+        assert(pv_library_metrics[l]&&*pv_library_metrics[l]);
+        assert(!strcmp(pv_translate(l,pv_library_metrics[0]),pv_library_metrics[l]));
         assert(!strcmp(pv_translate(l,pv_catalogue_search_hint[0]),pv_catalogue_search_hint[l]));
         assert(!strcmp(pv_translate(l,pv_ps5_notice[0]),pv_ps5_notice[l]));
         assert(!strcmp(pv_translate(l,pv_ps5_test[0]),pv_ps5_test[l]));

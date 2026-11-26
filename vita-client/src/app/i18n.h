@@ -330,6 +330,27 @@ static const char *const pv_ps5_test[PV_LANG_COUNT]={
     "實驗性測試",
     "اختبار تجريبي"
 };
+static const char *const pv_library_metrics[PV_LANG_COUNT]={
+    "Playtime: unavailable | Trophies: unavailable",
+    "Playtime: unavailable | Trophies: unavailable",
+    "Horas: indisponível | Troféus: indisponível",
+    "Horas: indisponível | Troféus: indisponível",
+    "Horas: no disponibles | Trofeos: no disponibles",
+    "Horas: no disponibles | Trofeos: no disponibles",
+    "Spielzeit: unbekannt | Trophäen: unbekannt",
+    "Temps : indisponible | Trophées : indisponibles",
+    "Tempo: non disponibile | Trofei: non disponibili",
+    "Speeltijd: onbekend | Trofeeën: onbekend",
+    "Czas gry: brak danych | Trofea: brak danych",
+    "Speltid: okänd | Troféer: okända",
+    "Süre: bilinmiyor | Kupalar: bilinmiyor",
+    "Время: нет данных | Трофеи: нет данных",
+    "プレイ時間：不明 | トロフィー：不明",
+    "플레이 시간: 정보 없음 | 트로피: 정보 없음",
+    "游戏时长：暂无 | 奖杯：暂无",
+    "遊戲時長：暫無 | 獎盃：暫無",
+    "وقت اللعب: غير متاح | الجوائز: غير متاحة"
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -338,6 +359,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     const char *v=pv_lookup(s,len,pv_catalogue_search_hint,&pv_catalogue_search_hint[lang],1);
     if(!v)v=pv_lookup(s,len,pv_ps5_notice,&pv_ps5_notice[lang],1);
     if(!v)v=pv_lookup(s,len,pv_ps5_test,&pv_ps5_test[lang],1);
+    if(!v)v=pv_lookup(s,len,pv_library_metrics,&pv_library_metrics[lang],1);
     if(!v)v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
     if(!v)v=pv_lookup(s,len,pv_dynamic[0],pv_dynamic[lang],PV_DYNAMIC_COUNT);

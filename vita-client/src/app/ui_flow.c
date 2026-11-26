@@ -26,18 +26,16 @@ static bool capture_current(const PlusVitaUiFlow *flow,const PlusVitaAppView *vi
 /* All artwork policy lives here so production and controlled-clock journeys agree. */
 static bool artwork_tick(PlusVitaUiFlow *flow)
 {
-#if PLUS_VITA_ADAPTIVE_STREAM
-	(void)flow;return false;
-#else
-	PlusVitaAppView view=plus_vita_app_view(flow->app);
+PlusVitaAppView view=plus_vita_app_view(flow->app);
 	bool changed=false;
 	if(!flow->artwork_initialized || view.account_epoch!=flow->artwork_epoch) {
 		plus_vita_covers_reset(flow->covers);flow->artwork_epoch=view.account_epoch;
 		flow->artwork_initialized=true;flow->preview_valid=false;changed=true;
 	}
 	const PlusVitaCatalogEntry *game=NULL;
-	if(view.screen==PLUS_VITA_APP_DETAILS) game=view.detail;
-	if(view.screen==PLUS_VITA_APP_CATALOGUE && view.selected<view.list_count) game=view.detail;
+	if(view.screen==PLUS_VITA_APP_DETAILS && !view.operation)game=view.detail;
+	if(view.screen==PLUS_VITA_APP_CATALOGUE && !view.operation &&
+		(PLUS_VITA_ADAPTIVE_STREAM || view.selected<view.list_count))game=view.detail;
 	bool same=game && flow->preview_valid && !strcmp(flow->preview_id,game->id)
 		&& !strcmp(flow->preview_name,game->name) && !strcmp(flow->preview_url,game->cover_url);
 	bool dragging=flow->touch_dragging;
@@ -58,8 +56,10 @@ static bool artwork_tick(PlusVitaUiFlow *flow)
 		bool details_return=same && flow->preview_screen==PLUS_VITA_APP_DETAILS
 			&& cached && cached->state==PLUS_VITA_COVER_READY;
 		if(flow->now_us<flow->preview_since) flow->preview_since=flow->now_us;
-		if(view.screen==PLUS_VITA_APP_DETAILS || details_return
-			|| flow->now_us-flow->preview_since>=3000000u) {
+		bool memory_ready=PLUS_VITA_ADAPTIVE_STREAM && cached && cached->state==PLUS_VITA_COVER_READY;
+		const uint64_t dwell=PLUS_VITA_ADAPTIVE_STREAM ? 350000u : 3000000u;
+		if(view.screen==PLUS_VITA_APP_DETAILS || details_return || memory_ready
+			|| flow->now_us-flow->preview_since>=dwell) {
 			if(!flow->preview_eligible) { flow->preview_eligible=true;changed=true; }
 			if(!flow->preview_requested) {
 				plus_vita_covers_retry(flow->covers,game->cover_url);flow->preview_requested=true;
@@ -70,7 +70,6 @@ static bool artwork_tick(PlusVitaUiFlow *flow)
 	}
 	flow->preview_screen=view.screen;flow->preview_dragging=dragging;
 	flow->dirty|=changed;return changed;
-#endif
 }
 
 void plus_vita_ui_flow_start(PlusVitaUiFlow *flow,PlusVitaBranding *branding,uint64_t now_us,bool log_available)

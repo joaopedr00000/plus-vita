@@ -291,7 +291,7 @@ int plus_vita_app_run(void)
 	bool network_ready = plus_vita_network_init() == CHIAKI_ERR_SUCCESS;
 	bool curl_ready = network_ready && curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
 	bool recovery_ready = plus_vita_recovery_init();
-	if(curl_ready && !PLUS_VITA_ADAPTIVE_STREAM) covers = plus_vita_covers_create();
+	if(curl_ready) covers = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_covers_create_cached("ux0:data/VitaPlus-Covers") : plus_vita_covers_create();
 	SceCtrlPadInputMode previous_mode = SCE_CTRL_MODE_DIGITAL;
 	bool restore_mode = sceCtrlGetSamplingMode(&previous_mode) == 0;
 	sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);

@@ -10,11 +10,14 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <dirent.h>
+#include <unistd.h>
 static atomic_bool block,entered;
+static atomic_uint downloads;
 static void pause_poll(void) { const struct timespec t={.tv_nsec=1000000}; nanosleep(&t,NULL); }
 bool __wrap_plus_vita_cover_download(const char *url,unsigned char **data,size_t *size,const atomic_bool *cancel,PlusVitaArtworkResult *result)
 {
-	*result=PLUS_VITA_ARTWORK_OK; atomic_store(&entered,true);
+	*result=PLUS_VITA_ARTWORK_OK; atomic_store(&entered,true);atomic_fetch_add(&downloads,1);
 	while(atomic_load(&block) && !atomic_load(cancel)) pause_poll();
 	if(atomic_load(cancel)) return false;
 	const unsigned char *source=strstr(url,".jpg") ? cover_jpeg : cover_png;
@@ -62,6 +65,28 @@ int main(void)
 	plus_vita_covers_request(covers,&broken,1); finish(covers);
 	assert(plus_vita_covers_find(covers,broken)->state==PLUS_VITA_COVER_FAILED);
 	assert(plus_vita_covers_close(covers));
-	puts("covers: real PNG/JPEG decode, bounded cache, blocked I/O, failure and stale reset passed");
+	/* Reopen the cache object to exercise persistent storage, not RAM reuse. */
+	char directory[]="/tmp/pv-cover-cache-XXXXXX";assert(mkdtemp(directory));
+	unsigned before=atomic_load(&downloads);
+	covers=plus_vita_covers_create_cached(directory);assert(covers);
+	plus_vita_covers_request(covers,&a,1);finish(covers);
+	assert(plus_vita_covers_find(covers,a)->state==PLUS_VITA_COVER_READY);
+	assert(atomic_load(&downloads)==before+1);assert(plus_vita_covers_close(covers));
+	covers=plus_vita_covers_create_cached(directory);assert(covers);
+	plus_vita_covers_request(covers,&a,1);finish(covers);
+	assert(plus_vita_covers_find(covers,a)->state==PLUS_VITA_COVER_READY);
+	assert(atomic_load(&downloads)==before+1);assert(plus_vita_covers_close(covers));
+	DIR *dir=opendir(directory);assert(dir);struct dirent *item;char file[320]={0};unsigned count=0;
+	while((item=readdir(dir)))if(strstr(item->d_name,".pvc")){
+		int n=snprintf(file,sizeof(file),"%s/%s",directory,item->d_name);assert(n>0 && (size_t)n<sizeof(file));count++;
+	}
+	closedir(dir);assert(count==1);
+	FILE *bad=fopen(file,"wb");assert(bad);fputs("truncated",bad);assert(!fclose(bad));
+	covers=plus_vita_covers_create_cached(directory);assert(covers);
+	plus_vita_covers_request(covers,&a,1);finish(covers);
+	assert(plus_vita_covers_find(covers,a)->state==PLUS_VITA_COVER_READY);
+	assert(atomic_load(&downloads)==before+2);assert(plus_vita_covers_close(covers));
+	assert(!unlink(file));assert(!rmdir(directory));
+	puts("covers: real decode, persistent cache reuse, corrupt-cache recovery, cancellation and stale reset passed");
 }
 

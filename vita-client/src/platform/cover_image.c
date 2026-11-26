@@ -55,11 +55,17 @@ bool plus_vita_cover_decode(const unsigned char *data,size_t size,uint32_t pixel
 	int w=width>=height ? 128 : width*128/height, h=height>=width ? 128 : height*128/width;
 	if(w<1) w=1;
 	if(h<1) h=1;
-	for(unsigned i=0;i<128*128;i++) pixels[i]=0xff421d09;
+	#if PLUS_VITA_ADAPTIVE_STREAM
+	const unsigned bg[]={29,29,31};
+	const uint32_t background=0xff1f1d1du;
+#else
+	const unsigned bg[]={9,29,66};
+	const uint32_t background=0xff421d09u;
+#endif
+	for(unsigned i=0;i<128*128;i++) pixels[i]=background;
 	for(int y=0;y<h;y++) for(int x=0;x<w;x++) {
 		unsigned char *p=rgba+((y*height/h)*width+x*width/w)*4;
 		unsigned a=p[3]; uint32_t color=0xff000000;
-		const unsigned bg[]={9,29,66};
 		for(unsigned c=0;c<3;c++) color|=((p[c]*a+bg[c]*(255-a))/255)<<(c*8);
 		pixels[(y+(128-h)/2)*128+x+(128-w)/2]=color;
 	}

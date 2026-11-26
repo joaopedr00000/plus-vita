@@ -129,10 +129,20 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		text(display,view->body,522,166,TEXT_HINT,390,30,false,MENU_MUTED);
 		bool ps5=view->detail?pv_catalog_platform(view->detail->platform)==3:view->platform_filter==3;
 		if(view->detail){
-			text(display,view->detail->name,522,210,TEXT_HEADING,390,ps5?78:136,true,MENU_WHITE);
-			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),522,ps5?290:354,TEXT_CONTROL,390,32,false,MENU_ACCENT);
+			/* Fixed preview; neither image loading nor a long title shifts the list. */
+			if(view->preview_eligible || !view->detail->cover_url[0] || !covers)
+				cover(display,covers,view->detail,522,196);
+			else {
+				rectangle(display,522,196,128,128,MENU_BUTTON);
+				text(display,localized(display,"Loading cover"),528,244,TEXT_MICRO,116,58,true,MENU_MUTED);
+			}
+			text(display,view->detail->name,666,196,TEXT_CONTROL,246,96,true,MENU_WHITE);
+			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),666,296,TEXT_CONTROL,246,28,false,MENU_ACCENT);
+			if(view->detail->launch_id_valid)
+				text(display,view->detail->id,522,331,TEXT_MICRO,390,22,false,MENU_MUTED);
+			text(display,localized(display,"Playtime: unavailable | Trophies: unavailable"),522,355,TEXT_MICRO,390,28,true,MENU_MUTED);
 		}else text(display,localized(display,view->title?view->title:"No cloud games found."),48,180,TEXT_BODY,408,120,true,MENU_BODY);
-		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),522,view->detail?324:210,TEXT_COMPACT,390,84,true,MENU_ACCENT);
+		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),522,view->detail?379:210,TEXT_HINT,390,34,true,MENU_ACCENT);
 		goto draw_actions;
 	}
 #endif

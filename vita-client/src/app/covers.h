@@ -11,6 +11,8 @@ typedef struct { char url[512]; PlusVitaCoverState state; PlusVitaArtworkResult 
 typedef struct plus_vita_covers_t PlusVitaCovers;
 /* All calls except the private downloader run on the UI owner thread. */
 PlusVitaCovers *plus_vita_covers_create(void);
+/* Optional persistent public-artwork cache; NULL/empty directory means RAM only. */
+PlusVitaCovers *plus_vita_covers_create_cached(const char *directory);
 void plus_vita_covers_request(PlusVitaCovers *covers,const char *const *urls,size_t count);
 bool plus_vita_covers_poll(PlusVitaCovers *covers);
 PlusVitaArtworkResult plus_vita_covers_last_result(const PlusVitaCovers *covers);

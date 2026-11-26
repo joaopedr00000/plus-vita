@@ -7,14 +7,18 @@
 #include <string.h>
 static uint32_t pixels[960*544];
 static uint32_t label_colors[2];
+static PlusVitaCoverImage artwork;
+static bool metrics_seen,ps5_seen;
 bool plus_vita_font_draw(PlusVitaFont *font,uint32_t *p,int pitch,const char *value,PlusVitaTextBox box,int size,bool wrap,uint32_t color){
     (void)font;(void)p;(void)pitch;(void)box;(void)size;(void)wrap;
     if(value && !strcmp(value,"First"))label_colors[0]=color;
     if(value && !strcmp(value,"Second"))label_colors[1]=color;
+    if(value && strstr(value,"Playtime: unavailable"))metrics_seen=true;
+    if(value && strstr(value,"PS5 streaming is not available yet"))ps5_seen=true;
     return true;
 }
 const PlusVitaCoverImage *plus_vita_covers_find(const PlusVitaCovers *covers,const char *url){
-    (void)covers;(void)url;return NULL;
+    return covers && url && !strcmp(url,artwork.url) ? &artwork : NULL;
 }
 int main(void){
     PlusVitaAppView v={.screen=PLUS_VITA_APP_WELCOME,.title="VitaPlus",.body="Welcome",.subtitle="Welcome",.hint="Back",.action_count=2,
@@ -31,6 +35,16 @@ int main(void){
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[200*960+40]==VP_PANEL && pixels[200*960+510]==VP_PANEL);
+    PlusVitaCatalogEntry game={.name="Synthetic PS5",.platform="PS5",.id="FAKEPPSA1",.launch_id_valid=true,
+        .cover_url="https://image.api.playstation.com/test.png"};
+    strcpy(artwork.url,game.cover_url);artwork.state=PLUS_VITA_COVER_READY;
+    for(unsigned i=0;i<128*128;i++)artwork.pixels[i]=0xff123456;
+    v.detail=&game;v.preview_eligible=true;
+    plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
+    assert(pixels[250*960+550]==0xff123456 && metrics_seen && ps5_seen);
+    v.preview_eligible=false;
+    plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
+    assert(pixels[250*960+550]!=0xff123456);
     for(unsigned lang=0;lang<19;lang++){
         assert(strstr(pv_lan_pages[lang],"background:#161618"));
         assert(strstr(pv_lan_pages[lang],"background:#ffcf40"));
