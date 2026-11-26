@@ -393,6 +393,27 @@ static const char *const pv_theme_labels[PV_LANG_COUNT][7]={
 {"外觀","主色","輔色","恢復原始主題","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
 {"المظهر","اللون الأساسي","اللون الثانوي","استعادة المظهر الأصلي","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."}
 };
+static const char *const pv_preset_labels[PV_LANG_COUNT][4]={
+{"Theme presets","Active theme","Wallpaper rotation: On","Wallpaper rotation: Off"},
+{"Theme presets","Active theme","Wallpaper rotation: On","Wallpaper rotation: Off"},
+{"Temas predefinidos","Tema ativo","Rotação de fundos: Ligada","Rotação de fundos: Desligada"},
+{"Temas predefinidos","Tema ativo","Rotação de fundos: Ligada","Rotação de fundos: Desligada"},
+{"Temas predefinidos","Tema activo","Rotación de fondos: Sí","Rotación de fondos: No"},
+{"Temas predefinidos","Tema activo","Rotación de fondos: Sí","Rotación de fondos: No"},
+{"Designvorlagen","Aktives Design","Hintergrundwechsel: An","Hintergrundwechsel: Aus"},
+{"Thèmes prédéfinis","Thème actif","Rotation des fonds : Oui","Rotation des fonds : Non"},
+{"Temi predefiniti","Tema attivo","Rotazione sfondi: Sì","Rotazione sfondi: No"},
+{"Vooraf ingestelde thema's","Actief thema","Achtergrondrotatie: Aan","Achtergrondrotatie: Uit"},
+{"Motywy","Aktywny motyw","Rotacja tapet: Tak","Rotacja tapet: Nie"},
+{"Förinställda teman","Aktivt tema","Bakgrundsrotation: På","Bakgrundsrotation: Av"},
+{"Hazır temalar","Etkin tema","Duvar kağıdı döngüsü: Açık","Duvar kağıdı döngüsü: Kapalı"},
+{"Готовые темы","Активная тема","Смена обоев: Вкл","Смена обоев: Выкл"},
+{"テーマプリセット","現在のテーマ","壁紙ローテーション: オン","壁紙ローテーション: オフ"},
+{"테마 프리셋","활성 테마","배경 화면 회전: 켬","배경 화면 회전: 끔"},
+{"预设主题","当前主题","壁纸轮换：开","壁纸轮换：关"},
+{"預設主題","目前主題","桌布輪換：開","桌布輪換：關"},
+{"سمات جاهزة","السمة النشطة","تدوير الخلفيات: تشغيل","تدوير الخلفيات: إيقاف"}
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -416,6 +437,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     /* New catalogue labels must not override established menu/session keys. */
     if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     if(!v)v=pv_lookup(s,len,pv_theme_labels[0],pv_theme_labels[lang],7);
+    if(!v)v=pv_lookup(s,len,pv_preset_labels[0],pv_preset_labels[lang],4);
     return v?v:s;
 }
 #endif

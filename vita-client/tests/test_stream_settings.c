@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "../src/app/custom_theme.h"
+#include "../src/app/theme_presets.h"
 static void click(PlusVitaApp *app,PlusVitaAppAction action){
     PlusVitaAppView v=plus_vita_app_view(app);
     for(size_t j=0;j<v.action_count;j++)if(v.actions[j].id==action){
@@ -37,12 +37,23 @@ int main(void){
     click(app,PLUS_VITA_ACTION_THEME);
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME);
     assert(v.theme_primary==PV_PRIMARY_DEFAULT&&!v.theme_custom);
+    click(app,PLUS_VITA_ACTION_THEME_PRESETS);
+    assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_THEME_PRESETS);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME&&v.theme_id==1&&v.theme_primary==pv_presets[1].primary);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
     PlusVitaAppEffect edit=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
     assert(edit.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY);
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_ENTERED,.operation=edit.operation,.status=PLUS_VITA_RESULT_OK,.data="0088ff",.data_size=6});
-    v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff);
+    v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff&&v.theme_id==1);
     click(app,PLUS_VITA_ACTION_THEME_RESET);
-    v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT);
+    v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT&&v.theme_id==0);
+    assert(pv_theme_expired(1000000000u+864000u,1000000000u,2,1));
+    assert(!pv_theme_expired(1000000000u+864000u,1000000000u,1,1));
+    assert(!pv_theme_expired(1000000000u+863999u,1000000000u,2,1));
+    assert(!pv_theme_expired(999999999u,1000000000u,2,1));
+    assert(pv_theme_logo_index(1)==0&&pv_theme_logo_index(12)==1&&pv_theme_logo_index(42)==2&&pv_theme_logo_index(2)<0);
     plus_vita_app_destroy(app);
     puts("Streaming profiles, localized labels and menu navigation passed");return 0;
 }
