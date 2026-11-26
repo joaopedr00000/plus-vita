@@ -135,6 +135,9 @@ jobs:
         run: sh tools/test-app-account-integration.sh
       - name: Test catalogue search and details
         run: sh tools/test-app-catalogue.sh
+      - name: Test focused artwork preview in legacy and adaptive catalogues
+        if: github.ref == 'refs/heads/update/vitaplus-library'
+        run: sh tools/test-app-preview.sh
       - name: Test allocation cancellation and recovery
         run: sh tools/test-app-recovery.sh
       - name: Test startup splash and welcome branding

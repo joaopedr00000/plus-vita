@@ -3,6 +3,7 @@
  * controlled monotonic clock and external HTTP/font/device fixtures. */
 #define _POSIX_C_SOURCE 200809L
 #include "ui_flow.h"
+#include "adaptive_stream.h"
 #include "cover_download.h"
 #include <curl/curl.h>
 #include <psp2/pvf.h>
@@ -53,6 +54,7 @@ static PlusVitaApp *catalogue(size_t count)
  assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_CATALOGUE);
  return app;
 }
+#if !PLUS_VITA_ADAPTIVE_STREAM
 static void list_sizes(PlusVitaFont *font)
 {
  const size_t counts[]={0,1,7,8};
@@ -172,3 +174,48 @@ int main(void)
  plus_vita_font_free(font);plus_vita_app_destroy(app);
  puts("preview: real transfers, 3000ms boundary, cached dwell, rapid browsing, drag and details return passed");
 }
+#else
+int main(void)
+{
+ cover_mode=6;
+ PlusVitaApp *app=catalogue(12);
+ PlusVitaCovers *covers=plus_vita_covers_create();assert(covers);
+ PlusVitaUiFlow flow={.app=app,.covers=covers,.dirty=true};
+ PlusVitaFont *font=plus_vita_font_create();assert(font);
+ const char *first="https://vulcan.dl.playstation.net/0.png";
+ tick(&flow,1000);tick(&flow,350999);
+ assert(atomic_load(&cover_requests)==0);
+ tick(&flow,351000);settle(&flow,first,351000,PLUS_VITA_COVER_READY);
+ assert(atomic_load(&cover_requests)==1);
+ assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
+ assert(pixels[260*960+530]==0xff0000ff);
+ event(&flow,PLUS_VITA_EVENT_DOWN,400000);
+ assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
+ assert(pixels[260*960+530]!=0xff0000ff);
+ event(&flow,PLUS_VITA_EVENT_UP,450000);
+ assert(flow.preview_eligible && atomic_load(&cover_requests)==1);
+ assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
+ assert(pixels[260*960+530]==0xff0000ff);
+ for(unsigned i=0;i<5;i++)event(&flow,PLUS_VITA_EVENT_DOWN,500000+i*10000);
+ assert(atomic_load(&cover_requests)==1);
+ PlusVitaAppView view=plus_vita_app_view(app);
+ assert(view.focus==5 && view.list_count==7);
+ char url[512];strcpy(url,view.detail->cover_url);
+ tick(&flow,889999);assert(atomic_load(&cover_requests)==1);
+ tick(&flow,890000);settle(&flow,url,890000,PLUS_VITA_COVER_READY);
+ assert(atomic_load(&cover_requests)==2);
+ assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
+ assert(pixels[260*960+530]==0xff0000ff);
+ /* Change focus, then start a drag: no new artwork work during scrolling. */
+ event(&flow,PLUS_VITA_EVENT_DOWN,900000);
+ plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_DOWN,.x=80,.y=240},900001);
+ plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_MOVE,.x=80,.y=310},900002);
+ tick(&flow,2000000);assert(atomic_load(&cover_requests)==2);
+ plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_UP,.x=80,.y=310},2000001);
+ view=plus_vita_app_view(app);assert(view.screen==PLUS_VITA_APP_CATALOGUE);
+ while(!plus_vita_covers_close(covers))pause_poll();
+ plus_vita_font_free(font);plus_vita_app_destroy(app);
+ puts("adaptive library: focused preview, 350ms dwell, cached return, rapid navigation and drag passed");
+ return 0;
+}
+#endif

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "ui_flow.h"
+#include "../platform/adaptive_stream.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
