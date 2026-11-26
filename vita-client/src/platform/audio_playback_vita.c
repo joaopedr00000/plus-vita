@@ -9,10 +9,11 @@
 #include <string.h>
 
 #include "adaptive_stream.h"
+#include "stream_affinity.h"
 #define AUDIO_QUEUE 32
 #define AUDIO_UNIT_MAX 255
 #define AUDIO_BLOCK 960
-#define AUDIO_STALL_US ((uint64_t)AUDIO_BLOCK * 1000000u / 48000u + 10000u)
+#define AUDIO_STALL_US(a) ((uint64_t)(a)->block_frames * 1000000u / 48000u + 10000u)
 typedef struct { uint16_t sequence; size_t size; uint64_t arrived_us; unsigned local_drops_before; uint8_t data[AUDIO_UNIT_MAX]; } AudioUnit;
 struct plus_vita_audio_playback_t {
 	ChiakiLog *log;
@@ -29,7 +30,7 @@ struct plus_vita_audio_playback_t {
 	bool sequence_valid;
 	uint16_t sequence;
 	int16_t block[AUDIO_BLOCK * 2];
-	unsigned fill;
+	unsigned fill,block_frames;
 	unsigned pcm_peak[2], tone_blocks;
 	uint64_t pcm_samples[2], pcm_nonzero[2], pcm_square_sum[2];
 	/* Arrival counters are updated by the receive callback under mutex. */
@@ -60,7 +61,7 @@ static void audio_log_timing(PlusVitaAudioPlayback *a, const char *phase)
 		(unsigned long long)a->empty_wait_max_us, a->empty_wait_gt20ms,
 		(unsigned long long)a->output_gap_max_us, a->output_gap_stalls,
 		(unsigned long long)a->output_call_max_us, a->output_call_stalls,
-		(unsigned long long)AUDIO_STALL_US,
+		(unsigned long long)AUDIO_STALL_US(a),
 		(unsigned long long)(a->queue_age_samples ? a->queue_age_total_us / a->queue_age_samples : 0),
 		(unsigned long long)a->queue_age_max_us, queue_count, a->sequence_gaps,
 		a->sequence_resets, a->max_missing_units, a->skipped_local);
@@ -91,22 +92,22 @@ static void audio_measure(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned
 static bool audio_output(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned samples)
 {
 	while(samples) {
-		unsigned take = AUDIO_BLOCK - a->fill;
+		unsigned take = a->block_frames - a->fill;
 		if(take > samples) take = samples;
 		memcpy(a->block + a->fill * a->channels, pcm, take * a->channels * sizeof(*pcm));
 		a->fill += take; pcm += take * a->channels; samples -= take;
-		if(a->fill == AUDIO_BLOCK) {
+		if(a->fill == a->block_frames) {
 			uint64_t started_us = sceKernelGetProcessTimeWide();
 			if(a->last_output_start_us) {
 				uint64_t gap_us = started_us - a->last_output_start_us;
 				if(gap_us > a->output_gap_max_us) a->output_gap_max_us = gap_us;
-				if(gap_us > AUDIO_STALL_US) a->output_gap_stalls++;
+				if(gap_us > AUDIO_STALL_US(a)) a->output_gap_stalls++;
 			}
 			a->last_output_start_us = started_us;
 			int result = sceAudioOutOutput(a->port, a->block);
 			uint64_t call_us = sceKernelGetProcessTimeWide() - started_us;
 			if(call_us > a->output_call_max_us) a->output_call_max_us = call_us;
-			if(call_us > AUDIO_STALL_US) a->output_call_stalls++;
+			if(call_us > AUDIO_STALL_US(a)) a->output_call_stalls++;
 			if(result < 0) { CHIAKI_LOGE(a->log, "Stream probe audio output failed=0x%08x", result); return false; }
 			a->outputs++; a->fill = 0;
 		}
@@ -117,6 +118,7 @@ static bool audio_output(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned 
 static void *audio_worker(void *user)
 {
 	PlusVitaAudioPlayback *a = user;
+	CHIAKI_LOGI(a->log,"Stream probe audio affinity result=%d",pv_stream_worker_affinity(true));
 	CHIAKI_LOGI(a->log, "Stream probe audio worker entered stack=262144; creating decoder");
 	int error;
 	a->decoder = opus_decoder_create(48000, a->channels, &error);
@@ -134,13 +136,18 @@ static void *audio_worker(void *user)
 	int test_samples = test_size > 0 ? opus_decode(a->decoder, test_packet, test_size, test_pcm, 480, 0) : -1;
 	if(test_samples != 480 || opus_decoder_ctl(a->decoder, OPUS_RESET_STATE) != OPUS_OK) goto failed;
 	CHIAKI_LOGI(a->log, "Stream probe audio codec selftest passed samples=%d", test_samples);
-	a->port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, AUDIO_BLOCK, 48000,
+	a->port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, a->block_frames, 48000,
 		a->channels == 2 ? SCE_AUDIO_OUT_MODE_STEREO : SCE_AUDIO_OUT_MODE_MONO);
+    if(a->port<0&&a->block_frames!=AUDIO_BLOCK){
+        CHIAKI_LOGW(a->log,"Stream probe low latency audio port unavailable; falling back to 960 frames");
+        a->block_frames=AUDIO_BLOCK;
+        a->port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,a->block_frames,48000,a->channels==2?SCE_AUDIO_OUT_MODE_STEREO:SCE_AUDIO_OUT_MODE_MONO);
+    }
 	if(a->port < 0) goto failed;
 	int volume[2] = { SCE_AUDIO_OUT_MAX_VOL, SCE_AUDIO_OUT_MAX_VOL };
 	if(sceAudioOutSetVolume(a->port, SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH, volume) < 0) goto failed;
 	CHIAKI_LOGI(a->log, "Stream probe audio playback started queue=%u block=%u volume=unity port_len=%d port_freq=%d port_mode=%d",
-		AUDIO_QUEUE, AUDIO_BLOCK,
+		AUDIO_QUEUE, a->block_frames,
 		sceAudioOutGetConfig(a->port, SCE_AUDIO_OUT_CONFIG_TYPE_LEN),
 		sceAudioOutGetConfig(a->port, SCE_AUDIO_OUT_CONFIG_TYPE_FREQ),
 		sceAudioOutGetConfig(a->port, SCE_AUDIO_OUT_CONFIG_TYPE_MODE));
@@ -258,7 +265,9 @@ PlusVitaAudioPlayback *plus_vita_audio_start_profile(const ChiakiAudioHeader *h,
 	PlusVitaAudioPlayback *a = calloc(1, sizeof(*a));
 	if(!a) return NULL;
 	a->log = log; a->channels = h->channels; a->port = -1;
+a->block_frames=AUDIO_BLOCK;
 #if PLUS_VITA_ADAPTIVE_STREAM
+	a->block_frames=cap_kbps?pv_audio_block(cap_kbps):AUDIO_BLOCK;
 	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
 #else
 	(void)cap_kbps;

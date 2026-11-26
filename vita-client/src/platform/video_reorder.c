@@ -76,9 +76,10 @@ PlusVitaVideoReorderEvent plus_vita_video_reorder_poll(
 	{
 		window->waiting = true;
 		window->waiting_since_us = first_future_us;
+		window->waiting_grace_us=window->grace_us ? window->grace_us : PLUS_VITA_VIDEO_REORDER_GRACE_US;
 	}
 	uint64_t wait_us = elapsed(now_us, window->waiting_since_us);
-	unsigned grace=window->grace_us ? window->grace_us : PLUS_VITA_VIDEO_REORDER_GRACE_US;
+	unsigned grace=window->waiting_grace_us;
 	if(!pressure && wait_us < grace) return event;
 	event.action = PLUS_VITA_VIDEO_REORDER_DROP;
 	event.slot = head;
@@ -90,4 +91,12 @@ PlusVitaVideoReorderEvent plus_vita_video_reorder_poll(
 	window->next = (uint16_t)(window->next + event.skipped);
 	window->waiting = false;
 	return event;
+}
+
+unsigned plus_vita_video_reorder_wait_ms(const PlusVitaVideoReorder *window,uint64_t now_us,unsigned limit_ms){
+    if(!window->waiting)return limit_ms;
+    uint64_t spent=elapsed(now_us,window->waiting_since_us);
+    if(spent>=window->waiting_grace_us)return limit_ms?1:0;
+    unsigned remaining=(unsigned)((window->waiting_grace_us-spent+999)/1000);
+    return remaining<limit_ms?remaining:limit_ms;
 }

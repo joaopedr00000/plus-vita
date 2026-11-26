@@ -2,6 +2,7 @@
 #include "input_worker.h"
 #include "latency_clock.h"
 #include "adaptive_stream.h"
+#include "stream_affinity.h"
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -63,6 +64,7 @@ static void release_controls(PlusVitaInputWorker *w)
 static void *input_thread(void *user)
 {
 	PlusVitaInputWorker *w = user;
+	(void)pv_stream_worker_affinity(false);
 	ChiakiControllerState previous;
 	chiaki_controller_state_set_idle(&previous);
 	uint64_t next = plus_vita_latency_now_us(), last_poll = 0;

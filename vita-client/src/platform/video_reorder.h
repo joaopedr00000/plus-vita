@@ -22,6 +22,7 @@ typedef struct {
 	uint16_t next;
 	uint64_t waiting_since_us;
 	unsigned grace_us; /* zero preserves the original fixed grace */
+	unsigned waiting_grace_us; /* latch each gap's deadline */
 	PlusVitaVideoReorderSlot slots[PLUS_VITA_VIDEO_REORDER_SLOTS];
 } PlusVitaVideoReorder;
 typedef enum {
@@ -43,4 +44,5 @@ void plus_vita_video_reorder_ready(PlusVitaVideoReorder *window,
 	int slot, uint64_t now_us);
 PlusVitaVideoReorderEvent plus_vita_video_reorder_poll(
 	PlusVitaVideoReorder *window, uint64_t now_us, bool pressure);
+unsigned plus_vita_video_reorder_wait_ms(const PlusVitaVideoReorder *window,uint64_t now_us,unsigned limit_ms);
 #endif

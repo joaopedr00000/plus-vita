@@ -8,29 +8,36 @@
 #endif
 static inline unsigned pv_profile_cap(unsigned v){return v==6000||v==10000||v==15000?v:15000;}
 static inline unsigned pv_profile_next(unsigned v){return v==6000?10000:v==10000?15000:6000;}
-static inline unsigned pv_profile_reorder(unsigned v){return v==6000?16000:v==10000?24000:32000;}
+static inline unsigned pv_profile_reorder(unsigned v){return v==6000?4000:v==10000?8000:12000;}
+static inline unsigned pv_profile_reorder_initial(unsigned v){return v==6000?12000:v==10000?16000:20000;}
+static inline unsigned pv_audio_block(unsigned v){return v==6000?512:960;}
 static inline unsigned pv_profile_audio(unsigned v){return v==6000?4:v==10000?4:6;}
 static inline unsigned pv_profile_queue(unsigned v){return v==6000?4:v==10000?6:8;}
 static inline unsigned pv_reorder_adjust(unsigned base,unsigned current,unsigned saved,unsigned expired){
+    unsigned max=base==4000?20000:base==8000?26000:30000;
     if(current<base)current=base;
-    if(current>48000)current=48000;
-    /* Only a recovered late frame is evidence that waiting helped.
-     * Loss alone must not indefinitely ratchet up the latency budget. */
-    if(saved)return current>=44000?48000:current+4000;
-    if(expired)return current>base+1000?current-1000:base;
-    return current>base+2000?current-2000:base;
+    if(current>max)current=max;
+    /* Recovered late frames justify waiting, not raw packet loss. On an
+     * unproductive hold reduce the cap multiplicatively, with a bounded loop. */
+    if(expired>=saved&&expired){
+        unsigned n=expired>8?8:expired;
+        while(n--&&current>base){current=current*3/4;if(current<base)current=base;}
+        return current;
+    }
+    if(saved)return current>=max-3000?max:current+3000;
+    return current>base+1000?current-1000:base;
 }
 static inline unsigned pv_audio_adjust(unsigned base,unsigned current,bool starved){
     if(current<base)current=base;
     if(current>11)current=11;
     return starved?(current<11?current+1:11):(current>base?current-1:base);
 }
-/* Each compressed Opus unit is 10 ms. Retain a four-unit jitter margin,
+/* Each compressed Opus unit is 10 ms. Retain a three-unit jitter margin,
  * but never allow the adaptive backlog to grow to the old fixed 160 ms. */
 static inline unsigned pv_audio_queue_limit(unsigned target){
     if(target<4)target=4;
     if(target>11)target=11;
-    return target+4;
+    return target+3;
 }
 /* Only skip presentation of a fully decoded picture. Compressed references
  * must always be submitted in order; show recovery/first output immediately. */

@@ -1545,6 +1545,81 @@ static ChiakiErrorCode probe_send_big(PlusVitaStreamProbe *probe)
 
 /* Called with the probe mutex held; returns with it held. Frame ownership
  * leaves the queue before unlocking. All decoder/display work stays here. */
+typedef struct {
+    uint64_t first_display,last_display,display_sum,wait_sum,wait_max;
+    unsigned displayed,generation;
+    bool recovery_output;
+    ProbeQueuedFrame frame;
+#if PLUS_VITA_ADAPTIVE_STREAM
+    PlusVitaLatencyStats bench,bench_interval;
+    uint64_t bench_start,bench_last,bench_min;
+    bool bench_done;
+#endif
+} ProbePresentationStats;
+
+/* Called with probe mutex held; only the display wait releases it. Timestamp
+ * is confirmation observed by this thread, an upper bound on the scanout. */
+static ChiakiErrorCode probe_finish_presentation(PlusVitaStreamProbe *probe,
+    PlusVitaVideoPresent *present,ProbePresentationStats *s){
+    if(present->slots.pending<0)return CHIAKI_ERR_SUCCESS;
+    chiaki_mutex_unlock(&probe->mutex);
+    int native_result = plus_vita_video_present_finish(present);
+    s->display_sum += present->last_display_us;
+    s->wait_sum += present->last_wait_us;
+    if(present->last_wait_us > s->wait_max)
+    	s->wait_max = present->last_wait_us;
+    plus_vita_latency_add(&probe->latency.display_wait, present->last_wait_us);
+    uint64_t display_done_us = sceKernelGetProcessTimeWide();
+    if(native_result >= 0)
+    {
+#if PLUS_VITA_ADAPTIVE_STREAM
+                    if(!s->bench_start)s->bench_start=display_done_us;
+                    uint64_t elapsed=display_done_us>=s->bench_start?display_done_us-s->bench_start:0;
+                    if(!s->bench_done&&elapsed>=10000000u&&elapsed<70000000u){
+                        plus_vita_latency_span(&s->bench,s->frame.enqueued_us,display_done_us);
+                        if(display_done_us>=s->frame.enqueued_us&&display_done_us-s->frame.enqueued_us<s->bench_min)
+                            s->bench_min=display_done_us-s->frame.enqueued_us;
+                        if(s->bench_last)plus_vita_latency_span(&s->bench_interval,s->bench_last,display_done_us);
+                        s->bench_last=display_done_us;
+                    }else if(!s->bench_done&&elapsed>=70000000u){
+                        s->bench_done=true;
+                        plus_vita_diagnostic_metric("benchmark.au_enqueue_to_present",&s->bench);
+                        plus_vita_diagnostic_metric("benchmark.presentation_interval",&s->bench_interval);
+                        if(s->bench.count)plus_vita_diagnostic_counter("benchmark.min_us",s->bench_min);
+                        if(s->bench.count)CHIAKI_LOGI(probe->log,"Stream probe benchmark 60s samples=%llu min_us=%llu mean_us=%llu p50_upper_us=%llu p95_upper_us=%llu p99_upper_us=%llu max_us=%llu interval_p95_upper_us=%llu",
+                            (unsigned long long)s->bench.count,(unsigned long long)s->bench_min,
+                            (unsigned long long)(s->bench.total_us/s->bench.count),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&s->bench,50),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&s->bench,95),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&s->bench,99),
+                            (unsigned long long)s->bench.max_us,(unsigned long long)plus_vita_latency_percentile_upper(&s->bench_interval,95));
+                    }
+#endif
+    	/* Native output can belong to an earlier AU. These spans
+    	 * describe this submission, not the age of that picture. */
+    	plus_vita_latency_span(&probe->latency.submitted_first_packet_to_present,
+    		s->frame.first_packet_us, display_done_us);
+    	plus_vita_latency_span(&probe->latency.submitted_ready_to_present,
+    		s->frame.ready_us, display_done_us);
+    }
+    probe_preview_lock(probe);
+    if(native_result < 0)
+    {
+    	CHIAKI_LOGE(probe->log, "Stream probe preview display failed=0x%08x", native_result);
+    	return CHIAKI_ERR_UNKNOWN;
+    }
+    s->displayed++;
+    s->last_display = display_done_us / 1000u;
+    if(s->recovery_output && s->generation == probe->recovery_resumes)
+    {
+    	probe->recovery_output_pending = false;
+    	CHIAKI_LOGI(probe->log, "Stream probe recovery output displayed generation=%u after_idr_ms=%llu",
+    		s->generation, (unsigned long long)(s->last_display - probe->recovery_resumed_ms));
+    }
+    if(!s->first_display)
+    	s->first_display = s->last_display;
+    return CHIAKI_ERR_SUCCESS;
+}
 static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 	bool *user_stopped)
 {
@@ -1560,7 +1635,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #endif
 	unsigned int controller_updates = 0;
 	chiaki_mutex_unlock(&probe->mutex);
-	int native_result = plus_vita_video_present_init(&present);
+	int native_result = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_video_present_pipeline_init(&present) : plus_vita_video_present_init(&present);
 	SceTouchSamplingState rear_sampling_prev = SCE_TOUCH_SAMPLING_STATE_STOP;
 	bool rear_sampling_known = sceTouchGetSamplingState(
 		SCE_TOUCH_PORT_BACK, &rear_sampling_prev) >= 0;
@@ -1611,18 +1686,18 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 	uint64_t last_feedback = started;
 	uint64_t last_heartbeat = started;
 	const uint64_t first_frame_timeout = probe->ps3_live ? PS3_MEDIA_START_TIMEOUT_MS : PROBE_TIMEOUT_MS;
-	uint64_t first_display = 0, last_display = 0;
+	ProbePresentationStats shown={0};
+#if PLUS_VITA_ADAPTIVE_STREAM
+	shown.bench_min=UINT64_MAX;
+#endif
+	CHIAKI_LOGI(probe->log,"Stream probe scanout slots=%u (3=overlapped decode, 2=fallback)",present.slots.count);
 #if PLUS_VITA_ADAPTIVE_STREAM
 	uint64_t hud_at=started,hud_rx=0;unsigned hud_frames=0,hud_saved=0,hud_expired=0;char hud_line[180]={0};
-	PlusVitaLatencyStats bench={0},bench_interval={0};
-	uint64_t bench_start=0,bench_last=0,bench_min=UINT64_MAX;
-	bool bench_done=false;
 #endif
-	unsigned int displayed = 0;
 	unsigned int decoded = 0, presentation_skips = 0;
 	unsigned int recovery_generation_fed = 0;
 	uint64_t prepare_sum = 0, decode_sum = 0, decode_max = 0;
-	uint64_t display_sum = 0, wait_sum = 0, wait_max = 0, queue_wait_max = 0;
+	uint64_t queue_wait_max = 0;
 #if !PLUS_VITA_INPUT_WORKER
 	uint64_t last_input_poll_us = 0;
 #endif
@@ -1634,6 +1709,11 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			err = CHIAKI_ERR_CANCELED;
 			break;
 		}
+		uint64_t stamp_us=sceKernelGetProcessTimeWide();
+        if(present.slots.pending>=0&&(!probe->queue_count||stamp_us-present.submitted_us>=20000u)){
+            err=probe_finish_presentation(probe,&present,&shown);
+            if(err!=CHIAKI_ERR_SUCCESS)break;
+        }
 		uint64_t now = sceKernelGetProcessTimeWide() / 1000u;
 		if(probe->state == PROBE_EXPECT_MEDIA)
 		{
@@ -1786,17 +1866,17 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 		}
 		#if PLUS_VITA_ADAPTIVE_STREAM
 		if(now-hud_at>=1000) {
-			unsigned saved=probe->reorder_saved_frames-hud_saved,expired=probe->reorder_expired_frames-hud_expired;
+			unsigned saved=probe->reorder_saved_frames-hud_saved,expired=probe->reorder_expired_frames+probe->reorder_missing_frames-hud_expired;
 			probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);
 			unsigned rx=(unsigned)((probe->video_rx_bytes-hud_rx)*8/(now-hud_at));
-			unsigned fps=(unsigned)((uint64_t)(displayed-hud_frames)*1000/(now-hud_at));
+			unsigned fps=(unsigned)((uint64_t)(shown.displayed-hud_frames)*1000/(now-hud_at));
 			uint64_t stamp=sceKernelGetProcessTimeWide();
 			uint64_t oldest=probe->queue_count?probe->queue[probe->queue_head].enqueued_us:stamp;
 			snprintf(hud_line,sizeof(hud_line),"FPS %u RX %u kbps RTT %llu ms Q %u/%llu ms DEC %llu us GAP %u SKIP %u RESYNC %u",
 				fps,rx,(unsigned long long)(probe->provision->rtt_us/1000),probe->queue_count,
 				(unsigned long long)(stamp>=oldest?(stamp-oldest)/1000:0),
 				(unsigned long long)probe->video_decoder.last_decode_us,expired,presentation_skips,probe->local_queue_resyncs);
-			hud_at=now;hud_rx=probe->video_rx_bytes;hud_frames=displayed;hud_saved=probe->reorder_saved_frames;hud_expired=probe->reorder_expired_frames;
+			hud_at=now;hud_rx=probe->video_rx_bytes;hud_frames=shown.displayed;hud_saved=probe->reorder_saved_frames;hud_expired=probe->reorder_expired_frames+probe->reorder_missing_frames;
 		}
 #endif
 		if(probe->state == PROBE_EXPECT_MEDIA && now - last_feedback >= 200)
@@ -1891,7 +1971,8 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 		{
 			/* Keep controller polling responsive even when video pauses while
 			 * waiting for a lost frame or a recovery IDR. */
-			err = chiaki_cond_timedwait(&probe->cond, &probe->mutex, 8);
+			err = chiaki_cond_timedwait(&probe->cond, &probe->mutex,
+				plus_vita_video_reorder_wait_ms(&probe->video_reorder,sceKernelGetProcessTimeWide(),8));
 			if(err == CHIAKI_ERR_TIMEOUT)
 				err = CHIAKI_ERR_SUCCESS;
 			continue;
@@ -1953,62 +2034,21 @@ chiaki_mutex_unlock(&probe->mutex);
 #if PLUS_VITA_ADAPTIVE_STREAM
 				if(probe->input&&probe->input->hud&&probe->input->paint_hud&&hud_line[0])probe->input->paint_hud(probe->input->hud_context,plus_vita_video_present_back_buffer(&present),hud_line);
 #endif
-				native_result = plus_vita_video_present_frame(&present);
-				display_sum += present.last_display_us;
-				wait_sum += present.last_wait_us;
-				if(present.last_wait_us > wait_max)
-					wait_max = present.last_wait_us;
-				plus_vita_latency_add(&probe->latency.display_wait, present.last_wait_us);
-				uint64_t display_done_us = sceKernelGetProcessTimeWide();
-				if(native_result >= 0)
-				{
-#if PLUS_VITA_ADAPTIVE_STREAM
-                    if(!bench_start)bench_start=display_done_us;
-                    uint64_t elapsed=display_done_us>=bench_start?display_done_us-bench_start:0;
-                    if(!bench_done&&elapsed>=10000000u&&elapsed<70000000u){
-                        plus_vita_latency_span(&bench,frame.enqueued_us,display_done_us);
-                        if(display_done_us>=frame.enqueued_us&&display_done_us-frame.enqueued_us<bench_min)
-                            bench_min=display_done_us-frame.enqueued_us;
-                        if(bench_last)plus_vita_latency_span(&bench_interval,bench_last,display_done_us);
-                        bench_last=display_done_us;
-                    }else if(!bench_done&&elapsed>=70000000u){
-                        bench_done=true;
-                        plus_vita_diagnostic_metric("benchmark.au_enqueue_to_present",&bench);
-                        plus_vita_diagnostic_metric("benchmark.presentation_interval",&bench_interval);
-                        if(bench.count)plus_vita_diagnostic_counter("benchmark.min_us",bench_min);
-                        if(bench.count)CHIAKI_LOGI(probe->log,"Stream probe benchmark 60s samples=%llu min_us=%llu mean_us=%llu p50_upper_us=%llu p95_upper_us=%llu p99_upper_us=%llu max_us=%llu interval_p95_upper_us=%llu",
-                            (unsigned long long)bench.count,(unsigned long long)bench_min,
-                            (unsigned long long)(bench.total_us/bench.count),
-                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,50),
-                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,95),
-                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,99),
-                            (unsigned long long)bench.max_us,(unsigned long long)plus_vita_latency_percentile_upper(&bench_interval,95));
-                    }
-#endif
-					/* Native output can belong to an earlier AU. These spans
-					 * describe this submission, not the age of that picture. */
-					plus_vita_latency_span(&probe->latency.submitted_first_packet_to_present,
-						frame.first_packet_us, display_done_us);
-					plus_vita_latency_span(&probe->latency.submitted_ready_to_present,
-						frame.ready_us, display_done_us);
-				}
-				probe_preview_lock(probe);
-				if(native_result < 0)
-				{
-					CHIAKI_LOGE(probe->log, "Stream probe preview display failed=0x%08x", native_result);
-					err = CHIAKI_ERR_UNKNOWN;
-					break;
-				}
-				displayed++;
-				last_display = sceKernelGetProcessTimeWide() / 1000u;
-				if(recovery_output && recovery_generation_fed == probe->recovery_resumes)
-				{
-					probe->recovery_output_pending = false;
-					CHIAKI_LOGI(probe->log, "Stream probe recovery output displayed generation=%u after_idr_ms=%llu",
-						recovery_generation_fed, (unsigned long long)(last_display - probe->recovery_resumed_ms));
-				}
-				if(!first_display)
-					first_display = last_display;
+                probe_preview_lock(probe);
+                /* The next decode may have overlapped the previous native
+                 * scanout. Finish that submission before replacing it. */
+                err=probe_finish_presentation(probe,&present,&shown);
+                if(err!=CHIAKI_ERR_SUCCESS)break;
+                chiaki_mutex_unlock(&probe->mutex);
+                native_result=plus_vita_video_present_submit(&present);
+                probe_preview_lock(probe);
+                if(native_result<0){err=CHIAKI_ERR_UNKNOWN;break;}
+                shown.frame=frame;shown.frame.data=NULL;
+                shown.generation=recovery_generation_fed;shown.recovery_output=recovery_output;
+                if(present.slots.count==2||!shown.displayed||recovery_output){
+                    err=probe_finish_presentation(probe,&present,&shown);
+                    if(err!=CHIAKI_ERR_SUCCESS)break;
+                }
 			}
 			else
 				presentation_skips++;
@@ -2026,6 +2066,8 @@ chiaki_mutex_unlock(&probe->mutex);
 				probe->queue_count, (unsigned long long)queue_wait_us,
 				(unsigned long long)(first_display ? sceKernelGetProcessTimeWide() / 1000u - first_display : 0));
 	}
+	/* Retire any confirmed final scanout before final timing is recorded. */
+	if(err==CHIAKI_ERR_SUCCESS&&present.slots.pending>=0)err=probe_finish_presentation(probe,&present,&shown);
 	/* Stop accepting media before restoring/freeing display buffers. */
 	if(err == CHIAKI_ERR_TIMEOUT)
 	{
@@ -2457,7 +2499,7 @@ ChiakiErrorCode plus_vita_stream_probe_with_pump(const ChiakiCloudProvisionResul
 	if(input)input->playback_started=false;
 	probe.profile_kbps=pv_profile_cap(input?input->profile_kbps:15000);
 #if PLUS_VITA_ADAPTIVE_STREAM
-	probe.video_reorder.grace_us=pv_profile_reorder(probe.profile_kbps);
+	probe.video_reorder.grace_us=pv_profile_reorder_initial(probe.profile_kbps);
 #endif
 	if(input && plus_vita_control_layout_valid(&input->layout)) probe.controls=input->layout;
 	else plus_vita_control_layout_defaults(&probe.controls);

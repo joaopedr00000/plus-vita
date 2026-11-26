@@ -5,6 +5,7 @@
 #include <psp2/kernel/sysmem.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "present_slots.h"
 
 #define PLUS_VITA_SCREEN_WIDTH 960u
 #define PLUS_VITA_SCREEN_HEIGHT 544u
@@ -12,15 +13,19 @@
 
 typedef struct {
 	SceDisplayFrameBuf saved;
-	SceUID blocks[2];
-	uint32_t *pixels[2];
-	unsigned int next;
+	SceUID blocks[3];
+	uint32_t *pixels[3];
+	PvPresentSlots slots;
+	uint64_t submitted_us;
 	bool displayed;
 	uint64_t last_display_us;
 	uint64_t last_wait_us;
 } PlusVitaVideoPresent;
 
 int plus_vita_video_present_init(PlusVitaVideoPresent *present);
+int plus_vita_video_present_pipeline_init(PlusVitaVideoPresent *present);
+int plus_vita_video_present_submit(PlusVitaVideoPresent *present);
+int plus_vita_video_present_finish(PlusVitaVideoPresent *present);
 /* Decoder writes only to this back buffer, never the active scanout. */
 uint32_t *plus_vita_video_present_back_buffer(PlusVitaVideoPresent *present);
 int plus_vita_video_present_frame(PlusVitaVideoPresent *present);

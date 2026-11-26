@@ -6,16 +6,20 @@ int main(void){
  assert(pv_profile_next(6000)==10000&&pv_profile_next(10000)==15000&&pv_profile_next(15000)==6000);
  assert(pv_profile_cap(0)==15000&&pv_profile_queue(6000)==4&&pv_profile_queue(15000)==8);
  assert(pv_profile_audio(6000)==4&&pv_profile_audio(10000)==4&&pv_profile_audio(15000)==6);
- assert(pv_profile_reorder(6000)==16000&&pv_profile_reorder(15000)==32000);
- unsigned r=16000;
- for(unsigned i=0;i<50;i++) { r=pv_reorder_adjust(16000,r,1,0); }
- assert(r==48000);
- for(unsigned i=0;i<50;i++) { r=pv_reorder_adjust(16000,r,0,0); }
- assert(r==16000);
- assert(pv_reorder_adjust(16000,32000,0,1)==31000);
- assert(pv_reorder_adjust(16000,16000,0,10)==16000);
- assert(pv_audio_queue_limit(5)==9&&pv_audio_queue_limit(8)==12&&pv_audio_queue_limit(11)==15);
- assert(pv_audio_queue_limit(0)==8&&pv_audio_queue_limit(100)==15);
+ assert(pv_profile_reorder(6000)==4000&&pv_profile_reorder(10000)==8000&&pv_profile_reorder(15000)==12000);
+ assert(pv_profile_reorder_initial(6000)==12000&&pv_profile_reorder_initial(15000)==20000);
+ assert(pv_audio_block(6000)==512&&pv_audio_block(10000)==960);
+ unsigned r=12000;
+ for(unsigned i=0;i<50;i++) { r=pv_reorder_adjust(4000,r,1,0); }
+ assert(r==20000);
+ for(unsigned i=0;i<50;i++) { r=pv_reorder_adjust(4000,r,0,0); }
+ assert(r==4000);
+ assert(pv_reorder_adjust(4000,16000,0,1)==12000);
+ assert(pv_reorder_adjust(4000,20000,0,10)==4000);
+ assert(pv_reorder_adjust(12000,30000,0,2)==16875);
+ assert(pv_reorder_adjust(8000,25000,2,1)==26000);
+ assert(pv_audio_queue_limit(5)==8&&pv_audio_queue_limit(8)==11&&pv_audio_queue_limit(11)==14);
+ assert(pv_audio_queue_limit(0)==7&&pv_audio_queue_limit(100)==14);
  assert(pv_present_due(4,100000,1,true));
  assert(pv_present_due(0,100000,1,false));
  assert(pv_present_due(1,15999,1,false)&&!pv_present_due(1,16000,1,false));
