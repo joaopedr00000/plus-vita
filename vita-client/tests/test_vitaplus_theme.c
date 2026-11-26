@@ -9,7 +9,7 @@
 static uint32_t pixels[960*544];
 static uint32_t label_colors[2];
 static PlusVitaCoverImage artwork;
-static bool metrics_seen,ps5_seen,status_seen;
+static bool metrics_seen,ps5_seen,status_seen,account_body_seen;
 static uint32_t logo[128*128];
 bool plus_vita_font_draw(PlusVitaFont *font,uint32_t *p,int pitch,const char *value,PlusVitaTextBox box,int size,bool wrap,uint32_t color){
     (void)font;(void)p;(void)pitch;(void)box;(void)size;(void)wrap;
@@ -17,6 +17,7 @@ bool plus_vita_font_draw(PlusVitaFont *font,uint32_t *p,int pitch,const char *va
     if(value && !strcmp(value,"Second"))label_colors[1]=color;
     if(value && strstr(value,"Playtime: unavailable"))metrics_seen=true;
     if(value && !strcmp(value,"97%"))status_seen=true;
+    if(value && !strcmp(value,"Account test details")){assert(box.height>=180&&box.x<500);account_body_seen=true;}
     if(value && strstr(value,"PS5 streaming is not available yet"))ps5_seen=true;
     return true;
 }
@@ -52,6 +53,8 @@ int main(void){
     v.screen=PLUS_VITA_APP_THEME;v.theme_id=12;v.battery_valid=true;v.battery_percent=97;v.action_count=1;
     v.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_PRIMARY,"First",64,182,832,44};
     plus_vita_app_paint(NULL,pixels,960,&v);assert(status_seen&&label_colors[0]==VP_DARK_INK);
+    v.screen=PLUS_VITA_APP_ACCOUNT;v.body="Account test details";v.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",544,93,398,56};
+    plus_vita_app_paint(NULL,pixels,960,&v);assert(account_body_seen);
     v.theme_id=0;
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);

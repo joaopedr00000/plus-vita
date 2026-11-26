@@ -5,7 +5,6 @@
 #include "../platform/build_identity.h"
 #include "../platform/adaptive_stream.h"
 #include "theme.h"
-#include "theme_presets.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
@@ -374,7 +373,7 @@ static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 static void menu_paint(Canvas *d,const PlusVitaAppView *v)
 {
     menu_chrome(d,v);
-    if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){    }else if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
+    if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
         outline(d,18,78,508,412,12,RGB(91,91,96),RGB(30,30,33),RGB(14,14,16));
         text(d,v->title?v->title:"VitaPlus",36,94,TEXT_TITLE,474,44,false,MENU_WHITE);
         rectangle(d,32,148,480,1,RGB(73,73,77));
