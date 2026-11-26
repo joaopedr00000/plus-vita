@@ -18,6 +18,8 @@ static atomic_uint_fast64_t now_us;
 static uint64_t next_arrival, output_deadline;
 static unsigned sequence, output_count, log_delay, slow_output, initial_units;
 static unsigned first_pcm_delay;
+static unsigned native_block, expected_block, open_attempts, period_remainder;
+static bool reject_small_block;
 static char final_timing[2048], final_summary[1024];
 
 uint64_t sceKernelGetProcessTimeWide(void) { return atomic_load(&now_us); }
@@ -52,18 +54,22 @@ int opus_decode(OpusDecoder *d, const unsigned char *packet, opus_int32 size, in
 { (void)packet; (void)size; assert(n == 480 && !fec); memset(pcm, 0, 480 * d->channels * sizeof(*pcm)); return 480; }
 int opus_decoder_ctl(OpusDecoder *d, int request, ...) { (void)d; assert(request == OPUS_RESET_STATE); return OPUS_OK; }
 int sceAudioOutOpenPort(int type, int block, int rate, int mode)
-{ assert(type == 0 && block == 960 && rate == 48000 && mode == 1); return 1; }
+{ assert(type == 0 && rate == 48000 && mode == 1); assert(block == (open_attempts++ ? 960 : (int)expected_block)); if(block == 512 && reject_small_block) return -1; native_block = (unsigned)block; return 1; }
 int sceAudioOutSetVolume(int port, int flags, const int *v)
 { assert(port == 1 && flags == 3 && v[0] == 32768 && v[1] == 32768); return 0; }
-int sceAudioOutGetConfig(int port, int key) { assert(port == 1); return key == 0 ? 960 : key == 1 ? 48000 : 1; }
+int sceAudioOutGetConfig(int port, int key) { assert(port == 1); return key == 0 ? (int)native_block : key == 1 ? 48000 : 1; }
 int sceAudioOutReleasePort(int port) { assert(port == 1); return 0; }
 int sceAudioOutOutput(int port, const void *pcm)
 {
 	assert(port == 1); if(!pcm) return 0;
 	uint64_t now = sceKernelGetProcessTimeWide();
 	if(!output_count) output_deadline = now;
-	output_deadline += 20000 + slow_output;
-	uint64_t target = relative_pacing ? now + 20000 + slow_output : (now > output_deadline ? now : output_deadline);
+	/* Carry the fractional sample period (512/48000 s is not an integer in us). */
+	unsigned scaled = native_block * 1000000u + period_remainder;
+	unsigned period = scaled / 48000u;
+	period_remainder = scaled % 48000u;
+	output_deadline += period + slow_output;
+	uint64_t target = relative_pacing ? now + period + slow_output : (now > output_deadline ? now : output_deadline);
 	deliver_until(target);
 	output_count++;
 	if(output_count >= 5000) {
@@ -86,6 +92,8 @@ static unsigned long long field(const char *line, const char *name)
 static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, unsigned pacing_error, bool relative, bool after_first, unsigned profile)
 {
 	ready = finished = false; audio = NULL; sequence = output_count = 0;
+	native_block = open_attempts = period_remainder = 0;
+	expected_block = profile == 6000 ? 512 : 960;
 	log_delay = writer_delay; slow_output = pacing_error; relative_pacing = relative;
 	first_pcm_delay = after_first ? startup : 0;
 	if(after_first) startup = 0;
@@ -105,6 +113,8 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 	while(!finished) pthread_cond_wait(&changed, &gate);
 	pthread_mutex_unlock(&gate);
 	assert(plus_vita_audio_stop(audio));
+	assert(native_block == (reject_small_block && expected_block == 512 ? 960 : expected_block));
+	assert(open_attempts == (reject_small_block && expected_block == 512 ? 2u : 1u));
 	uint64_t average = field(final_timing, "queue_age_avg_us=");
 	printf("%s: queue_avg_us=%llu queue_max_us=%llu gap_stalls=%llu drops=%llu outputs=%llu\n", name,
 		(unsigned long long)average, field(final_timing, "queue_age_max_us="), field(final_timing, "output_gap_stalls="),
@@ -131,6 +141,10 @@ int main(void)
 	assert(mismatch > startup + 25000);
 	uint64_t low=run("adaptive 6 Mbps / 200ms startup",200000,0,0,false,false,6000);
 	assert(low<110000 && field(final_summary,"queue_peak=")<=9 && field(final_summary,"dropped=")>0);
+	reject_small_block=true;
+	uint64_t fallback=run("adaptive 6 Mbps / rejected 512-frame port fallback",200000,0,0,false,false,6000);
+	assert(fallback<110000 && field(final_summary,"queue_peak=")<=9 && field(final_summary,"dropped=")>0);
+	reject_small_block=false;
 	uint64_t quality=run("adaptive 15 Mbps / 200ms startup",200000,0,0,false,false,15000);
 	assert(quality<140000 && field(final_summary,"queue_peak=")<=12 && field(final_summary,"dropped=")>0);
 	puts("audio queue: legacy timing and adaptive bounded backlog passed; no hardware latency inferred");
