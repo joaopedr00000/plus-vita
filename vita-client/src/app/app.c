@@ -454,7 +454,7 @@ static void setup_view(PlusVitaApp *app)
 	app->view = (PlusVitaAppView){
 		.screen = PLUS_VITA_APP_SETUP,
 		.title = "Import your sign-in JSON.", .subtitle = "CONNECT TO SONY",
-		.body = "Save plus-vita-auth.json in ux0:data with VitaShell.\nThe JSON stays there and can sign you in next launch.\nRemember Off pauses automatic sign-in; files are locally readable.",
+		.body = "Save plus-vita-auth.json in ux0:data/VitaPlus/Imports with VitaShell.\nThe JSON stays there and can sign you in next launch.\nRemember Off pauses automatic sign-in; files are locally readable.",
 		.hint = "X  Select     O  Back",
 		.actions = {
 			{ PLUS_VITA_ACTION_IMPORT, "Import JSON", 64, 316, 832, 52 },
@@ -517,7 +517,7 @@ static const char *result_message(PlusVitaAppResult result)
 	switch(result)
 	{
 		case PLUS_VITA_RESULT_MISSING:
-			return "No sign-in JSON was found. Transfer plus-vita-auth.json\nto ux0:data with VitaShell, then choose Import JSON.";
+			return "No sign-in JSON was found. Transfer plus-vita-auth.json\nto ux0:data/VitaPlus/Imports with VitaShell, then choose Import JSON.";
 		case PLUS_VITA_RESULT_STORAGE_ERROR:
 			return "The sign-in JSON could not be read. Check it with VitaShell and try again.";
 		case PLUS_VITA_RESULT_REJECTED:
@@ -1009,7 +1009,7 @@ static void font_comparison(PlusVitaApp *app)
 		.subtitle=app->alternative_font ? "B: FREETYPE / NOTO SANS" : "A: CURRENT SYSTEM FONT",
 		.title=app->comparison_page ? "Choose your next game." : "Import your sign-in JSON.",
 		.body=app->comparison_page ? "Synthetic titles. Japanese uses the system fallback." :
-			"Save plus-vita-auth.json in ux0:data with VitaShell.\nThe JSON stays there and can sign you in next launch.\nRemember Off pauses automatic sign-in; files are locally readable.",
+			"Save plus-vita-auth.json in ux0:data/VitaPlus/Imports with VitaShell.\nThe JSON stays there and can sign you in next launch.\nRemember Off pauses automatic sign-in; files are locally readable.",
 		.hint="Left stick  Move     X  Select     O  Back     Square  Save image",
 		.alternative_font=app->alternative_font,.comparison_page=app->comparison_page,
 		.actions={{PLUS_VITA_ACTION_FONT_TOGGLE,app->alternative_font ? "Show A: System" : "Show B: FreeType",64,444,260,48},
@@ -1160,7 +1160,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		return effect;
 	}
 	if(event.kind==PLUS_VITA_EVENT_FONT_CAPTURED && view->screen==PLUS_VITA_APP_FONT_COMPARISON) {
-		view->hint=event.status==PLUS_VITA_RESULT_OK ? "Synthetic screenshot saved in ux0:data. Square saves again." : "Screenshot could not be saved. Check storage.";
+		view->hint=event.status==PLUS_VITA_RESULT_OK ? "Synthetic screenshot saved in ux0:data/VitaPlus/Captures. Square saves again." : "Screenshot could not be saved. Check storage.";
 		return effect;
 	}
 	if(event.kind == PLUS_VITA_EVENT_PAD)

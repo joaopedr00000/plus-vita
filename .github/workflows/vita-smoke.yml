@@ -121,6 +121,10 @@ jobs:
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -Iexternal/json-c -I/tmp/pv-stream-test vita-client/tests/test_cloud_response.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/response
           /tmp/pv-stream-test/response
+      - name: Test storage migration and restricted vault-key migration
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/src/platform/storage_migration.c vita-client/tests/test_storage_migration.c -o /tmp/pv-storage-test
+          /tmp/pv-storage-test
       - name: Test VitaPlus dark gold renderer and QR theme
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 vita-client/tests/test_vitaplus_theme.c vita-client/src/app/render.c -o /tmp/pv-theme

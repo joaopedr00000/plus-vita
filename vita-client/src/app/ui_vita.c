@@ -25,6 +25,8 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/sysmem.h>
 #include "../platform/credential_ime.h"
+#include "../platform/storage_paths.h"
+#include "../platform/storage_migration.h"
 #include "../platform/diagnostic_log.h"
 #include "../platform/latency_clock.h"
 #include "../platform/network.h"
@@ -295,7 +297,7 @@ static int menu_read(PlusVitaController *controller,SceCtrlData *pad)
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "../platform/region_policy.h"
 #include "i18n.h"
-#define PV_THEME_PREFS "ux0:data/plus-vita-theme.cfg"
+#define PV_THEME_PREFS PV_THEME_FILE
 static void theme_load(PlusVitaApp *app){
     FILE *file=fopen(PV_THEME_PREFS,"rb");if(!file)return;
     char p[8]={0},s[8]={0},extra;unsigned mode=0;uint32_t primary,secondary;
@@ -311,7 +313,7 @@ static bool theme_save(PlusVitaAppView v){
     if(ok&&rename(PV_THEME_PREFS ".tmp",PV_THEME_PREFS)==0)return true;
     remove(PV_THEME_PREFS ".tmp");return false;
 }
-#define PV_STREAM_PREFS "ux0:data/plus-vita-stream.cfg"
+#define PV_STREAM_PREFS PV_STREAM_FILE
 static void stream_prefs_load(PlusVitaApp *app)
 {
 	unsigned profile=15000,hud=0,region=0,lang=0;char extra=0;
@@ -327,8 +329,38 @@ static void stream_prefs_save(unsigned profile,bool hud,unsigned region,unsigned
 	if(!ok||rename(PV_STREAM_PREFS ".tmp",PV_STREAM_PREFS)!=0)remove(PV_STREAM_PREFS ".tmp");
 }
 #endif
+#if PLUS_VITA_ADAPTIVE_STREAM
+static int migration_failed(void)
+{
+    UiDisplay *d=calloc(1,sizeof(*d));if(!d)return 1;
+    if(!display_open(d)){free(d);return 1;}
+    PlusVitaAppView v={.screen=PLUS_VITA_APP_ERROR,.title="Storage migration paused",.subtitle="VitaPlus",
+        .body="A storage error or conflicting file was found. Different files were not overwritten. Back up the VitaPlus and plus-vita data folders on ux0 and ur0 with VitaShell. Restart to retry.",.hint="X / O  Exit"};
+    v.library_logo=d->library_logo;
+    plus_vita_app_paint(d->font,d->pixels[0],PITCH,&v);
+    SceDisplayFrameBuf fb={.size=sizeof(fb),.base=d->pixels[0],.pitch=PITCH,.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8,.width=WIDTH,.height=HEIGHT};
+    if(sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME)>=0){
+        d->displayed=true;
+        if(sceDisplayWaitSetFrameBuf()>=0){
+            SceCtrlData pad={0};bool released=false;
+            for(;;){
+                if(sceCtrlPeekBufferPositive(0,&pad,1)>0){
+                    if(!(pad.buttons&(SCE_CTRL_CROSS|SCE_CTRL_CIRCLE)))released=true;
+                    else if(released)break;
+                }
+                sceKernelDelayThread(20000);
+            }
+        }
+    }
+    if(display_close(d))free(d);
+    return 1;
+}
+#endif
 int plus_vita_app_run(void)
 {
+#if PLUS_VITA_ADAPTIVE_STREAM
+    if(!pv_storage_migrate("ux0:data")||!pv_key_storage_migrate("ur0:data"))return migration_failed();
+#endif
 	plus_vita_diagnostic_ui_begin();
 	bool log_available = plus_vita_diagnostic_persistence_ok();
 	UiDisplay *display = calloc(1, sizeof(*display));
@@ -351,7 +383,7 @@ int plus_vita_app_run(void)
 	bool network_ready = plus_vita_network_init() == CHIAKI_ERR_SUCCESS;
 	bool curl_ready = network_ready && curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
 	bool recovery_ready = plus_vita_recovery_init();
-	if(curl_ready) covers = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_covers_create_cached("ux0:data/VitaPlus-Covers") : plus_vita_covers_create();
+	if(curl_ready) covers = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_covers_create_cached(PV_COVER_DIR) : plus_vita_covers_create();
 	SceCtrlPadInputMode previous_mode = SCE_CTRL_MODE_DIGITAL;
 	bool restore_mode = sceCtrlGetSamplingMode(&previous_mode) == 0;
 	sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
@@ -458,8 +490,8 @@ int plus_vita_app_run(void)
 			if(!input_changed && current.screen==PLUS_VITA_APP_FONT_COMPARISON
 				&& (pad.buttons & ~capture_buttons & SCE_CTRL_SQUARE)) {
 				const char *path=current.alternative_font
-					? (current.comparison_page ? "ux0:data/plus-vita-font-B-tiles.ppm" : "ux0:data/plus-vita-font-B-setup.ppm")
-					: (current.comparison_page ? "ux0:data/plus-vita-font-A-tiles.ppm" : "ux0:data/plus-vita-font-A-setup.ppm");
+					? (current.comparison_page ? PV_CAPTURE_DIR "plus-vita-font-B-tiles.ppm" : PV_CAPTURE_DIR "plus-vita-font-B-setup.ppm")
+					: (current.comparison_page ? PV_CAPTURE_DIR "plus-vita-font-A-tiles.ppm" : PV_CAPTURE_DIR "plus-vita-font-A-setup.ppm");
 				bool saved=plus_vita_comparison_capture(display->pixels[display->back^1u],PITCH,path);
 				plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_FONT_CAPTURED,
 					.status=saved ? PLUS_VITA_RESULT_OK : PLUS_VITA_RESULT_STORAGE_ERROR},0);

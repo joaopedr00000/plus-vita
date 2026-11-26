@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PLUS_VITA_CONTROLS_PATH "ux0:data/plus-vita-controls.dat"
+#include "storage_paths.h"
+#define PLUS_VITA_CONTROLS_PATH PV_CONTROLS_FILE
 typedef enum {
 	PLUS_VITA_INPUT_CROSS, PLUS_VITA_INPUT_CIRCLE, PLUS_VITA_INPUT_SQUARE, PLUS_VITA_INPUT_TRIANGLE,
 	PLUS_VITA_INPUT_UP, PLUS_VITA_INPUT_DOWN, PLUS_VITA_INPUT_LEFT, PLUS_VITA_INPUT_RIGHT,

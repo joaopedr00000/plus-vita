@@ -14,14 +14,15 @@
 #include <chiaki/random.h>
 #endif
 
-#define IMPORT_FILE "ux0:data/plus-vita-auth.json"
-#define ACCOUNT_DIR "ux0:data/plus-vita"
+#include "../platform/storage_paths.h"
+#define IMPORT_FILE PV_IMPORT_FILE
+#define ACCOUNT_DIR PV_ACCOUNT_DIR
 #define ACCOUNT_FILE ACCOUNT_DIR "/account.json"
 #define ACCOUNT_TEMP ACCOUNT_DIR "/account.tmp"
 #define ACCOUNT_BLOCK ACCOUNT_DIR "/account.blocked"
 #if PLUS_VITA_ACCOUNT_VAULT
 /* Separate internal partition, not a fixed key or a key embedded in the JSON. */
-#define KEY_DIR "ur0:data/plus-vita"
+#define KEY_DIR PV_KEY_DIR
 #define KEY_FILE KEY_DIR "/account.key"
 #define KEY_TEMP KEY_DIR "/account.key.tmp"
 #endif

@@ -1,6 +1,6 @@
 # VitaPlus clean development candidate
 
-Direct parent: published v0.0.5-2 (ccce864310dc6694a243915be7c4e2edcc99fc1e). No storage migration, preset theme collection, decorative icons, wallpaper worker or changes to published VPKs.
+Direct parent: published v0.0.5-2 (ccce864310dc6694a243915be7c4e2edcc99fc1e). No preset theme collection, decorative icons, wallpaper worker or changes to published VPKs.
 
 - Appearance: persistent independent RGB primary/secondary colors, native hex entry, preview swatches, restore original gold. The original logo remains. No bundled themes or wallpaper support in this candidate.
 - Menus: native catalogue button surface, focus colors, original header, live RTC/battery/network indicators, account/setup panel and QR frame. Existing library layout, cover aspect ratio, filters and game actions retained. System dialogs remain native.
@@ -8,3 +8,7 @@ Direct parent: published v0.0.5-2 (ccce864310dc6694a243915be7c4e2edcc99fc1e). No
 - PS5: Con v0.5.2 (https://github.com/houqai/Con-app/releases/tag/v0.5.2) fixed 002.0011 using PC session envelope; independent adaptation of its public protocol fields only for the PS5 configuration. Existing PS5 OAuth, protocol 12/cronos, measured RTT, region and authorization rules retained. The Vita still requests AVC and rejects unsupported HEVC. Con's HEVC playback does not establish Vita playback compatibility. PS5 remains experimental/unavailable for confirmed gameplay.
 
 Test branch only. GitHub Actions must pass; physical device validation remains required.
+
+## Storage organization
+
+All native adaptive user data is organized under `ux0:data/VitaPlus`: Account, Settings, Imports, Cache/Covers, Cache/PS5-Catalog, Logs/Archive and Captures. Wallpapers and Cache/Themes are reserved and existing local files are migrated, but the wallpaper renderer is not part of this clean candidate. Only dedicated automatic vault key files are moved to `ur0:data/VitaPlus`, keeping the key on a separate partition from the encrypted vault. Startup migration is idempotent, uses same-volume renames, compares duplicates byte-for-byte before removing them, refuses conflicting files, and does not recurse through unrelated ur0 directories. Back up the old and new dedicated directories privately before testing. Downgrading may require manually restoring the original paths. No system or jailbreak files are touched. Current logs retain the existing single-active-log policy; legacy logs are archived. Host regression tests cover idempotency, conflicting files, key length validation, and unrelated file preservation.

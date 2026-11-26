@@ -16,7 +16,7 @@
 #endif
 
 #ifdef __vita__
-#define PV_LOG_DIR "ux0:data/"
+#define PV_LOG_DIR PV_DIAG_DIR
 #else
 #define PV_LOG_DIR ""
 #endif
@@ -93,7 +93,7 @@ static void diagnostic_remove_legacy(void)
 {
 #if !(defined(__vita__) && PLUS_VITA_PS3_REPLAY)
 #ifdef __vita__
-#define PV_OLD_LOG_PREFIX "ux0:data/"
+#define PV_OLD_LOG_PREFIX PV_DIAG_DIR
 #else
 #define PV_OLD_LOG_PREFIX ""
 #endif
