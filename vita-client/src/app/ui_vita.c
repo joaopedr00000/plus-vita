@@ -27,6 +27,7 @@
 #include "../platform/credential_ime.h"
 #include "../platform/storage_paths.h"
 #include "../platform/storage_migration.h"
+#include "../platform/updater_vita.h"
 #include "../platform/diagnostic_log.h"
 #include "../platform/latency_clock.h"
 #include "../platform/network.h"
@@ -389,6 +390,9 @@ int plus_vita_app_run(void)
 	bool network_ready = plus_vita_network_init() == CHIAKI_ERR_SUCCESS;
 	bool curl_ready = network_ready && curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
 	bool recovery_ready = plus_vita_recovery_init();
+#if PLUS_VITA_ADAPTIVE_STREAM
+	PvUpdater *updater=pv_updater_create();bool update_checked=false;
+#endif
 	if(curl_ready) covers = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_covers_create_cached(PV_COVER_DIR) : plus_vita_covers_create();
 	SceCtrlPadInputMode previous_mode = SCE_CTRL_MODE_DIGITAL;
 	bool restore_mode = sceCtrlGetSamplingMode(&previous_mode) == 0;
@@ -445,6 +449,16 @@ int plus_vita_app_run(void)
 		PlusVitaAppView current=plus_vita_app_view(app);
 #if PLUS_VITA_ADAPTIVE_STREAM
         display->menu_language=current.ui_language;
+        PvUpdateReport update_report;
+        if(pv_updater_poll(updater,&update_report)){
+            plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UPDATE_REPORT,.update_report=&update_report},0);
+            flow.dirty=true;current=plus_vita_app_view(app);
+            if(current.screen==PLUS_VITA_APP_CLOSED)break;
+        }
+        if(!update_checked&&curl_ready&&!flow.splash_active&&workers_idle&&plus_vita_account_idle(storage)&&!current.operation&&(current.screen==PLUS_VITA_APP_WELCOME||current.screen==PLUS_VITA_APP_CATALOGUE)){
+            update_checked=true;
+            if(pv_updater_automatic(updater))pv_updater_command(updater,PV_UP_CMD_CHECK,current.ui_language);
+        }
 		uint64_t status_now=plus_vita_latency_now_us();
 		if(!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen){
 			library_status(&flow);last_status=status_now;
@@ -539,6 +553,17 @@ int plus_vita_app_run(void)
 			PlusVitaAppEffect effect = plus_vita_ui_flow_take(&flow);
 			if(effect.operation && effect.operation == plus_vita_app_view(app).operation)
 			{
+#if PLUS_VITA_ADAPTIVE_STREAM
+                if(effect.kind==PLUS_VITA_EFFECT_UPDATE){
+                    if(updater&&((effect.update_command!=PV_UP_CMD_CHECK&&effect.update_command!=PV_UP_CMD_DOWNLOAD)||curl_ready))
+                        pv_updater_command(updater,effect.update_command,effect.ui_language);
+                    else {
+                        PvUpdateReport failed={.state=PV_UP_ERROR,.automatic=true};
+                        plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UPDATE_REPORT,.update_report=&failed},0);
+                    }
+                    flow.dirty=true;
+                }else
+#endif
 				if(effect.kind == PLUS_VITA_EFFECT_PREPARE_SETUP)
 					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = PLUS_VITA_EVENT_SETUP_READY, .operation = effect.operation },0);
 				#if PLUS_VITA_LAN_LOGIN
@@ -750,6 +775,9 @@ int plus_vita_app_run(void)
 		}
 		sceDisplayWaitVblankStart();
 	}
+#if PLUS_VITA_ADAPTIVE_STREAM
+	pv_updater_destroy(updater);
+#endif
 	if(restore_touch) sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, previous_touch);
 	if(restore_mode) sceCtrlSetSamplingMode(previous_mode);
 	if(previous_extended_mode>=0) sceCtrlSetSamplingModeExt((SceCtrlPadInputMode)previous_extended_mode);

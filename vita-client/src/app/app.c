@@ -76,6 +76,9 @@ struct plus_vita_app_t {
 	uint32_t theme_primary,theme_secondary;
 	bool theme_custom;
 	char theme_labels[2][128];
+	PvUpdateReport update;
+	unsigned update_note_page;
+	char update_body[768];
 };
 
 static void welcome(PlusVitaApp *app)
@@ -119,6 +122,10 @@ static void welcome(PlusVitaApp *app)
 		app->view.action_count = 5;
 		if(app->view.selected >= 5) app->view.selected = 0;
 	}
+#if PLUS_VITA_ADAPTIVE_STREAM
+    if(app->update.state==PV_UP_AVAILABLE)
+        for(size_t j=0;j<app->view.action_count;j++)if(app->view.actions[j].id==PLUS_VITA_ACTION_SETTINGS)app->view.actions[j].label="Updates available - Settings";
+#endif
 }
 
 static void settings_view(PlusVitaApp *app)
@@ -154,12 +161,57 @@ static void settings_view(PlusVitaApp *app)
  	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
 	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME,"Appearance",64,0,832,34};
 	app->view.action_count++;
+	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
+	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATES,app->update.state==PV_UP_AVAILABLE?"Updates available":"Updates",64,0,832,34};
+	app->view.action_count++;
 	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=174+(int)i*39;app->view.actions[i].height=34;}
 	app->view.body="Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled.";
 #endif
 }
 
 #if PLUS_VITA_ADAPTIVE_STREAM
+static bool update_busy(PvUpdateState state){return state==PV_UP_CHECKING||state==PV_UP_DOWNLOADING||state==PV_UP_INSTALLING;}
+static void update_view(PlusVitaApp *app){
+    PvUpdateReport *q=&app->update;
+    static const char *const status[]={"Check for updates.","Checking GitHub releases...","Update available","No newer version in this channel.","Downloading update...","Verified VPK ready to install.","Installing update. Do not turn off the console.","Update installed. Returning to LiveArea.","Update failed. Check Wi-Fi or free space. A verified VPK remains in Downloads if installation failed.","Update cancelled."};
+    unsigned st=(unsigned)q->state;
+    if(st>=sizeof(status)/sizeof(status[0]))st=0;
+    char notes[241]={0};
+    size_t len=strlen(q->notes),offset=0;
+    for(unsigned page=0;page<app->update_note_page&&offset<len;page++){
+        size_t n=len-offset;if(n>220)n=220;
+        while(n&&offset+n<len&&((unsigned char)q->notes[offset+n]&0xc0)==0x80)n--;
+        if(!n)break;
+        offset+=n;
+    }
+    if(offset<len){
+        size_t n=len-offset;if(n>220)n=220;
+        while(n&&offset+n<len&&((unsigned char)q->notes[offset+n]&0xc0)==0x80)n--;
+        memcpy(notes,q->notes+offset,n);
+    }
+    snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s%s%s",PV_TR("Installed:"),PLUS_VITA_APP_VERSION,PV_TR(status[st]),q->version[0]?" ":"",q->version);
+    size_t used=strlen(app->update_body);
+    if(!update_busy(q->state)&&notes[0])snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
+    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
+    if(update_busy(q->state)){
+        app->view.hint=q->state==PV_UP_INSTALLING?"Please wait":"O  Cancel";
+        if(q->state!=PV_UP_INSTALLING)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CANCEL,"Cancel",64,440,832,42};
+        return;
+    }
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHANNEL,q->beta?"Channel: Beta":"Channel: Stable",64,0,832,34};
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_AUTO,q->automatic?"Automatic checks: On":"Automatic checks: Off",64,0,832,34};
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHECK,"Check for updates",64,0,832,34};
+    if(q->state==PV_UP_AVAILABLE)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_DOWNLOAD,"Download update",64,0,832,34};
+    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install verified update",64,0,832,34};
+    if(len>220)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
+    int first=490-(int)app->view.action_count*40;
+    for(size_t j=0;j<app->view.action_count;j++)app->view.actions[j].y=first+(int)j*40;
+}
+static PlusVitaAppEffect update_effect(PlusVitaApp *app,PvUpdateCommand command){
+    app->view.operation=app->pending_operation=++app->next_operation;
+    return (PlusVitaAppEffect){.kind=PLUS_VITA_EFFECT_UPDATE,.operation=app->pending_operation,.update_command=command,.ui_language=app->ui_language};
+}
 static void theme_view(PlusVitaApp *app,const char *notice)
 {
     snprintf(app->theme_labels[0],sizeof(app->theme_labels[0]),"%s: #%06X",PV_TR("Primary color"),(unsigned)app->theme_primary);
@@ -410,6 +462,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 #if PLUS_VITA_ADAPTIVE_STREAM
 	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
 	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;
+	view.update_progress=app->update.progress;view.update_downloading=app->update.state==PV_UP_DOWNLOADING;
     if(view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP){
         int step=view.action_count>6?44:62;
         for(size_t j=0;j<view.action_count;j++){
@@ -1054,6 +1107,24 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	PlusVitaAppView *view = &app->view;
 	PlusVitaAppEffect effect = { .kind = PLUS_VITA_EFFECT_NONE };
 	#if PLUS_VITA_ADAPTIVE_STREAM
+    if(event.kind==PLUS_VITA_EVENT_UPDATE_REPORT&&event.update_report){
+        bool new_release=strcmp(app->update.version,event.update_report->version)!=0;
+        bool changed=app->update.state!=event.update_report->state;
+        app->update=*event.update_report;
+        if(new_release)app->update_note_page=0;
+        if(view->screen==PLUS_VITA_APP_UPDATES){
+            size_t selected=view->selected;
+            app->pending_operation=0;
+            update_view(app);
+            if(!changed&&selected<view->action_count)view->selected=selected;
+        }else if(view->screen==PLUS_VITA_APP_SETTINGS){
+            size_t selected=view->selected;settings_view(app);if(selected<view->action_count)view->selected=selected;
+        }else if(view->screen==PLUS_VITA_APP_WELCOME){
+            size_t selected=view->selected;welcome(app);if(selected<view->action_count)view->selected=selected;
+        }
+        if(app->update.state==PV_UP_INSTALLED)view->screen=PLUS_VITA_APP_CLOSED;
+        return effect;
+    }
     if(event.kind==PLUS_VITA_EVENT_THEME_LOADED){
         if(event.theme_primary<=0xffffffu&&event.theme_secondary<=0xffffffu){
             app->theme_custom=event.theme_custom;
@@ -1553,6 +1624,11 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
+		if(view->screen==PLUS_VITA_APP_UPDATES){
+            if(app->update.state==PV_UP_INSTALLING)return effect;
+            if(update_busy(app->update.state))return update_effect(app,PV_UP_CMD_CANCEL);
+            app->pending_operation=0;settings_view(app);return effect;
+        }
 		if(app->waiting_for==PLUS_VITA_EFFECT_EDIT_PRIMARY||app->waiting_for==PLUS_VITA_EFFECT_EDIT_SECONDARY){app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;theme_view(app,NULL);return effect;}
 #endif
 		if(controls_screen(view->screen)) return edit_controls(app,PLUS_VITA_ACTION_BACK);
@@ -1716,6 +1792,21 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect.vault_clean_import=action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT;return effect;
 		}
 #endif
+        else if(action==PLUS_VITA_ACTION_UPDATES&&view->screen==PLUS_VITA_APP_SETTINGS)update_view(app);
+        else if(view->screen==PLUS_VITA_APP_UPDATES){
+            if(action==PLUS_VITA_ACTION_UPDATE_NOTES){
+                if((size_t)(++app->update_note_page)*216>=strlen(app->update.notes))app->update_note_page=0;
+                update_view(app);return effect;
+            }
+            if(action==PLUS_VITA_ACTION_BACK){settings_view(app);return effect;}
+            if(action==PLUS_VITA_ACTION_UPDATE_CANCEL)return update_effect(app,PV_UP_CMD_CANCEL);
+            if(action==PLUS_VITA_ACTION_UPDATE_CHANNEL)return update_effect(app,PV_UP_CMD_CHANNEL);
+            if(action==PLUS_VITA_ACTION_UPDATE_AUTO)return update_effect(app,PV_UP_CMD_AUTO);
+            if(action==PLUS_VITA_ACTION_UPDATE_CHECK)return update_effect(app,PV_UP_CMD_CHECK);
+            if(action==PLUS_VITA_ACTION_UPDATE_DOWNLOAD)return update_effect(app,PV_UP_CMD_DOWNLOAD);
+            if(action==PLUS_VITA_ACTION_UPDATE_INSTALL)return update_effect(app,PV_UP_CMD_INSTALL);
+            return effect;
+        }
         else if(action==PLUS_VITA_ACTION_THEME && view->screen==PLUS_VITA_APP_SETTINGS)theme_view(app,NULL);
         else if(view->screen==PLUS_VITA_APP_THEME&&(action==PLUS_VITA_ACTION_PRIMARY||action==PLUS_VITA_ACTION_SECONDARY))
             return operation(app,action==PLUS_VITA_ACTION_PRIMARY?PLUS_VITA_EFFECT_EDIT_PRIMARY:PLUS_VITA_EFFECT_EDIT_SECONDARY,"Enter a color (RRGGBB).",true);

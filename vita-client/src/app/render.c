@@ -463,6 +463,13 @@ static void menu_paint(Canvas *d,const PlusVitaAppView *v)
             text(d,v->body,64,83,bottom<150?TEXT_MICRO:TEXT_COMPACT,832,bottom-85,true,MENU_BODY);
         }
     }
+    if(v->screen==PLUS_VITA_APP_UPDATES&&v->update_downloading){
+        unsigned p=v->update_progress>100?100:v->update_progress;
+        char percent[12];snprintf(percent,sizeof(percent),"%u%%",p);
+        outline(d,64,338,832,24,6,RGB(105,105,109),RGB(35,35,38),RGB(20,20,22));
+        if(p)rectangle(d,68,342,(824*(int)p)/100,16,readable(d,MENU_ACCENT));
+        text(d,percent,64,370,TEXT_CONTROL,832,30,false,MENU_WHITE);
+    }
     for(size_t j=0;j<v->action_count;j++)menu_card(d,v,j);
     if(v->list_total>v->list_count&&v->list_count&&v->list_height>0){
         int height=v->list_height,thumb=(int)((size_t)height*v->list_count/v->list_total);if(thumb<8)thumb=8;
