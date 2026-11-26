@@ -5,6 +5,7 @@
 #include "../platform/build_identity.h"
 #include "../platform/adaptive_stream.h"
 #include "theme.h"
+#include "custom_theme.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
@@ -38,7 +39,7 @@ typedef enum {
 	TEXT_MICRO=14, TEXT_HINT=16, TEXT_COMPACT=18, TEXT_BODY=20,
 	TEXT_CONTROL=22, TEXT_BRAND=24, TEXT_TITLE=26, TEXT_HEADING=36
 } TextRole;
-typedef struct { uint32_t *pixels; int pitch; PlusVitaFont *font; unsigned language; } Canvas;
+typedef struct { uint32_t *pixels; int pitch; PlusVitaFont *font; unsigned language; bool custom; uint32_t primary,secondary; } Canvas;
 static const char *localized(Canvas *d,const char *s){
 #if PLUS_VITA_ADAPTIVE_STREAM
 	return pv_translate(d->language,s);
@@ -175,6 +176,10 @@ static void library_logo(Canvas *d,const uint32_t *logo)
 		}
 	}
 }
+static uint32_t primary(Canvas *d,uint32_t fallback){return d->custom?d->primary:fallback;}
+static uint32_t secondary(Canvas *d,uint32_t fallback){return d->custom?d->secondary:fallback;}
+static uint32_t tint(Canvas *d,uint32_t fallback,unsigned amount){return d->custom?mix(RGB(18,18,20),d->secondary,amount):fallback;}
+static uint32_t readable(Canvas *d,uint32_t fallback){return d->custom?mix(d->primary,RGB(255,255,255),125):fallback;}
 static void library_background(Canvas *d)
 {
 	for(int y=0;y<HEIGHT;y++)rectangle(d,0,y,WIDTH,1,RGB(12+y*6/544,12+y*6/544,14+y*6/544));
@@ -185,11 +190,11 @@ static void library_background(Canvas *d)
 		int lower=485-((x-550)*(x-550))/3000+(x-400)/45;
 		for(int b=0;b<14;b++){
 			int shade=14-b;
-			rectangle(d,x,upper+b*3,1,3,RGB(18+shade*3,17+shade*2,19+shade));
-			rectangle(d,x,lower-b*3,1,3,RGB(18+shade*3,17+shade*2,19+shade));
+			rectangle(d,x,upper+b*3,1,3,tint(d,RGB(18+shade*3,17+shade*2,19+shade),(unsigned)shade*8));
+			rectangle(d,x,lower-b*3,1,3,tint(d,RGB(18+shade*3,17+shade*2,19+shade),(unsigned)shade*8));
 		}
-		rectangle(d,x,upper,1,1,RGB(186,148,66));
-		rectangle(d,x,lower,1,1,RGB(163,127,53));
+		rectangle(d,x,upper,1,1,secondary(d,RGB(186,148,66)));
+		rectangle(d,x,lower,1,1,secondary(d,RGB(163,127,53)));
 	}
 	rectangle(d,0,497,960,47,RGB(10,10,12));
 }
@@ -209,7 +214,7 @@ static void library_status(Canvas *d,const PlusVitaAppView *v)
 	if(v->battery_valid){
 		snprintf(buf,sizeof(buf),"%u%%",v->battery_percent);text(d,buf,879,7,TEXT_HINT,44,26,false,MENU_WHITE);
 		outline(d,925,9,26,14,3,MENU_WHITE,RGB(20,20,22),RGB(20,20,22));rectangle(d,951,13,3,6,MENU_WHITE);
-		rectangle(d,927,11,(int)(22u*(v->battery_percent>100?100:v->battery_percent)/100u),10,MENU_ACCENT);
+		rectangle(d,927,11,(int)(22u*(v->battery_percent>100?100:v->battery_percent)/100u),10,readable(d,MENU_ACCENT));
 	}
 }
 static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCovers *covers,size_t index)
@@ -218,13 +223,13 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 	bool focus=index==v->selected,pressed=v->touch_pressed&&index==v->pressed_index;
 	if(b->id==PLUS_VITA_ACTION_GAME&&index<v->list_count){
 		bool chosen=v->focus==v->list_first+index;const PlusVitaCatalogEntry *game=v->games[index];
-		if(chosen||focus||pressed)outline(d,b->x,b->y,b->width,b->height,9,RGB(249,213,122),RGB(96,79,43),pressed?RGB(95,70,28):RGB(43,34,20));
+		if(chosen||focus||pressed)outline(d,b->x,b->y,b->width,b->height,9,primary(d,RGB(249,213,122)),tint(d,RGB(96,79,43),84),pressed?tint(d,RGB(95,70,28),108):tint(d,RGB(43,34,20),34));
 		else rectangle(d,b->x+8,b->y+b->height-1,b->width-16,1,RGB(51,51,53));
 		const PlusVitaCoverImage *art=game?plus_vita_covers_find(covers,game->cover_url):NULL;
 		library_art(d,art,b->x+7,b->y+4,67,42,true);
 		text(d,b->label,b->x+87,b->y+6,TEXT_HINT,222,38,true,MENU_WHITE);
 		if(game&&game->platform[0]){
-			outline(d,b->x+315,b->y+13,43,23,7,chosen?MENU_ACCENT:RGB(111,111,115),RGB(26,26,28),RGB(18,18,20));
+			outline(d,b->x+315,b->y+13,43,23,7,chosen?readable(d,MENU_ACCENT):RGB(111,111,115),RGB(26,26,28),RGB(18,18,20));
 			text(d,game->platform,b->x+323,b->y+14,TEXT_MICRO,32,22,false,MENU_WHITE);
 		}
 		return;
@@ -234,25 +239,25 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 	bool active=filter&&(unsigned)(b->id-PLUS_VITA_ACTION_FILTER_ALL)==v->platform_filter;
 	bool play=b->id==PLUS_VITA_ACTION_PLAY;
 	bool filled=active||play||pressed;
-	uint32_t edge=(filled||focus)?RGB(255,216,125):RGB(119,119,123);
+	uint32_t edge=(filled||focus)?primary(d,RGB(255,216,125)):RGB(119,119,123);
 	int rad=filter?14:9;
-	outline(d,b->x,b->y,b->width,b->height,rad,edge,filled?RGB(255,216,126):RGB(36,36,38),filled?RGB(185,137,44):RGB(21,21,23));
+	outline(d,b->x,b->y,b->width,b->height,rad,edge,filled?primary(d,RGB(255,216,126)):RGB(36,36,38),filled?secondary(d,RGB(185,137,44)):RGB(21,21,23));
 	const char *label=b->id==PLUS_VITA_ACTION_CLEAR_SEARCH?"X":b->label;
 	if(b->id==PLUS_VITA_ACTION_SEARCH){
 		ring(d,b->x+19,b->y+13,7,2,MENU_MUTED);line(d,b->x+24,b->y+18,b->x+30,b->y+24,2,MENU_MUTED);
 		text(d,label,b->x+45,b->y+4,TEXT_HINT,b->width-50,b->height-7,false,MENU_BODY);
 	}else if(play){
 		int cx=b->x+100;
-		for(int j=-9;j<=9;j++)rectangle(d,cx-7,b->y+23+j,15-((j<0?-j:j)*15/10),1,MENU_INK);
+		for(int j=-9;j<=9;j++)rectangle(d,cx-7,b->y+23+j,15-((j<0?-j:j)*15/10),1,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
 		/* Long experimental label needs the complete button width. */
 		bool ps5=v->detail&&pv_catalog_platform(v->detail->platform)==3;
 		if(ps5){
-			round_gradient(d,b->x+2,b->y+2,b->width-4,b->height-4,7,RGB(255,216,126),RGB(185,137,44));
-			text(d,label,b->x+15,b->y+10,TEXT_CONTROL,b->width-30,34,false,MENU_INK);
-		}else text(d,label,cx+15,b->y+8,TEXT_TITLE,b->width-115,38,false,MENU_INK);
+			round_gradient(d,b->x+2,b->y+2,b->width-4,b->height-4,7,primary(d,RGB(255,216,126)),secondary(d,RGB(185,137,44)));
+			text(d,label,b->x+15,b->y+10,TEXT_CONTROL,b->width-30,34,false,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
+		}else text(d,label,cx+15,b->y+8,TEXT_TITLE,b->width-115,38,false,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
 	}else {
 		int inset=filter?15:10;
-		text(d,label,b->x+inset,b->y+3,filter?TEXT_HINT:TEXT_MICRO,b->width-inset-5,b->height-4,false,filled?MENU_INK:MENU_WHITE);
+		text(d,label,b->x+inset,b->y+3,filter?TEXT_HINT:TEXT_MICRO,b->width-inset-5,b->height-4,false,filled?(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK):MENU_WHITE);
 	}
 }
 static void footer(Canvas *d,const PlusVitaAppView *v)
@@ -263,7 +268,7 @@ static void footer(Canvas *d,const PlusVitaAppView *v)
 	static const char *const labels[]={"Search","Filter","Play","Back"};
 	static const int starts[]={600,703,800,878};
 	for(unsigned j=0;j<4;j++){
-		int x=starts[j];ring(d,x,520,12,1,RGB(105,105,109));symbol(d,x,520,j,j==2?MENU_WHITE:MENU_ACCENT);
+		int x=starts[j];ring(d,x,520,12,1,RGB(105,105,109));symbol(d,x,520,j,j==2?MENU_WHITE:readable(d,MENU_ACCENT));
 		text(d,localized(d,labels[j]),x+17,509,TEXT_HINT,(j==3?960:starts[j+1])-x-18,28,false,MENU_WHITE);
 	}
 }
@@ -271,7 +276,7 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 {
 	library_background(d);library_logo(d,v->library_logo);
 	text(d,"VitaPlus",99,11,TEXT_TITLE,127,39,false,MENU_WHITE);
-	rectangle(d,228,12,1,30,MENU_ACCENT);
+	rectangle(d,228,12,1,30,readable(d,MENU_ACCENT));
 	text(d,localized(d,"Game Library"),248,5,TEXT_CONTROL,490,30,false,MENU_WHITE);
 	text(d,v->subtitle,248,34,TEXT_MICRO,500,23,false,MENU_MUTED);
 	library_status(d,v);text(d,PLUS_VITA_BUILD_LABEL,865,56,TEXT_MICRO,89,25,false,MENU_MUTED);
@@ -292,13 +297,13 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 			text(d,localized(d,status),432,263,TEXT_HINT,208,60,true,MENU_MUTED);
 		}
 		text(d,g->name,670,117,TEXT_TITLE,270,57,true,MENU_WHITE);
-		outline(d,672,177,57,25,7,MENU_ACCENT,RGB(24,24,26),RGB(15,15,17));
-		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),681,179,TEXT_HINT,46,23,false,MENU_ACCENT);
-		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),672,207,TEXT_MICRO,264,56,true,MENU_ACCENT);
+		outline(d,672,177,57,25,7,readable(d,MENU_ACCENT),RGB(24,24,26),RGB(15,15,17));
+		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),681,179,TEXT_HINT,46,23,false,readable(d,MENU_ACCENT));
+		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),672,207,TEXT_MICRO,264,56,true,readable(d,MENU_ACCENT));
 		else text(d,localized(d,"Cloud streaming"),672,210,TEXT_BODY,264,46,true,MENU_BODY);
 		rectangle(d,672,270,264,1,RGB(108,108,110));
 		text(d,localized(d,"Status:"),678,279,TEXT_HINT,105,23,false,MENU_MUTED);
-		text(d,localized(d,ps5?"Unavailable":g->launch_id_valid?"Check eligibility":"Unavailable"),789,279,TEXT_HINT,147,23,false,MENU_ACCENT);
+		text(d,localized(d,ps5?"Unavailable":g->launch_id_valid?"Check eligibility":"Unavailable"),789,279,TEXT_HINT,147,23,false,readable(d,MENU_ACCENT));
 		text(d,localized(d,"Platform:"),678,303,TEXT_HINT,105,23,false,MENU_MUTED);
 		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),789,303,TEXT_HINT,147,23,false,MENU_WHITE);
 		text(d,localized(d,"Game ID:"),678,326,TEXT_HINT,105,23,false,MENU_MUTED);
@@ -306,7 +311,7 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 		text(d,localized(d,"Playtime: unavailable | Trophies: unavailable"),678,350,TEXT_MICRO,258,34,true,MENU_MUTED);
 	}else{
 		text(d,localized(d,v->title?v->title:"No cloud games found."),24,145,TEXT_BODY,350,100,true,MENU_BODY);
-		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),418,150,TEXT_BODY,510,100,true,MENU_ACCENT);
+		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),418,150,TEXT_BODY,510,100,true,readable(d,MENU_ACCENT));
 	}
 	for(size_t j=0;j<v->action_count;j++)library_button(d,v,covers,j);
 	footer(d,v);
@@ -338,13 +343,14 @@ static void wordmark(Canvas *display,const PlusVitaBranding *branding)
 
 void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int pitch,const PlusVitaAppView *view,const PlusVitaCovers *covers,const PlusVitaBranding *branding)
 {
-	Canvas canvas = {pixels, pitch, font, 0}; Canvas *display = &canvas;
+	Canvas canvas = {.pixels=pixels,.pitch=pitch,.font=font}; Canvas *display = &canvas;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	canvas.language=view->ui_language;
+	canvas.language=view->ui_language;canvas.custom=view->theme_custom;
+	canvas.primary=pv_theme_pixel(view->theme_primary);canvas.secondary=pv_theme_pixel(view->theme_secondary);
 	(void)branding;
 	if(view->screen==PLUS_VITA_APP_CATALOGUE){library_paint(display,view,covers);return;}
-	for(int y=0;y<HEIGHT;y++)rectangle(display,0,y,WIDTH,1,vp_menu_background((unsigned)y));
-	rectangle(display,0,0,WIDTH,4,MENU_ACCENT);
+	for(int y=0;y<HEIGHT;y++)rectangle(display,0,y,WIDTH,1,tint(display,vp_menu_background((unsigned)y),(unsigned)(12+y*14/544)));
+	rectangle(display,0,0,WIDTH,4,primary(display,MENU_ACCENT));
 	text(display,"VitaPlus",64,25,TEXT_BRAND,400,38,false,MENU_WHITE);
 #else
 	const uint32_t *background=plus_vita_branding_background(branding);
@@ -356,7 +362,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 	wordmark(display,branding);
 #endif
 	text(display, PLUS_VITA_BUILD_LABEL, 712, 32, TEXT_MICRO, 220, 24, false, MENU_MUTED);
-	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, MENU_ACCENT);
+	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, display->custom?pv_theme_pixel(view->theme_primary):MENU_ACCENT);
 	text(display, view->title, 64, 128, TEXT_HEADING, 832, 54, false, MENU_WHITE);
 	int body_bottom = view->action_count ? view->actions[0].y - 12 : 480;
 	if(view->screen==PLUS_VITA_APP_CATALOGUE) {
@@ -405,7 +411,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		bool selected = i == view->selected;
 		bool pressed = view->touch_pressed && i == view->pressed_index;
 		rounded(display, button->x, button->y, button->width, button->height,
-			pressed ? MENU_PRESSED : selected ? MENU_ACCENT : MENU_BUTTON);
+			pressed ? (display->custom?display->secondary:MENU_PRESSED) : selected ? (display->custom?display->primary:MENU_ACCENT) : MENU_BUTTON);
 #if PLUS_VITA_ADAPTIVE_STREAM
 		if(view->screen==PLUS_VITA_APP_CATALOGUE && button->id==PLUS_VITA_ACTION_SEARCH && !selected && !pressed){
 			/* Make the search entry visually distinct from normal menu buttons. */
@@ -417,7 +423,12 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		int inset=button->height<=32 ? 2 : compact ? 4 : 8;
 		text(display,button->label,button->x+20,button->y+inset,
 			compact ? TEXT_COMPACT : TEXT_CONTROL,button->width-40,button->height-2*inset,false,
-			selected || pressed ? MENU_INK : MENU_WHITE);
+			selected || pressed ? (display->custom?pv_theme_ink(pressed?display->secondary:display->primary):MENU_INK) : MENU_WHITE);
+		if(view->screen==PLUS_VITA_APP_THEME&&(button->id==PLUS_VITA_ACTION_PRIMARY||button->id==PLUS_VITA_ACTION_SECONDARY)){
+			uint32_t swatch=pv_theme_pixel(button->id==PLUS_VITA_ACTION_PRIMARY?view->theme_primary:view->theme_secondary);
+			rectangle(display,button->x+button->width-72,button->y+6,56,button->height-12,MENU_WHITE);
+			rectangle(display,button->x+button->width-70,button->y+8,52,button->height-16,swatch);
+		}
 	}
 	text(display, view->hint, 64, 509, TEXT_HINT, 832, 28, false, MENU_MUTED);
 }

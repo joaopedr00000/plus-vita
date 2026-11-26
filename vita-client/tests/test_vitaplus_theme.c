@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "../src/app/render.h"
 #include "../src/app/theme.h"
+#include "../src/app/custom_theme.h"
 #include "../src/app/lan_login_page.h"
 #include <assert.h>
 #include <stdio.h>
@@ -33,6 +34,11 @@ int main(void){
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[320*960+80]==VP_BUTTON && label_colors[0]==VP_WHITE);
     assert(pixels[370*960+80]==VP_GOLD_PRESSED && label_colors[1]==VP_DARK_INK);
+    v.theme_custom=true;v.theme_primary=0x2277ff;v.theme_secondary=0xa000cc;
+    v.selected=0;v.touch_pressed=false;
+    plus_vita_app_paint(NULL,pixels,960,&v);
+    assert(pixels[0]==pv_theme_pixel(0x2277ff)&&pixels[320*960+80]==pv_theme_pixel(0x2277ff));
+    v.theme_custom=false;
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[104*960+40]==VP_RGB(75,75,78) && pixels[200*960+395]==VP_RGB(75,75,78));
