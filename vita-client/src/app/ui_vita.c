@@ -49,6 +49,7 @@
 _Static_assert((unsigned)PLUS_VITA_MENU_CROSS == (unsigned)SCE_CTRL_CROSS, "Menu Cross bit must match VitaSDK");
 _Static_assert((unsigned)PLUS_VITA_MENU_CIRCLE == (unsigned)SCE_CTRL_CIRCLE, "Menu Circle bit must match VitaSDK");
 _Static_assert((unsigned)PLUS_VITA_MENU_TRIANGLE == (unsigned)SCE_CTRL_TRIANGLE, "Menu Triangle bit must match VitaSDK");
+_Static_assert((unsigned)PLUS_VITA_MENU_SQUARE == (unsigned)SCE_CTRL_SQUARE, "Menu Square bit must match VitaSDK");
 _Static_assert((unsigned)PLUS_VITA_MENU_UP == (unsigned)SCE_CTRL_UP, "Menu Up bit must match VitaSDK");
 _Static_assert((unsigned)PLUS_VITA_MENU_DOWN == (unsigned)SCE_CTRL_DOWN, "Menu Down bit must match VitaSDK");
 _Static_assert((unsigned)PLUS_VITA_MENU_LEFT == (unsigned)SCE_CTRL_LEFT, "Menu Left bit must match VitaSDK");
