@@ -93,7 +93,7 @@ bool pv_storage_migrate(const char *data){
        !move_relative(data,"VitaPlus-Themes-Cache",cache,"Themes")||
        !move_relative(data,"plus-vita-ps5-catalog",cache,"PS5-Catalog")||
        !move_relative(data,"VitaPlus-Wallpapers",root,"Wallpapers"))return false;
-    const char *const dirs[]={"Account","Account/Keys","Cache/Covers","Cache/Themes","Cache/PS5-Catalog","Wallpapers","Settings","Imports","Logs","Logs/Archive","Captures"};
+    const char *const dirs[]={"Account","Cache/Covers","Cache/Themes","Cache/PS5-Catalog","Wallpapers","Settings","Imports","Logs","Logs/Archive","Captures"};
     for(unsigned j=0;j<sizeof(dirs)/sizeof(dirs[0]);j++){char p[CAP];if(!join(p,root,dirs[j])||!directory(p))return false;}
     const char *const old[]={"plus-vita-auth.json","plus-vita-controls.dat","plus-vita-stream.cfg","plus-vita-theme.cfg","plus-vita-font-A-tiles.ppm","plus-vita-font-A-setup.ppm","plus-vita-font-B-tiles.ppm","plus-vita-font-B-setup.ppm"};
     const char *const next[]={"Imports/plus-vita-auth.json","Settings/controls.dat","Settings/stream.cfg","Settings/theme.cfg","Captures/plus-vita-font-A-tiles.ppm","Captures/plus-vita-font-A-setup.ppm","Captures/plus-vita-font-B-tiles.ppm","Captures/plus-vita-font-B-setup.ppm"};
