@@ -34,17 +34,17 @@ int main(void){
     assert(pixels[370*960+80]==VP_GOLD_PRESSED && label_colors[1]==VP_DARK_INK);
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[200*960+40]==VP_PANEL && pixels[200*960+510]==VP_PANEL);
+    assert(pixels[108*960+40]==VP_RGB(75,75,78) && pixels[200*960+396]==VP_RGB(75,75,78));
     PlusVitaCatalogEntry game={.name="Synthetic PS5",.platform="PS5",.id="FAKEPPSA1",.launch_id_valid=true,
         .cover_url="https://image.api.playstation.com/test.png"};
     strcpy(artwork.url,game.cover_url);artwork.state=PLUS_VITA_COVER_READY;
     for(unsigned i=0;i<128*128;i++)artwork.pixels[i]=0xff123456;
     v.detail=&game;v.preview_eligible=true;
     plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
-    assert(pixels[250*960+550]==0xff123456 && metrics_seen && ps5_seen);
+    assert(pixels[292*960+525]==0xff123456 && metrics_seen && ps5_seen);
     v.preview_eligible=false;
     plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
-    assert(pixels[250*960+550]!=0xff123456);
+    assert(pixels[292*960+525]!=0xff123456);
     for(unsigned lang=0;lang<19;lang++){
         assert(strstr(pv_lan_pages[lang],"background:#161618"));
         assert(strstr(pv_lan_pages[lang],"background:#ffcf40"));

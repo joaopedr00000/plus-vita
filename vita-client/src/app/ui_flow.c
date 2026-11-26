@@ -65,8 +65,17 @@ PlusVitaAppView view=plus_vita_app_view(flow->app);
 			if(!flow->preview_requested) {
 				plus_vita_covers_retry(flow->covers,game->cover_url);flow->preview_requested=true;
 			}
-			const char *url=game->cover_url;
-			plus_vita_covers_request(flow->covers,&url,1);
+			const char *urls[8]={game->cover_url};
+			size_t count=1;
+			/* Only prefetch visible thumbnails after a stable focus. The single
+			 * worker stays cancellable; the focused cover is always first. */
+			if(PLUS_VITA_ADAPTIVE_STREAM && view.screen==PLUS_VITA_APP_CATALOGUE &&
+				flow->now_us-flow->preview_since>=1200000u){
+				for(size_t i=0;i<view.list_count && count<8;i++)
+					if(view.games[i] && strcmp(view.games[i]->cover_url,game->cover_url))
+						urls[count++]=view.games[i]->cover_url;
+			}
+			plus_vita_covers_request(flow->covers,urls,count);
 		}
 	}
 	flow->preview_screen=view.screen;flow->preview_dragging=dragging;

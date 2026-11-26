@@ -188,14 +188,14 @@ int main(void)
  tick(&flow,351000);settle(&flow,first,351000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==1);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[260*960+530]==0xff0000ff);
+ assert(pixels[292*960+525]==0xff0000ff);
  event(&flow,PLUS_VITA_EVENT_DOWN,400000);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[260*960+530]!=0xff0000ff);
+ assert(pixels[292*960+525]!=0xff0000ff);
  event(&flow,PLUS_VITA_EVENT_UP,450000);
  assert(flow.preview_eligible && atomic_load(&cover_requests)==1);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[260*960+530]==0xff0000ff);
+ assert(pixels[292*960+525]==0xff0000ff);
  for(unsigned i=0;i<5;i++)event(&flow,PLUS_VITA_EVENT_DOWN,500000+i*10000);
  assert(atomic_load(&cover_requests)==1);
  PlusVitaAppView view=plus_vita_app_view(app);
@@ -205,7 +205,7 @@ int main(void)
  tick(&flow,890000);settle(&flow,url,890000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==2);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[260*960+530]==0xff0000ff);
+ assert(pixels[292*960+525]==0xff0000ff);
  /* Change focus, then start a drag: no new artwork work during scrolling. */
  event(&flow,PLUS_VITA_EVENT_DOWN,900000);
  plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_DOWN,.x=80,.y=240},900001);

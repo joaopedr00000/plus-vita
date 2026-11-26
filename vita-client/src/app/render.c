@@ -79,6 +79,127 @@ static void cover(Canvas *display,const PlusVitaCovers *covers,const PlusVitaCat
 	} else text(display,localized(display,!game || (!game->cover_url[0] && game->cover_metadata==PLUS_VITA_ARTWORK_MISSING) ? "No cover" : !game->cover_url[0] || !covers ? "Cover unavailable" : !image || image->state==PLUS_VITA_COVER_LOADING ? "Loading cover" : "Cover unavailable"),x+6,y+48,TEXT_MICRO,116,58,true,MENU_MUTED);
 }
 
+#if PLUS_VITA_ADAPTIVE_STREAM
+/* Reuse decoded art; never download or allocate in the painter. Remove the
+ * decoder's uniform letterbox margins before fitting into the portrait well. */
+static void library_art(Canvas *display,const PlusVitaCoverImage *image,int x,int y,int w,int h)
+{
+	rounded(display,x,y,w,h,RGB(38,38,40));
+	if(!image || image->state!=PLUS_VITA_COVER_READY)return;
+	int left=0,right=127,top=0,bottom=127;
+	const uint32_t pad=0xff1f1d1du;
+	while(left<right){bool blank=true;for(int k=0;k<128;k++)if(image->pixels[k*128+left]!=pad){blank=false;break;}if(!blank)break;left++;}
+	while(right>left){bool blank=true;for(int k=0;k<128;k++)if(image->pixels[k*128+right]!=pad){blank=false;break;}if(!blank)break;right--;}
+	while(top<bottom){bool blank=true;for(int k=0;k<128;k++)if(image->pixels[top*128+k]!=pad){blank=false;break;}if(!blank)break;top++;}
+	while(bottom>top){bool blank=true;for(int k=0;k<128;k++)if(image->pixels[bottom*128+k]!=pad){blank=false;break;}if(!blank)break;bottom--;}
+	int sw=right-left+1,sh=bottom-top+1,dw=w,dh=h;
+	if(sw*h>sh*w)dh=w*sh/sw;else dw=h*sw/sh;
+	if(dw<1)dw=1;
+	if(dh<1)dh=1;
+	x+=(w-dw)/2;y+=(h-dh)/2;
+	for(int row=0;row<dh;row++)for(int col=0;col<dw;col++)
+		display->pixels[(y+row)*display->pitch+x+col]=image->pixels[(top+row*sh/dh)*128+left+col*sw/dw];
+}
+static void library_background(Canvas *display)
+{
+	for(int y=0;y<HEIGHT;y++){
+		/* Subtle warm gold ribbon behind the content, no large texture. */
+		rectangle(display,0,y,WIDTH,1,RGB(15+y*9/544,15+y*7/544,17+y*4/544));
+	}
+	for(int x=405;x<960;x++){
+		int bend=x-680;
+		int y=55+(bend*bend)/2200;
+		rectangle(display,x,y,1,2,RGB(112,87,35));
+		rectangle(display,x,487-(bend*bend)/2600,1,1,RGB(92,70,28));
+	}
+	rectangle(display,0,0,960,3,MENU_ACCENT);
+	/* Small directional gold mark matching the reference, not an app icon change. */
+	rounded(display,24,12,12,17,MENU_ACCENT);rounded(display,24,33,12,17,MENU_ACCENT);
+	rounded(display,8,25,13,12,MENU_ACCENT);rounded(display,39,25,13,12,MENU_ACCENT);
+	text(display,"VitaPlus",58,14,TEXT_BRAND,180,37,false,MENU_WHITE);
+	rectangle(display,209,14,1,36,RGB(145,113,47));
+}
+static void library_button(Canvas *display,const PlusVitaAppView *view,const PlusVitaCovers *covers,size_t i)
+{
+	const PlusVitaAppButton *b=&view->actions[i];
+	bool focus=i==view->selected,pressed=view->touch_pressed&&i==view->pressed_index;
+	if(b->id==PLUS_VITA_ACTION_GAME && i<view->list_count){
+		bool chosen=view->focus==view->list_first+i;
+		const PlusVitaCatalogEntry *game=view->games[i];
+		if(chosen||focus||pressed){
+			rounded(display,b->x,b->y,b->width,b->height,MENU_ACCENT);
+			rounded(display,b->x+2,b->y+2,b->width-4,b->height-4,pressed?RGB(104,78,33):RGB(61,49,29));
+		}else rectangle(display,b->x,b->y+b->height-1,b->width,1,RGB(51,51,53));
+		const PlusVitaCoverImage *art=game?plus_vita_covers_find(covers,game->cover_url):NULL;
+		library_art(display,art,b->x+7,b->y+5,52,38);
+		text(display,b->label,b->x+68,b->y+7,TEXT_COMPACT,230,36,false,MENU_WHITE);
+		if(game && game->platform[0]){
+			rounded(display,b->x+302,b->y+9,56,30,chosen?MENU_ACCENT:RGB(82,82,86));
+			rounded(display,b->x+304,b->y+11,52,26,RGB(22,22,24));
+			text(display,game->platform,b->x+311,b->y+12,TEXT_HINT,43,25,false,chosen?MENU_ACCENT:MENU_WHITE);
+		}
+		return;
+	}
+	bool filter=b->id>=PLUS_VITA_ACTION_FILTER_ALL&&b->id<=PLUS_VITA_ACTION_FILTER_PS5;
+	bool active=filter && (unsigned)(b->id-PLUS_VITA_ACTION_FILTER_ALL)==view->platform_filter;
+	bool play=b->id==PLUS_VITA_ACTION_PLAY;
+	uint32_t edge=(active||focus||play)?MENU_ACCENT:RGB(105,105,110);
+	rounded(display,b->x,b->y,b->width,b->height,edge);
+	rounded(display,b->x+2,b->y+2,b->width-4,b->height-4,pressed?MENU_PRESSED:(active||play)?MENU_ACCENT:RGB(36,36,39));
+	const char *label=b->id==PLUS_VITA_ACTION_CLEAR_SEARCH?"X":b->label;
+	int inset=b->id==PLUS_VITA_ACTION_SEARCH?32:10;
+	if(b->id==PLUS_VITA_ACTION_SEARCH){
+		/* Magnifier built from bounded framebuffer rectangles. */
+		rectangle(display,b->x+9,b->y+10,12,2,MENU_MUTED);
+		rectangle(display,b->x+9,b->y+20,12,2,MENU_MUTED);
+		rectangle(display,b->x+8,b->y+12,2,8,MENU_MUTED);
+		rectangle(display,b->x+20,b->y+12,2,8,MENU_MUTED);
+		for(int k=0;k<7;k++)rectangle(display,b->x+20+k,b->y+21+k,2,2,MENU_MUTED);
+	}
+	text(display,label,b->x+inset,b->y+(play?9:5),play?TEXT_CONTROL:TEXT_HINT,b->width-inset-6,b->height-10,false,(active||play||pressed)?MENU_INK:MENU_WHITE);
+}
+static void library_paint(Canvas *display,const PlusVitaAppView *view,const PlusVitaCovers *covers)
+{
+	library_background(display);
+	text(display,view->subtitle,224,12,TEXT_HINT,510,24,false,MENU_WHITE);
+	text(display,view->body,224,36,TEXT_MICRO,510,22,false,MENU_MUTED);
+	text(display,PLUS_VITA_BUILD_LABEL,800,17,TEXT_MICRO,144,24,false,MENU_MUTED);
+	rectangle(display,0,108,960,1,RGB(75,75,78));
+	rectangle(display,396,109,1,377,RGB(75,75,78));
+	rectangle(display,0,489,960,1,RGB(75,75,78));
+	if(view->list_total>view->list_count && view->list_count){
+		int thumb=(int)((size_t)view->list_height*view->list_count/view->list_total);
+		if(thumb<8)thumb=8;
+		int offset=(int)((size_t)(view->list_height-thumb)*view->list_first/(view->list_total-view->list_count));
+		rectangle(display,386,view->list_y,5,view->list_height,RGB(44,44,46));
+		rectangle(display,386,view->list_y+offset,5,thumb,RGB(118,118,120));
+	}
+	bool ps5=view->detail?pv_catalog_platform(view->detail->platform)==3:view->platform_filter==3;
+	if(view->detail){
+		const PlusVitaCatalogEntry *g=view->detail;
+		const PlusVitaCoverImage *art=view->preview_eligible?plus_vita_covers_find(covers,g->cover_url):NULL;
+		library_art(display,art,410,118,230,352);
+		if(!art || art->state!=PLUS_VITA_COVER_READY){
+			const char *status=!g->cover_url[0]?"No cover":!covers||(art&&art->state==PLUS_VITA_COVER_FAILED)?"Cover unavailable":"Loading cover";
+			text(display,localized(display,status),422,268,TEXT_HINT,206,62,true,MENU_MUTED);
+		}
+		text(display,g->name,656,120,TEXT_BRAND,288,100,true,MENU_WHITE);
+		rounded(display,656,225,68,32,MENU_ACCENT);
+		rounded(display,658,227,64,28,RGB(25,25,27));
+		text(display,g->platform[0]?g->platform:localized(display,"Not specified"),665,228,TEXT_HINT,54,26,false,MENU_ACCENT);
+		rectangle(display,656,269,288,1,RGB(79,79,82));
+		if(g->launch_id_valid)text(display,g->id,656,280,TEXT_MICRO,288,46,true,MENU_MUTED);
+		text(display,localized(display,"Playtime: unavailable | Trophies: unavailable"),656,330,TEXT_HINT,288,52,true,MENU_MUTED);
+		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),656,382,TEXT_MICRO,288,47,true,MENU_ACCENT);
+	}else {
+		text(display,localized(display,view->title?view->title:"No cloud games found."),24,145,TEXT_BODY,350,100,true,MENU_BODY);
+		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),414,150,TEXT_BODY,510,100,true,MENU_ACCENT);
+	}
+	for(size_t i=0;i<view->action_count;i++)library_button(display,view,covers,i);
+	text(display,view->hint,20,505,TEXT_HINT,802,31,false,MENU_MUTED);
+}
+#endif
+
  #if !PLUS_VITA_ADAPTIVE_STREAM
 static void wordmark(Canvas *display,const PlusVitaBranding *branding)
 {
@@ -122,29 +243,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 #endif
 	text(display, PLUS_VITA_BUILD_LABEL, 712, 32, TEXT_MICRO, 220, 24, false, MENU_MUTED);
 	#if PLUS_VITA_ADAPTIVE_STREAM
-	if(view->screen==PLUS_VITA_APP_CATALOGUE){
-		text(display,view->subtitle,32,64,TEXT_HINT,896,26,false,MENU_ACCENT);
-		rectangle(display,32,150,446,320,MENU_PANEL);
-		rectangle(display,502,150,426,320,MENU_PANEL);
-		text(display,view->body,522,166,TEXT_HINT,390,30,false,MENU_MUTED);
-		bool ps5=view->detail?pv_catalog_platform(view->detail->platform)==3:view->platform_filter==3;
-		if(view->detail){
-			/* Fixed preview; neither image loading nor a long title shifts the list. */
-			if(view->preview_eligible || !view->detail->cover_url[0] || !covers)
-				cover(display,covers,view->detail,522,196);
-			else {
-				rectangle(display,522,196,128,128,MENU_BUTTON);
-				text(display,localized(display,"Loading cover"),528,244,TEXT_MICRO,116,58,true,MENU_MUTED);
-			}
-			text(display,view->detail->name,666,196,TEXT_CONTROL,246,96,true,MENU_WHITE);
-			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),666,296,TEXT_CONTROL,246,28,false,MENU_ACCENT);
-			if(view->detail->launch_id_valid)
-				text(display,view->detail->id,522,331,TEXT_MICRO,390,22,false,MENU_MUTED);
-			text(display,localized(display,"Playtime: unavailable | Trophies: unavailable"),522,355,TEXT_MICRO,390,28,true,MENU_MUTED);
-		}else text(display,localized(display,view->title?view->title:"No cloud games found."),48,180,TEXT_BODY,408,120,true,MENU_BODY);
-		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),522,view->detail?379:210,TEXT_HINT,390,34,true,MENU_ACCENT);
-		goto draw_actions;
-	}
+	if(view->screen==PLUS_VITA_APP_CATALOGUE){library_paint(display,view,covers);return;}
 #endif
 	text(display, view->subtitle, 64, 94, TEXT_HINT, 832, 26, false, MENU_ACCENT);
 	text(display, view->title, 64, 128, TEXT_HEADING, 832, 54, false, MENU_WHITE);
@@ -181,9 +280,6 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 			text(display,"18 px: Agjpqy é Å Müller 日本",64,376,TEXT_COMPACT,832,32,false,MENU_BODY);
 		}
 	}
-	#if PLUS_VITA_ADAPTIVE_STREAM
- draw_actions:
-	#endif
 	if(view->list_total>view->list_count && view->list_count) {
 		int height=view->list_height;
 		int thumb=(int)((size_t)height*view->list_count/view->list_total);

@@ -51,12 +51,12 @@ int main(void){
     assert(v.screen==PLUS_VITA_APP_CATALOGUE&&v.list_total==10&&v.list_count==7);
     search(a,"rAcInG");
     v=plus_vita_app_view(a);
-    assert(v.list_total==9&&v.list_count==7&&v.action_count==12);
+    assert(v.list_total==9&&v.list_count==7&&v.action_count==15);
     assert(strstr(v.actions[v.list_count].label,"rAcInG"));
     assert(v.actions[v.list_count+1].id==PLUS_VITA_ACTION_CLEAR_SEARCH);
-    click(a,PLUS_VITA_ACTION_PLATFORM_FILTER);
+    click(a,PLUS_VITA_ACTION_FILTER_PS3);
     v=plus_vita_app_view(a);assert(v.platform_filter==1&&v.list_total==1&&v.detail&&!strcmp(v.detail->platform,"PS3"));
-    click(a,PLUS_VITA_ACTION_PLATFORM_FILTER);
+    click(a,PLUS_VITA_ACTION_FILTER_PS4);
     v=plus_vita_app_view(a);assert(v.platform_filter==2&&v.list_total==7);
     entered(a,click(a,PLUS_VITA_ACTION_SEARCH),PLUS_VITA_RESULT_CANCELLED,NULL);
     v=plus_vita_app_view(a);assert(v.list_total==7&&v.platform_filter==2);

@@ -10,9 +10,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #define COVER_DISK_SLOTS 64u
+#define COVER_RAM_SLOTS 12u
 #define COVER_CACHE_MAGIC UINT64_C(0x5056434f56455231)
 struct plus_vita_covers_t {
-	PlusVitaCoverImage slots[6], output;
+	PlusVitaCoverImage slots[COVER_RAM_SLOTS], output;
 	pthread_t thread;
 	atomic_bool complete,cancel;
 	bool running;
@@ -105,7 +106,7 @@ PlusVitaCovers *plus_vita_covers_create(void){return plus_vita_covers_create_cac
 const PlusVitaCoverImage *plus_vita_covers_find(const PlusVitaCovers *covers,const char *url)
 {
 	if(!covers || !url || !*url) return NULL;
-	for(unsigned i=0;i<6;i++) if(strcmp(covers->slots[i].url,url)==0) return &covers->slots[i];
+	for(unsigned i=0;i<COVER_RAM_SLOTS;i++) if(strcmp(covers->slots[i].url,url)==0) return &covers->slots[i];
 	return NULL;
 }
 bool plus_vita_covers_poll(PlusVitaCovers *covers)
@@ -115,7 +116,7 @@ bool plus_vita_covers_poll(PlusVitaCovers *covers)
 	covers->last_result=atomic_load(&covers->cancel) || covers->generation!=covers->job_generation
 		? PLUS_VITA_ARTWORK_CANCELLED : covers->output.result;
 	if(covers->generation==covers->job_generation)
-		for(unsigned i=0;i<6;i++) if(strcmp(covers->slots[i].url,covers->output.url)==0) {
+		for(unsigned i=0;i<COVER_RAM_SLOTS;i++) if(strcmp(covers->slots[i].url,covers->output.url)==0) {
 			if(atomic_load(&covers->cancel)) memset(&covers->slots[i],0,sizeof(covers->slots[i]));
 			else covers->slots[i]=covers->output;
 		}
@@ -132,7 +133,7 @@ void plus_vita_covers_request(PlusVitaCovers *covers,const char *const *urls,siz
 	for(size_t i=0;i<count;i++) {
 		const char *url=urls[i];
 		if(!plus_vita_cover_url_allowed(url) || plus_vita_covers_find(covers,url)) continue;
-		PlusVitaCoverImage *slot=&covers->slots[covers->next++ % 6];
+		PlusVitaCoverImage *slot=&covers->slots[covers->next++ % COVER_RAM_SLOTS];
 		memset(slot,0,sizeof(*slot)); strcpy(slot->url,url); slot->state=PLUS_VITA_COVER_LOADING;
 		memset(&covers->output,0,sizeof(covers->output)); strcpy(covers->output.url,url);
 		covers->job_generation=covers->generation; atomic_store(&covers->complete,false); atomic_store(&covers->cancel,false);
@@ -148,7 +149,7 @@ void plus_vita_covers_request(PlusVitaCovers *covers,const char *const *urls,siz
 void plus_vita_covers_retry(PlusVitaCovers *covers,const char *url)
 {
 	if(!covers || !url) return;
-	for(unsigned i=0;i<6;i++) if(covers->slots[i].state==PLUS_VITA_COVER_FAILED
+	for(unsigned i=0;i<COVER_RAM_SLOTS;i++) if(covers->slots[i].state==PLUS_VITA_COVER_FAILED
 		&& strcmp(covers->slots[i].url,url)==0) memset(&covers->slots[i],0,sizeof(covers->slots[i]));
 }
 void plus_vita_covers_reset(PlusVitaCovers *covers)
