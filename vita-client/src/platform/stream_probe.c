@@ -1584,7 +1584,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #if PLUS_VITA_INPUT_WORKER
 	PlusVitaInputVita input_vita = { .rear_ready = rear_ready, .front_ready = front_ready,
 		.rear_mid_x = rear_mid_x, .rear_mid_y = rear_mid_y, .front_info = front_info,
-		.layout=probe->controls,.layout_ready=true,
+		.layout=probe->controls,.layout_ready=true,.fast_native=PLUS_VITA_ADAPTIVE_STREAM,
 		.controller=probe->input ? probe->input->controller : (PlusVitaController){0} };
 	if(input_vita.controller.external) {
 		input_vita.controller.neutral_required=true;input_vita.controller.ready=false;
@@ -1614,6 +1614,9 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 	uint64_t first_display = 0, last_display = 0;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	uint64_t hud_at=started,hud_rx=0;unsigned hud_frames=0,hud_saved=0,hud_expired=0;char hud_line[180]={0};
+	PlusVitaLatencyStats bench={0},bench_interval={0};
+	uint64_t bench_start=0,bench_last=0,bench_min=UINT64_MAX;
+	bool bench_done=false;
 #endif
 	unsigned int displayed = 0;
 	unsigned int decoded = 0, presentation_skips = 0;
@@ -1959,6 +1962,29 @@ chiaki_mutex_unlock(&probe->mutex);
 				uint64_t display_done_us = sceKernelGetProcessTimeWide();
 				if(native_result >= 0)
 				{
+#if PLUS_VITA_ADAPTIVE_STREAM
+                    if(!bench_start)bench_start=display_done_us;
+                    uint64_t elapsed=display_done_us>=bench_start?display_done_us-bench_start:0;
+                    if(!bench_done&&elapsed>=10000000u&&elapsed<70000000u){
+                        plus_vita_latency_span(&bench,frame.enqueued_us,display_done_us);
+                        if(display_done_us>=frame.enqueued_us&&display_done_us-frame.enqueued_us<bench_min)
+                            bench_min=display_done_us-frame.enqueued_us;
+                        if(bench_last)plus_vita_latency_span(&bench_interval,bench_last,display_done_us);
+                        bench_last=display_done_us;
+                    }else if(!bench_done&&elapsed>=70000000u){
+                        bench_done=true;
+                        plus_vita_diagnostic_metric("benchmark.au_enqueue_to_present",&bench);
+                        plus_vita_diagnostic_metric("benchmark.presentation_interval",&bench_interval);
+                        if(bench.count)plus_vita_diagnostic_counter("benchmark.min_us",bench_min);
+                        if(bench.count)CHIAKI_LOGI(probe->log,"Stream probe benchmark 60s samples=%llu min_us=%llu mean_us=%llu p50_upper_us=%llu p95_upper_us=%llu p99_upper_us=%llu max_us=%llu interval_p95_upper_us=%llu",
+                            (unsigned long long)bench.count,(unsigned long long)bench_min,
+                            (unsigned long long)(bench.total_us/bench.count),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,50),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,95),
+                            (unsigned long long)plus_vita_latency_percentile_upper(&bench,99),
+                            (unsigned long long)bench.max_us,(unsigned long long)plus_vita_latency_percentile_upper(&bench_interval,95));
+                    }
+#endif
 					/* Native output can belong to an earlier AU. These spans
 					 * describe this submission, not the age of that picture. */
 					plus_vita_latency_span(&probe->latency.submitted_first_packet_to_present,

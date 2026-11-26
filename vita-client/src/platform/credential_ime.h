@@ -24,6 +24,7 @@ void plus_vita_credential_ime_read_masked(PlusVitaCredential *credential,
 	PlusVitaCredentialImeResult *result);
 void plus_vita_account_label_read(char output[129], PlusVitaCredentialImeResult *result);
 void plus_vita_catalogue_search_read(char output[129], PlusVitaCredentialImeResult *result);
+void plus_vita_theme_color_read(char output[129],PlusVitaCredentialImeResult *result);
 
 void plus_vita_vault_password_read(PlusVitaCredential *value,PlusVitaCredentialImeResult *result,const char *prompt);
 #endif

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "../src/app/custom_theme.h"
 static void click(PlusVitaApp *app,PlusVitaAppAction action){
     PlusVitaAppView v=plus_vita_app_view(app);
     for(size_t j=0;j<v.action_count;j++)if(v.actions[j].id==action){
@@ -28,6 +29,20 @@ int main(void){
     assert(plus_vita_app_view(app).selected==2);
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_BACK});
     assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_SETTINGS);
+    uint32_t color=0;
+    assert(pv_theme_hex("#00abFF",7,&color)&&color==0x00abff);
+    assert(pv_theme_hex("000000",6,&color)&&color==0);
+    assert(!pv_theme_hex("12345G",6,&color)&&!pv_theme_hex("1234567",7,&color));
+    for(unsigned j=0;j<8;j++)plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+    click(app,PLUS_VITA_ACTION_THEME);
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME);
+    assert(v.theme_primary==PV_PRIMARY_DEFAULT&&!v.theme_custom);
+    PlusVitaAppEffect edit=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
+    assert(edit.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_ENTERED,.operation=edit.operation,.status=PLUS_VITA_RESULT_OK,.data="0088ff",.data_size=6});
+    v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff);
+    click(app,PLUS_VITA_ACTION_THEME_RESET);
+    v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT);
     plus_vita_app_destroy(app);
     puts("Streaming profiles, localized labels and menu navigation passed");return 0;
 }

@@ -295,6 +295,14 @@ void plus_vita_catalogue_search_read(char output[129], PlusVitaCredentialImeResu
 	plus_vita_credential_clear(&unused);
 }
 
+void plus_vita_theme_color_read(char output[129],PlusVitaCredentialImeResult *result)
+{
+    static const uint16_t title[]={'C','o','l','o','r',' ','(','R','R','G','G','B','B',')',0};
+    PlusVitaCredential unused;
+    memset(output,0,129);
+    credential_ime_read(&unused,result,false,output,false,title);
+    plus_vita_credential_clear(&unused);
+}
 #if PLUS_VITA_ACCOUNT_VAULT
 #include "../app/utf8.h"
 void plus_vita_vault_password_read(PlusVitaCredential *value,PlusVitaCredentialImeResult *result,const char *prompt)

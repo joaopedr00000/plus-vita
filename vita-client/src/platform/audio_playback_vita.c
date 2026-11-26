@@ -175,6 +175,9 @@ static void *audio_worker(void *user)
 		a->head = (a->head + 1) % AUDIO_QUEUE; a->count--;
 		unsigned queue_after_pop = a->count, dropped_total = a->dropped;
 #if PLUS_VITA_ADAPTIVE_STREAM
+		unsigned target_snapshot=a->prebuffer_target;
+#endif
+#if PLUS_VITA_ADAPTIVE_STREAM
 		if(a->prebuffer_base && ++a->clean_audio_units>=2000) {
 			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,false);
 		}
@@ -214,6 +217,7 @@ static void *audio_worker(void *user)
 		if(n != 480) { CHIAKI_LOGE(a->log, "Stream probe audio decode failed samples=%d", n); goto failed; }
 		a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
 #if PLUS_VITA_ADAPTIVE_STREAM
+		bool stable_pcm=a->decoded>2&&!a->audio_fade;
 		if(a->audio_fade) {
 			for(unsigned i=0;i<240;i++) {
 				for(int ch=0;ch<a->channels;ch++) {
@@ -233,6 +237,10 @@ static void *audio_worker(void *user)
 				queue_after_pop, dropped_total, a->concealed, a->stale);
 			audio_log_timing(a, "periodic");
 		}
+		#if PLUS_VITA_ADAPTIVE_STREAM
+		unsigned trim=pv_pcm_trim(queue_after_pop,target_snapshot,stable_pcm,(unsigned)n);
+		n=(int)pv_pcm_shorten(pcm,(unsigned)n,(unsigned)a->channels,trim);
+		#endif
 		if(!audio_output(a, pcm, (unsigned)n)) goto failed;
 		if(a->decoded == 1) CHIAKI_LOGI(a->log, "Stream probe audio first PCM decoded samples=%d", n);
 	}

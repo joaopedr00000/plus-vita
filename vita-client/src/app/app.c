@@ -13,6 +13,7 @@
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
+#include "custom_theme.h"
 #define PV_TR(s) pv_translate(app->ui_language,(s))
 #else
 #define PV_TR(s) (s)
@@ -72,6 +73,9 @@ struct plus_vita_app_t {
 	unsigned region_mode,ui_language;
 	bool regional_catalogue;
 	char locale_label[128];
+	uint32_t theme_primary,theme_secondary;
+	bool theme_custom;
+	char theme_labels[2][128];
 };
 
 static void welcome(PlusVitaApp *app)
@@ -147,12 +151,27 @@ static void settings_view(PlusVitaApp *app)
 #endif
 	snprintf(app->locale_label,sizeof(app->locale_label),"%s: %s",pv_translate(app->ui_language,"Language"),pv_locale_names[pv_language(app->ui_language)]);
 	app->view.actions[5]=(PlusVitaAppButton){PLUS_VITA_ACTION_LANGUAGE,app->locale_label,64,0,832,34};
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
+ 	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
+	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME,"Appearance",64,0,832,34};
+	app->view.action_count++;
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=174+(int)i*39;app->view.actions[i].height=34;}
 	app->view.body="Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled.";
 #endif
 }
 
 #if PLUS_VITA_ADAPTIVE_STREAM
+static void theme_view(PlusVitaApp *app,const char *notice)
+{
+    snprintf(app->theme_labels[0],sizeof(app->theme_labels[0]),"%s: #%06X",PV_TR("Primary color"),(unsigned)app->theme_primary);
+    snprintf(app->theme_labels[1],sizeof(app->theme_labels[1]),"%s: #%06X",PV_TR("Secondary color"),(unsigned)app->theme_secondary);
+    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_THEME,.title="Appearance",.subtitle="SETTINGS AND HELP",
+        .body=notice?notice:"Choose any RGB color using six hexadecimal digits (RRGGBB).",
+        .hint="X  Select     O  Back",
+        .actions={{PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,208,832,48},
+            {PLUS_VITA_ACTION_SECONDARY,app->theme_labels[1],64,266,832,48},
+            {PLUS_VITA_ACTION_THEME_RESET,"Restore original theme",64,324,832,48},
+            {PLUS_VITA_ACTION_BACK,"Back to settings",64,382,832,48}},.action_count=4};
+}
 static void stream_settings_view(PlusVitaApp *app)
 {
 	unsigned profile=pv_profile_cap(app->bitrate_kbps);
@@ -369,6 +388,9 @@ PlusVitaApp *plus_vita_app_create(void)
 	PlusVitaApp *app = calloc(1, sizeof(*app));
 	if(!app) return NULL;
 	app->remember = true;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	app->theme_primary=PV_PRIMARY_DEFAULT;app->theme_secondary=PV_SECONDARY_DEFAULT;
+#endif
 	plus_vita_control_layout_defaults(&app->controls);
 	welcome(app);
 	return app;
@@ -387,6 +409,13 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	view.account_connected=app->connected;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
+	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;
+    if(view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP){
+        int step=view.action_count>6?44:62;
+        for(size_t j=0;j<view.action_count;j++){
+            view.actions[j].x=544;view.actions[j].y=93+(int)j*step;view.actions[j].width=398;view.actions[j].height=step-6;
+        }
+    }
 #endif
 	if(!view.list_total && view.action_count && !(PLUS_VITA_ADAPTIVE_STREAM && view.screen==PLUS_VITA_APP_CATALOGUE)) {
 		view.list_total=view.action_count;view.focus=view.selected;
@@ -523,6 +552,7 @@ static PlusVitaAppEffect operation(PlusVitaApp *app, PlusVitaAppEffectKind kind,
 		.hint = cancel ? "O  Cancel" : "Please wait", .operation = app->pending_operation };
 	if(cancel) { app->view.actions[0] = (PlusVitaAppButton){ PLUS_VITA_ACTION_BACK, "Cancel", 64, 444, 832, 52 }; app->view.action_count = 1; }
 	if(kind==PLUS_VITA_EFFECT_EDIT_SEARCH) { app->view.title="Search your games."; app->view.subtitle="CATALOGUE SEARCH"; }
+	if(kind==PLUS_VITA_EFFECT_EDIT_PRIMARY||kind==PLUS_VITA_EFFECT_EDIT_SECONDARY){app->view.title="Appearance";app->view.subtitle="SETTINGS AND HELP";}
 	PlusVitaAppEffect effect = { .kind = kind, .operation = app->pending_operation, .credential = app->credential, .forget = app->forgetting };
 	memcpy(effect.label, app->label, sizeof(effect.label));
 	memcpy(effect.store_country, app->store_country, sizeof(effect.store_country));
@@ -1024,6 +1054,26 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	PlusVitaAppView *view = &app->view;
 	PlusVitaAppEffect effect = { .kind = PLUS_VITA_EFFECT_NONE };
 	#if PLUS_VITA_ADAPTIVE_STREAM
+    if(event.kind==PLUS_VITA_EVENT_THEME_LOADED){
+        if(event.theme_primary<=0xffffffu&&event.theme_secondary<=0xffffffu){
+            app->theme_custom=event.theme_custom;
+            app->theme_primary=event.theme_custom?event.theme_primary:PV_PRIMARY_DEFAULT;
+            app->theme_secondary=event.theme_custom?event.theme_secondary:PV_SECONDARY_DEFAULT;
+        }
+        return effect;
+    }
+    if(event.kind==PLUS_VITA_EVENT_THEME_ENTERED){
+        bool primary=app->waiting_for==PLUS_VITA_EFFECT_EDIT_PRIMARY;
+        if((!primary&&app->waiting_for!=PLUS_VITA_EFFECT_EDIT_SECONDARY)||!event.operation||event.operation!=app->pending_operation)return effect;
+        app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;
+        uint32_t rgb;
+        if(event.status==PLUS_VITA_RESULT_CANCELLED){theme_view(app,NULL);return effect;}
+        if(event.status!=PLUS_VITA_RESULT_OK||!pv_theme_hex(event.data,event.data_size,&rgb)){
+            theme_view(app,"Invalid color. Enter exactly six hexadecimal digits.");return effect;
+        }
+        if(primary)app->theme_primary=rgb;else app->theme_secondary=rgb;
+        app->theme_custom=true;theme_view(app,NULL);app->view.selected=primary?0:1;return effect;
+    }
 	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
 		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);app->ui_language=pv_language(event.ui_language);return effect;
 	}
@@ -1502,6 +1552,9 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	}
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(app->waiting_for==PLUS_VITA_EFFECT_EDIT_PRIMARY||app->waiting_for==PLUS_VITA_EFFECT_EDIT_SECONDARY){app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;theme_view(app,NULL);return effect;}
+#endif
 		if(controls_screen(view->screen)) return edit_controls(app,PLUS_VITA_ACTION_BACK);
 #if PLUS_VITA_FONT_COMPARISON
 		if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) {
@@ -1511,7 +1564,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(app->waiting_for == PLUS_VITA_EFFECT_SAVE_ACCOUNT || app->waiting_for == PLUS_VITA_EFFECT_DELETE_ACCOUNT
 			|| app->waiting_for == PLUS_VITA_EFFECT_ENABLE_AUTO) return effect;
 		if(view->screen == PLUS_VITA_APP_FORGET_CONFIRM) { account_view(app); return effect; }
-		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING || view->screen == PLUS_VITA_APP_STREAM_SETTINGS || view->screen == PLUS_VITA_APP_SECURITY
+		if(view->screen == PLUS_VITA_APP_CONTROLS || view->screen == PLUS_VITA_APP_REPORTING || view->screen == PLUS_VITA_APP_STREAM_SETTINGS || view->screen == PLUS_VITA_APP_SECURITY || view->screen==PLUS_VITA_APP_THEME
 			|| (view->screen == PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) {
 			settings_view(app); return effect;
 		}
@@ -1663,6 +1716,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect.vault_clean_import=action==PLUS_VITA_ACTION_VAULT_CLEAN_IMPORT;return effect;
 		}
 #endif
+        else if(action==PLUS_VITA_ACTION_THEME && view->screen==PLUS_VITA_APP_SETTINGS)theme_view(app,NULL);
+        else if(view->screen==PLUS_VITA_APP_THEME&&(action==PLUS_VITA_ACTION_PRIMARY||action==PLUS_VITA_ACTION_SECONDARY))
+            return operation(app,action==PLUS_VITA_ACTION_PRIMARY?PLUS_VITA_EFFECT_EDIT_PRIMARY:PLUS_VITA_EFFECT_EDIT_SECONDARY,"Enter a color (RRGGBB).",true);
+        else if(view->screen==PLUS_VITA_APP_THEME&&action==PLUS_VITA_ACTION_THEME_RESET){
+            app->theme_custom=false;app->theme_primary=PV_PRIMARY_DEFAULT;app->theme_secondary=PV_SECONDARY_DEFAULT;theme_view(app,NULL);
+        }
 		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
 		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){
 			app->bitrate_kbps=action==PLUS_VITA_ACTION_STREAM_LOW?6000:action==PLUS_VITA_ACTION_STREAM_BALANCED?10000:15000;
@@ -1719,7 +1778,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		{
 			if(view->screen==PLUS_VITA_APP_FONT_COMPARISON) { about_view(app); return effect; }
 			if(view->screen==PLUS_VITA_APP_DETAILS || view->screen==PLUS_VITA_APP_STREAM_STOPPED) { catalogue_view(app); return effect; }
-			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING || view->screen==PLUS_VITA_APP_STREAM_SETTINGS || view->screen==PLUS_VITA_APP_SECURITY
+			if(view->screen==PLUS_VITA_APP_CONTROLS || view->screen==PLUS_VITA_APP_REPORTING || view->screen==PLUS_VITA_APP_STREAM_SETTINGS || view->screen==PLUS_VITA_APP_SECURITY || view->screen==PLUS_VITA_APP_THEME
 				|| (view->screen==PLUS_VITA_APP_ACCOUNT && app->account_from_settings)) { settings_view(app); return effect; }
 			app->pending_operation = 0;
 			app->waiting_for = PLUS_VITA_EFFECT_NONE;

@@ -372,6 +372,27 @@ static const char *const pv_library_labels[PV_LANG_COUNT][11]={
 {"遊戲庫","搜尋遊戲...","全部","搜尋","篩選","雲端串流","狀態:","平台:","遊戲 ID:","無法使用","檢查資格"},
 {"مكتبة الألعاب","ابحث عن الألعاب...","الكل","بحث","تصفية","البث السحابي","الحالة:","المنصة:","معرف اللعبة:","غير متاح","تحقق من الأهلية"}
 };
+static const char *const pv_theme_labels[PV_LANG_COUNT][7]={
+{"Appearance","Primary color","Secondary color","Restore original theme","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Appearance","Primary colour","Secondary colour","Restore original theme","Choose any RGB colour using six hexadecimal digits (RRGGBB).","Invalid colour. Enter exactly six hexadecimal digits.","Enter a colour (RRGGBB)."},
+{"Aparência","Cor primária","Cor secundária","Restaurar tema original","Escolha qualquer cor RGB com seis dígitos hexadecimais (RRGGBB).","Cor inválida. Digite seis dígitos hexadecimais.","Digite uma cor (RRGGBB)."},
+{"Aspeto","Cor primária","Cor secundária","Restaurar tema original","Escolha uma cor RGB de seis dígitos hexadecimais (RRGGBB).","Cor inválida. Introduza seis dígitos hexadecimais.","Introduza uma cor (RRGGBB)."},
+{"Apariencia","Color primario","Color secundario","Restaurar tema original","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Apariencia","Color primario","Color secundario","Restaurar tema original","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Design","Primärfarbe","Sekundärfarbe","Originaldesign wiederherstellen","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Apparence","Couleur primaire","Couleur secondaire","Rétablir le thème original","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Aspetto","Colore primario","Colore secondario","Ripristina tema originale","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Uiterlijk","Primaire kleur","Secundaire kleur","Herstel origineel thema","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Wygląd","Kolor podstawowy","Kolor dodatkowy","Przywróć oryginalny motyw","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Utseende","Primärfärg","Sekundärfärg","Återställ originaltema","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Görünüm","Birincil renk","İkincil renk","Orijinal temayı geri yükle","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"Оформление","Основной цвет","Дополнительный цвет","Восстановить исходную тему","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"外観","メインカラー","サブカラー","元のテーマに戻す","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"외관","기본 색상","보조 색상","기본 테마 복원","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"外观","主色","辅色","恢复原始主题","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"外觀","主色","輔色","恢復原始主題","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
+{"المظهر","اللون الأساسي","اللون الثانوي","استعادة المظهر الأصلي","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."}
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -394,6 +415,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_auto_vault[0],pv_auto_vault[lang],PV_AUTO_VAULT_COUNT);
     /* New catalogue labels must not override established menu/session keys. */
     if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
+    if(!v)v=pv_lookup(s,len,pv_theme_labels[0],pv_theme_labels[lang],7);
     return v?v:s;
 }
 #endif
