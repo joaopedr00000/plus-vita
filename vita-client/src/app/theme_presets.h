@@ -4,7 +4,7 @@
 #include "custom_theme.h"
 #define PV_THEME_COUNT 50u
 #define PV_THEME_SLOTS 3u
-#define PV_THEME_PAGE 5u
+#define PV_THEME_PAGE 12u
 #define PV_THEME_RETENTION_SECONDS (10u*24u*60u*60u)
 #define PV_THEME_ROTATION_US UINT64_C(60000000)
 typedef struct { const char *name; uint32_t primary,secondary; } PvThemePreset;
@@ -64,6 +64,10 @@ static const PvThemePreset pv_presets[PV_THEME_COUNT+1]={
 };
 static inline unsigned pv_theme_id(unsigned id){return id<=PV_THEME_COUNT?id:0;}
 static inline int pv_theme_logo_index(unsigned id){return id==1?0:id==12?1:id==42?2:-1;}
+/* Positions of the approved miniature art in a 4x3 atlas. */
+static inline int pv_theme_art_index(unsigned id){
+    switch(id){case 12:return 0;case 2:return 1;case 42:return 2;case 29:return 3;case 3:return 4;case 11:return 5;case 27:return 6;case 33:return 7;case 36:return 8;case 37:return 9;case 38:return 10;case 5:return 11;default:return -1;}
+}
 static inline bool pv_theme_expired(uint64_t now,uint64_t last,unsigned id,unsigned active){
     return id<=PV_THEME_COUNT&&id!=active&&last>=UINT64_C(946684800)&&now>=last&&now-last>=PV_THEME_RETENTION_SECONDS;
 }

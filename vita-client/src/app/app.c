@@ -155,7 +155,7 @@ static void settings_view(PlusVitaApp *app)
  	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
 	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME,"Appearance",64,0,832,34};
 	app->view.action_count++;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].y=222+(int)i*39;app->view.actions[i].height=34;}
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].x=20+(int)(i%2)*466;app->view.actions[i].y=125+(int)(i/2)*72;app->view.actions[i].width=454;app->view.actions[i].height=64;}
 	app->view.body="Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled.";
 #endif
 }
@@ -201,13 +201,12 @@ static void theme_presets_view(PlusVitaApp *app)
     for(unsigned k=0;k<PV_THEME_PAGE;k++){
         unsigned id=app->theme_page*PV_THEME_PAGE+k;
         if(id>PV_THEME_COUNT)break;
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,pv_presets[id].name,64,234+(int)k*32,832,26};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,pv_presets[id].name,18+(int)(k%4)*176,126+(int)(k/4)*106,166,98};
         if(id==app->theme_id)app->view.selected=k;
     }
-    int y=234+(int)app->view.action_count*32;
-    if(app->theme_page){app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PREV,"Previous page",64,y,832,26};y+=32;}
-    if(app->theme_page+1<pages){app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_NEXT,"Next page",64,y,832,26};y+=32;}
-    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,y,832,26};
+    if(app->theme_page)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PREV,"Previous page",18,452,218,38};
+    if(app->theme_page+1<pages)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_NEXT,"Next page",244,452,218,38};
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",470,452,252,38};
 }
 static void stream_settings_view(PlusVitaApp *app)
 {
@@ -455,7 +454,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		size_t capacity=(size_t)((502-view.list_y+6)/view.row_step);
 		if(!capacity) capacity=1;
 		/* The diagnostic font comparison is a horizontal sample toolbar. */
-		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON) capacity=view.action_count;
+		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON || (PLUS_VITA_ADAPTIVE_STREAM && (view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS))) capacity=view.action_count;
 		view.list_count=capacity<view.list_total ? capacity : view.list_total;
 		list_viewport(view.list_total,view.list_count,view.focus,&view.list_first);
 		if(view.list_count<view.list_total) {
@@ -467,6 +466,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		}
 		const PlusVitaAppButton *last=&view.actions[view.action_count-1];
 		view.list_height=last->y+last->height-view.list_y;
+        if(PLUS_VITA_ADAPTIVE_STREAM&&(view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS))view.list_height=490-view.list_y;
 	}
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	if(view.screen!=PLUS_VITA_APP_DETAILS && ((view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)||(!app->label[0]&&!app->online_id[0])))view.title=pv_translate(app->ui_language,view.title);

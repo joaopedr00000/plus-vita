@@ -441,8 +441,7 @@ int plus_vita_app_run(void)
             if(wall_id!=current.theme_id)wall_previous=wall_id;
             wall_id=current.theme_id;wall_revision=current.wallpaper_revision;wall_touch_due=0;
             wall_slot=wall_attempts=0;wall_next=0;wall_ready=false;flow.theme_wallpaper=NULL;flow.dirty=true;
-            int idx=pv_theme_logo_index(wall_id);
-            flow.theme_wordmark=idx>=0&&theme_headers?theme_headers+(size_t)idx*PV_HEADER_WIDTH*PV_HEADER_HEIGHT:NULL;
+            flow.theme_wordmark=theme_headers;
         }
         if(wall_job&&pv_wallpaper_poll(wall_job)){
             if(wall_job->id==wall_id&&!atomic_load(&wall_job->cancel)){wall_touch_due=status_now+UINT64_C(86400000000);wall_previous=UINT32_MAX;}
@@ -464,7 +463,7 @@ int plus_vita_app_run(void)
             unsigned slot=(!current.theme_rotate&&wall_ready)?(wall_slot+PV_THEME_SLOTS-1)%PV_THEME_SLOTS:wall_slot;
             if(!pv_wallpaper_start(wall_job,wall_id,slot,wall_previous))wall_next=status_now+PV_THEME_ROTATION_US;
         }
-		if(current.screen==PLUS_VITA_APP_CATALOGUE && (!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen)){
+		if(!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen){
 			library_status(&flow);last_status=status_now;
 		}
 #endif

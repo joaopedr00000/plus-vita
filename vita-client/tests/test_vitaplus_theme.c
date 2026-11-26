@@ -26,18 +26,20 @@ int main(void){
     PlusVitaAppView v={.screen=PLUS_VITA_APP_WELCOME,.title="VitaPlus",.body="Welcome",.subtitle="Welcome",.hint="Back",.action_count=2,
         .actions={{PLUS_VITA_ACTION_SETUP,"First",64,300,500,44},{PLUS_VITA_ACTION_SETTINGS,"Second",64,350,500,44}}};
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[0]==VP_GOLD);
-    assert(pixels[100*960+900]==vp_menu_background(100));
-    assert(pixels[320*960+80]==VP_GOLD && label_colors[0]==VP_DARK_INK);
-    assert(pixels[370*960+80]==VP_BUTTON && label_colors[1]==VP_WHITE);
+    assert(pixels[64*960+40]==VP_RGB(105,105,109));
+    assert(pixels[300*960+110]==VP_GOLD && label_colors[0]==VP_WHITE);
+    assert(pixels[350*960+110]==VP_RGB(91,91,96) && label_colors[1]==VP_WHITE);
     v.selected=1;v.touch_pressed=true;v.pressed_index=1;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[320*960+80]==VP_BUTTON && label_colors[0]==VP_WHITE);
-    assert(pixels[370*960+80]==VP_GOLD_PRESSED && label_colors[1]==VP_DARK_INK);
+    assert(pixels[300*960+110]==VP_RGB(91,91,96) && label_colors[0]==VP_WHITE);
+    assert(pixels[350*960+110]==VP_GOLD && label_colors[1]==VP_WHITE);
     v.theme_custom=true;v.theme_primary=0x2277ff;v.theme_secondary=0xa000cc;
     v.selected=0;v.touch_pressed=false;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[0]==pv_theme_pixel(0x2277ff)&&pixels[320*960+80]==pv_theme_pixel(0x2277ff));
+    assert(label_colors[0]==VP_WHITE && label_colors[1]==VP_WHITE);
+    v.theme_primary=0;v.theme_secondary=0xffffff;
+    plus_vita_app_paint(NULL,pixels,960,&v);
+    assert(label_colors[0]==VP_WHITE && label_colors[1]==VP_WHITE);
     v.theme_custom=false;
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
