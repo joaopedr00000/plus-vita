@@ -1,3 +1,4 @@
+#include "storage_paths.h"
 // SPDX-License-Identifier: AGPL-3.0-only
 
 #include "auth_probe.h"
@@ -274,7 +275,7 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
  * No upstream catalogue logs or account-specific cache survive this request. */
 static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAuthProbeResult *result,unsigned mode)
 {
-	const char *cache="ux0:data/plus-vita-ps5-catalog";
+	const char *cache=PV_PS5_CATALOG;
 	char locale[24];
 	/* Discovery must use the authenticated account's actual country, never a
 	 * user-selected foreign locale. Mode only permits same-region fallback. */

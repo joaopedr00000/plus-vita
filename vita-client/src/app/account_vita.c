@@ -14,14 +14,15 @@
 #include <chiaki/random.h>
 #endif
 
-#define IMPORT_FILE "ux0:data/plus-vita-auth.json"
-#define ACCOUNT_DIR "ux0:data/plus-vita"
+#include "../platform/storage_paths.h"
+#define IMPORT_FILE PV_IMPORT_FILE
+#define ACCOUNT_DIR PV_ACCOUNT_DIR
 #define ACCOUNT_FILE ACCOUNT_DIR "/account.json"
 #define ACCOUNT_TEMP ACCOUNT_DIR "/account.tmp"
 #define ACCOUNT_BLOCK ACCOUNT_DIR "/account.blocked"
 #if PLUS_VITA_ACCOUNT_VAULT
 /* Separate internal partition, not a fixed key or a key embedded in the JSON. */
-#define KEY_DIR "ur0:data/plus-vita"
+#define KEY_DIR PV_KEY_DIR
 #define KEY_FILE KEY_DIR "/account.key"
 #define KEY_TEMP KEY_DIR "/account.key.tmp"
 #endif
@@ -134,7 +135,13 @@ static bool cleanup_matching_import(const PlusVitaCredential *credential)
     return remove(IMPORT_FILE)==0||errno==ENOENT;
 }
 static bool key_read(uint8_t key[32]){
-	FILE *f=fopen(KEY_FILE,"rb");if(!f)return false;
+	FILE *f=fopen(KEY_FILE,"rb");
+#if PV_NEW_STORAGE
+    /* Compatibility only: never write, rename or unlink the old internal key.
+     * New automatic vaults use ux0. Existing ones can still be opened. */
+    if(!f&&errno==ENOENT)f=fopen("ur0:data/plus-vita/account.key","rb");
+#endif
+    if(!f)return false;
 	size_t n=fread(key,1,32,f);int extra=fgetc(f);
 	bool ok=n==32&&extra==EOF&&!ferror(f);if(fclose(f)!=0)ok=false;
 	if(!ok)pv_vault_wipe(key,32);

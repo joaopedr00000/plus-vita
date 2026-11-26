@@ -7,8 +7,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <errno.h>
-#define SOURCE "ux0:data/VitaPlus-Wallpapers"
-#define CACHE "ux0:data/VitaPlus-Themes-Cache"
+#include "../platform/storage_paths.h"
+#define SOURCE PV_WALL_SOURCE
+#define CACHE PV_WALL_CACHE
 #define PIXEL_BYTES (PV_WALL_WIDTH*PV_WALL_HEIGHT*sizeof(uint32_t))
 #define MAX_SOURCE (2u*1024u*1024u)
 typedef struct {uint64_t magic,stamp,size,format,hash;} CacheHeader;

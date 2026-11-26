@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #ifndef PLUS_VITA_BUILD_IDENTITY_H
 #define PLUS_VITA_BUILD_IDENTITY_H
-#define PLUS_VITA_DIAGNOSTIC_VITA_PATH "ux0:data/VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log"
+#include "storage_paths.h"
+#define PLUS_VITA_DIAGNOSTIC_VITA_PATH PV_DIAG_DIR "VitaPlus-Diagnostic-DD-MM-YYYY-HH-MM.log"
 #if PLUS_VITA_PS3_LIVE
 #define PLUS_VITA_APP_BUILD "ps3-live-54-2"
 #define PLUS_VITA_BUILD_LABEL "PS3 PLAYBACK #54-2"
