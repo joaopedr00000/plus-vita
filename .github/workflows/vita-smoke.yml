@@ -127,6 +127,8 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_update_policy.c -o /tmp/pv-update-policy
           /tmp/pv-update-policy
+          cc -std=c11 -Wall -Wextra -Werror vita-client/src/platform/update_package.c vita-client/tests/test_update_package.c -lz -o /tmp/pv-update-package
+          python3 tools/test-update-package.py /tmp/pv-update-package
       - name: Test storage migration and restricted vault-key migration
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/src/platform/storage_migration.c vita-client/tests/test_storage_migration.c -o /tmp/pv-storage-test
