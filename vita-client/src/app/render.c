@@ -6,6 +6,7 @@
 #include "../platform/adaptive_stream.h"
 #include "theme.h"
 #include "theme_presets.h"
+#include "theme_motifs.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
@@ -180,6 +181,23 @@ static uint32_t primary(Canvas *d,uint32_t fallback){return d->custom?d->primary
 static uint32_t secondary(Canvas *d,uint32_t fallback){return d->custom?d->secondary:fallback;}
 static uint32_t tint(Canvas *d,uint32_t fallback,unsigned amount){return d->custom?mix(RGB(18,18,20),d->secondary,amount):fallback;}
 static uint32_t readable(Canvas *d,uint32_t fallback){return d->custom?mix(d->primary,RGB(255,255,255),125):fallback;}
+static void theme_motif(Canvas *d,unsigned id,int x,int y,int size,uint32_t color,int thick)
+{
+    if(!id||id>PV_THEME_COUNT)return;
+    const PvThemeMotif *m=&pv_theme_motifs[id];
+    for(unsigned k=0;k<m->count;k++){
+        const PvThemeLine *l=&m->lines[k];
+        line(d,x+l->x0*size/16,y+l->y0*size/16,x+l->x1*size/16,y+l->y1*size/16,thick,color);
+    }
+}
+static void theme_details(Canvas *d,const PlusVitaAppView *v,bool library)
+{
+    if(!v->theme_id||v->theme_id>PV_THEME_COUNT)return;
+    uint32_t muted=mix(RGB(12,12,15),d->secondary,55);
+    /* Quiet watermark and a unique high-contrast emblem; no animated assets. */
+    theme_motif(d,v->theme_id,library?752:687,library?350:95,160,muted,2);
+    theme_motif(d,v->theme_id,library?728:656,library?55:26,32,readable(d,MENU_ACCENT),2);
+}
 static void local_wallpaper(Canvas *d,const PlusVitaAppView *v)
 {
     if(!v->theme_wallpaper)return;
@@ -286,7 +304,7 @@ static void footer(Canvas *d,const PlusVitaAppView *v)
 }
 static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCovers *covers)
 {
-	library_background(d);local_wallpaper(d,v);
+	library_background(d);local_wallpaper(d,v);theme_details(d,v,true);
 	if(v->theme_wordmark)theme_header(d,v,8,5);
 	else {library_logo(d,v->library_logo);text(d,"VitaPlus",99,11,TEXT_TITLE,127,39,false,MENU_WHITE);}
 	rectangle(d,228,12,1,30,readable(d,MENU_ACCENT));
@@ -363,7 +381,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 	(void)branding;
 	if(view->screen==PLUS_VITA_APP_CATALOGUE){library_paint(display,view,covers);return;}
 	for(int y=0;y<HEIGHT;y++)rectangle(display,0,y,WIDTH,1,tint(display,vp_menu_background((unsigned)y),(unsigned)(12+y*14/544)));
-	local_wallpaper(display,view);
+	local_wallpaper(display,view);theme_details(display,view,false);
 	rectangle(display,0,0,WIDTH,4,primary(display,MENU_ACCENT));
 	if(view->theme_wordmark)theme_header(display,view,64,20);
 	else text(display,"VitaPlus",64,25,TEXT_BRAND,400,38,false,MENU_WHITE);
