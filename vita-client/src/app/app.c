@@ -165,7 +165,7 @@ static void theme_view(PlusVitaApp *app,const char *notice)
 {
     snprintf(app->theme_labels[0],sizeof(app->theme_labels[0]),"%s: #%06X",PV_TR("Primary color"),(unsigned)app->theme_primary);
     snprintf(app->theme_labels[1],sizeof(app->theme_labels[1]),"%s: #%06X",PV_TR("Secondary color"),(unsigned)app->theme_secondary);
-    snprintf(app->theme_status,sizeof(app->theme_status),"%s",PV_TR("Choose your colors and optional wallpaper."));
+    snprintf(app->theme_status,sizeof(app->theme_status),"%s",PV_TR("Choose any RGB color using six hexadecimal digits (RRGGBB)."));
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_THEME,.title="Appearance",.subtitle="SETTINGS AND HELP",
         .body=notice?notice:app->theme_status,.hint="X  Select     O  Back",
         .actions={{PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,182,832,44},

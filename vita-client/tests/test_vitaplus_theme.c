@@ -32,8 +32,15 @@ int main(void){
     assert(pixels[350*960+110]==VP_RGB(119,119,123) && label_colors[1]==VP_WHITE);
     v.selected=1;v.touch_pressed=true;v.pressed_index=1;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[300*960+110]==VP_RGB(91,91,96) && label_colors[0]==VP_WHITE);
+    assert(pixels[300*960+110]==VP_RGB(119,119,123) && label_colors[0]==VP_WHITE);
     assert(pixels[350*960+110]==VP_RGB(255,216,125) && label_colors[1]==VP_DARK_INK);
+    /* Compare actual rasterized button pixels across screens, not a mock palette. */
+    uint32_t sample[44][500];
+    for(int y=0;y<44;y++)memcpy(sample[y],pixels+(350+y)*960+64,500*sizeof(uint32_t));
+    v.screen=PLUS_VITA_APP_CATALOGUE;
+    plus_vita_app_paint(NULL,pixels,960,&v);
+    for(int y=4;y<40;y++)for(int x=10;x<490;x++)assert(sample[y][x]==pixels[(350+y)*960+64+x]);
+    v.screen=PLUS_VITA_APP_WELCOME;
     v.theme_custom=true;v.theme_primary=0x2277ff;v.theme_secondary=0xa000cc;
     v.selected=0;v.touch_pressed=false;
     plus_vita_app_paint(NULL,pixels,960,&v);
