@@ -175,6 +175,16 @@ int main(void)
  puts("preview: real transfers, 3000ms boundary, cached dwell, rapid browsing, drag and details return passed");
 }
 #else
+/* The synthetic artwork is a 2:1 red/blue image. The 230x352 well
+ * fits it into 230x115 pixels at (410,236), preserving aspect ratio.
+ * Sample both halves away from their shared center and the letterbox. */
+static void assert_preview_art(void)
+{
+ assert(pixels[292*960+460]==0xff0000ff);
+ assert(pixels[292*960+590]==0xffff0000);
+ assert(pixels[180*960+460]!=0xff0000ff);
+ assert(pixels[180*960+590]!=0xffff0000);
+}
 int main(void)
 {
  cover_mode=6;
@@ -188,14 +198,14 @@ int main(void)
  tick(&flow,351000);settle(&flow,first,351000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==1);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[292*960+525]==0xff0000ff);
+ assert_preview_art();
  event(&flow,PLUS_VITA_EVENT_DOWN,400000);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[292*960+525]!=0xff0000ff);
+ assert(pixels[292*960+460]!=0xff0000ff && pixels[292*960+590]!=0xffff0000);
  event(&flow,PLUS_VITA_EVENT_UP,450000);
  assert(flow.preview_eligible && atomic_load(&cover_requests)==1);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[292*960+525]==0xff0000ff);
+ assert_preview_art();
  for(unsigned i=0;i<5;i++)event(&flow,PLUS_VITA_EVENT_DOWN,500000+i*10000);
  assert(atomic_load(&cover_requests)==1);
  PlusVitaAppView view=plus_vita_app_view(app);
@@ -205,7 +215,7 @@ int main(void)
  tick(&flow,890000);settle(&flow,url,890000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==2);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
- assert(pixels[292*960+525]==0xff0000ff);
+ assert_preview_art();
  /* Change focus, then start a drag: no new artwork work during scrolling. */
  event(&flow,PLUS_VITA_EVENT_DOWN,900000);
  plus_vita_ui_flow_event(&flow,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_TOUCH_DOWN,.x=80,.y=240},900001);
