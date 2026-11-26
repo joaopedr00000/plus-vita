@@ -197,6 +197,10 @@ static void *audio_worker(void *user)
 			unsigned local = pending_local_drops < missing ? pending_local_drops : missing;
 			unsigned wire_missing = missing - local;
 			a->skipped_local += local;
+#if PLUS_VITA_ADAPTIVE_STREAM
+			/* Fade in after deliberately skipping stale audio to reduce clicks. */
+			if(local && a->prebuffer_base)a->audio_fade=true;
+#endif
 			if(wire_missing <= 3) {
 				for(unsigned i = 0; i < wire_missing; i++) {
 					int n = opus_decode(a->decoder, NULL, 0, pcm, 480, 0);
@@ -289,12 +293,15 @@ bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uin
 	a->arrived++;
 	unsigned queue_limit=AUDIO_QUEUE;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	if(a->prebuffer_base)queue_limit=16;
+	if(a->prebuffer_base)queue_limit=pv_audio_queue_limit(a->prebuffer_target);
 #endif
-	if(a->count >= queue_limit) {
+	while(a->count >= queue_limit) {
 		unsigned carry = a->queue[a->head].local_drops_before + 1;
 		a->head = (a->head + 1) % AUDIO_QUEUE; a->count--; a->dropped++;
 		a->queue[a->head].local_drops_before += carry;
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(a->prebuffer_base)a->clean_audio_units=0;
+#endif
 	}
 	AudioUnit *unit = &a->queue[(a->head + a->count) % AUDIO_QUEUE];
 	unit->sequence = sequence; unit->size = size; unit->arrived_us = arrived_us;

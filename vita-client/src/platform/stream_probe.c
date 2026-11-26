@@ -1787,9 +1787,12 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);
 			unsigned rx=(unsigned)((probe->video_rx_bytes-hud_rx)*8/(now-hud_at));
 			unsigned fps=(unsigned)((uint64_t)(displayed-hud_frames)*1000/(now-hud_at));
-			snprintf(hud_line,sizeof(hud_line),"FPS %u  RX %u kbps  RTT %llu ms  Q %u  WAIT %u ms  DEC %llu us  GAP %u  RESYNC %u",
-				fps,rx,(unsigned long long)(probe->provision->rtt_us/1000),probe->queue_count,probe->video_reorder.grace_us/1000,
-				(unsigned long long)probe->video_decoder.last_decode_us,expired,probe->local_queue_resyncs);
+			uint64_t stamp=sceKernelGetProcessTimeWide();
+			uint64_t oldest=probe->queue_count?probe->queue[probe->queue_head].enqueued_us:stamp;
+			snprintf(hud_line,sizeof(hud_line),"FPS %u RX %u kbps RTT %llu ms Q %u/%llu ms DEC %llu us GAP %u SKIP %u RESYNC %u",
+				fps,rx,(unsigned long long)(probe->provision->rtt_us/1000),probe->queue_count,
+				(unsigned long long)(stamp>=oldest?(stamp-oldest)/1000:0),
+				(unsigned long long)probe->video_decoder.last_decode_us,expired,presentation_skips,probe->local_queue_resyncs);
 			hud_at=now;hud_rx=probe->video_rx_bytes;hud_frames=displayed;hud_saved=probe->reorder_saved_frames;hud_expired=probe->reorder_expired_frames;
 		}
 #endif
@@ -1934,6 +1937,13 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 				&& recovery_generation_fed == probe->recovery_resumes;
 			bool show = recovery_output || !displayed || probe->queue_count < 2
 				|| sceKernelGetProcessTimeWide() / 1000u - last_display >= 100;
+#if PLUS_VITA_ADAPTIVE_STREAM
+			uint64_t present_now=sceKernelGetProcessTimeWide();
+			uint64_t oldest=probe->queue_count?probe->queue[probe->queue_head].enqueued_us:present_now;
+			show=pv_present_due(probe->queue_count,present_now>=oldest?present_now-oldest:0,
+				present_now/1000u>=last_display?present_now/1000u-last_display:0,
+				recovery_output||!displayed);
+#endif
 			if(show)
 			{
 chiaki_mutex_unlock(&probe->mutex);

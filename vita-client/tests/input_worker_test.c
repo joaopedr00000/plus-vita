@@ -404,6 +404,11 @@ static void lifecycle_cases(void)
 			assert(!plus_vita_input_worker_status(worker).done);
 			pthread_mutex_lock(&device_mutex); device_mode=1; device_pad.lx=255; pthread_mutex_unlock(&device_mutex);
 			wait_x(32767);
+			pthread_mutex_lock(&device_mutex);device_mode=0;pthread_mutex_unlock(&device_mutex);
+			wait_x(0); /* An extended sample outage must release held axes. */
+			assert(!plus_vita_input_worker_status(worker).done);
+			pthread_mutex_lock(&device_mutex);device_mode=1;device_pad.lx=255;pthread_mutex_unlock(&device_mutex);
+			wait_x(32767);
 			assert(plus_vita_input_worker_stop(worker,&stats)==CHIAKI_ERR_SUCCESS);
 			assert(stats.poll_failures>=3 && stats.native_repeats+stats.native_changes>0);
 		}

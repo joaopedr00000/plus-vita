@@ -83,7 +83,7 @@ static void log_message(ChiakiLogLevel level, const char *message, void *user)
 }
 static unsigned long long field(const char *line, const char *name)
 { const char *p = strstr(line, name); assert(p); return strtoull(p + strlen(name), NULL, 10); }
-static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, unsigned pacing_error, bool relative, bool after_first)
+static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, unsigned pacing_error, bool relative, bool after_first, unsigned profile)
 {
 	ready = finished = false; audio = NULL; sequence = output_count = 0;
 	log_delay = writer_delay; slow_output = pacing_error; relative_pacing = relative;
@@ -93,7 +93,7 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 	atomic_store(&now_us, 1); final_timing[0] = final_summary[0] = 0;
 	ChiakiLog log; chiaki_log_init(&log, CHIAKI_LOG_ALL, log_message, NULL);
 	ChiakiAudioHeader header = { .channels = 2, .bits = 16, .rate = 48000, .frame_size = 480 };
-	audio = plus_vita_audio_start(&header, &log); assert(audio);
+	audio = plus_vita_audio_start_profile(&header, &log,profile); assert(audio);
 	/* Simulate arrivals during native initialization before its consumer runs. */
 	for(unsigned i = 0; i < initial_units; i++) {
 		atomic_store(&now_us, 1 + (startup ? i * 10000u : 0)); uint8_t packet = 0;
@@ -115,12 +115,12 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 int main(void)
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
-	uint64_t clean = run("no startup / no writer delay", 0, 0, 0, false, false);
-	uint64_t startup = run("200ms initialization backlog", 200000, 0, 0, false, false);
-	uint64_t early = run("200ms writer stall after first dequeue", 200000, 0, 0, false, true);
-	uint64_t logging = run("startup + 2x10ms periodic writes / deadline pacing", 200000, 10000, 0, false, false);
-	uint64_t relative = run("startup + writes / fixed relative wait", 200000, 10000, 0, true, false);
-	uint64_t mismatch = run("startup + 20us output period mismatch", 200000, 0, 20, false, false);
+	uint64_t clean = run("no startup / no writer delay", 0, 0, 0, false, false, 0);
+	uint64_t startup = run("200ms initialization backlog", 200000, 0, 0, false, false, 0);
+	uint64_t early = run("200ms writer stall after first dequeue", 200000, 0, 0, false, true, 0);
+	uint64_t logging = run("startup + 2x10ms periodic writes / deadline pacing", 200000, 10000, 0, false, false, 0);
+	uint64_t relative = run("startup + writes / fixed relative wait", 200000, 10000, 0, true, false, 0);
+	uint64_t mismatch = run("startup + 20us output period mismatch", 200000, 0, 20, false, false, 0);
 	assert(clean < 15000);
 	assert(startup > 175000 && startup < 205000);
 	assert(early > 175000 && early < 205000);
@@ -129,5 +129,9 @@ int main(void)
 	assert(logging >= startup && logging - startup < 25000);
 	assert(relative > logging + 30000);
 	assert(mismatch > startup + 25000);
-	puts("audio queue: unchanged production arrival-to-output path separates startup, periodic writer stalls and output pacing; no hardware cause inferred");
+	uint64_t low=run("adaptive 6 Mbps / 200ms startup",200000,0,0,false,false,6000);
+	assert(low<110000 && field(final_summary,"queue_peak=")<=9 && field(final_summary,"dropped=")>0);
+	uint64_t quality=run("adaptive 15 Mbps / 200ms startup",200000,0,0,false,false,15000);
+	assert(quality<140000 && field(final_summary,"queue_peak=")<=12 && field(final_summary,"dropped=")>0);
+	puts("audio queue: legacy timing and adaptive bounded backlog passed; no hardware latency inferred");
 }

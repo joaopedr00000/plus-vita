@@ -12,6 +12,16 @@ int main(void){
  assert(r==48000);
  for(unsigned i=0;i<50;i++) { r=pv_reorder_adjust(16000,r,0,0); }
  assert(r==16000);
+ assert(pv_reorder_adjust(16000,32000,0,1)==31000);
+ assert(pv_reorder_adjust(16000,16000,0,10)==16000);
+ assert(pv_audio_queue_limit(5)==9&&pv_audio_queue_limit(8)==12&&pv_audio_queue_limit(11)==15);
+ assert(pv_audio_queue_limit(0)==9&&pv_audio_queue_limit(100)==15);
+ assert(pv_present_due(4,100000,1,true));
+ assert(pv_present_due(0,100000,1,false));
+ assert(pv_present_due(1,15999,1,false)&&!pv_present_due(1,16000,1,false));
+ assert(!pv_present_due(2,0,49,false)&&pv_present_due(2,0,50,false));
+ assert(!pv_input_stale(100000,0)&&!pv_input_stale(100999,1000)&&pv_input_stale(101000,1000));
+ assert(!pv_input_stale(999,1000));
  unsigned a=5;
  for(unsigned i=0;i<20;i++) { a=pv_audio_adjust(5,a,true); }
  assert(a==11);

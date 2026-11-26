@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "input_worker.h"
 #include "latency_clock.h"
+#include "adaptive_stream.h"
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -65,7 +66,7 @@ static void *input_thread(void *user)
 	ChiakiControllerState previous;
 	chiaki_controller_state_set_idle(&previous);
 	uint64_t next = plus_vita_latency_now_us(), last_poll = 0;
-	uint64_t chord_since = 0, last_native = 0;
+	uint64_t chord_since = 0, last_native = 0, last_good = 0;
 	bool chord_held = false, native_known = false, user_stopped = false;
 	ChiakiErrorCode error = CHIAKI_ERR_SUCCESS;
 	for(;;)
@@ -87,9 +88,21 @@ static void *input_thread(void *user)
 		{
 			w->stats.poll_failures++;
 			chord_held = false;
+			/* No new sample is not proof of release. After a bounded outage,
+			 * clear held inputs once rather than replaying stale commands. */
+			if(pv_input_stale(sampled_us,last_good)){
+				ChiakiControllerState idle;
+				chiaki_controller_state_set_idle(&idle);
+				if(!chiaki_controller_state_equals(&idle,&previous)){
+					error=chiaki_feedback_sender_set_controller_state(w->sender,&idle);
+					if(error!=CHIAKI_ERR_SUCCESS)break;
+					previous=idle;w->stats.updates++;
+				}
+			}
 		}
 		else
 		{
+			last_good=sampled_us;
 			if(native_known && last_native == sample.native_timestamp) w->stats.native_repeats++;
 			else w->stats.native_changes++;
 			last_native = sample.native_timestamp;

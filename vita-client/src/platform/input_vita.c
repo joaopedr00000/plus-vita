@@ -156,8 +156,10 @@ int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 	chiaki_controller_state_set_idle(&sample->state);
 	map_pad_axes(&pad,&sample->state);
 	PlusVitaControlLayout defaults;
-	plus_vita_control_layout_defaults(&defaults);
-	const PlusVitaControlLayout *layout=input->layout_ready && plus_vita_control_layout_valid(&input->layout) ? &input->layout : &defaults;
+	const PlusVitaControlLayout *layout=&input->layout;
+	if(!input->layout_ready || !plus_vita_control_layout_valid(layout)){
+		plus_vita_control_layout_defaults(&defaults);layout=&defaults;
+	}
 	uint8_t levels[PLUS_VITA_INPUT_COUNT]={0};
 	static const uint32_t pad_buttons[]={SCE_CTRL_CROSS,SCE_CTRL_CIRCLE,SCE_CTRL_SQUARE,SCE_CTRL_TRIANGLE,
 		SCE_CTRL_UP,SCE_CTRL_DOWN,SCE_CTRL_LEFT,SCE_CTRL_RIGHT,SCE_CTRL_LTRIGGER,SCE_CTRL_RTRIGGER,SCE_CTRL_START,SCE_CTRL_SELECT};
