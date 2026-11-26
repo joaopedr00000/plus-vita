@@ -16,3 +16,7 @@ All native adaptive user data is organized under `ux0:data/VitaPlus`: Account, S
 ## Shared controller glyphs
 
 The catalogue's existing circular PlayStation button artwork is reused in native menu footers: Cross selects, Circle goes back or cancels, Square saves the diagnostic capture where supported, and a directional glyph indicates navigation. Only actual commands are displayed; notices stay textual. Localized labels derive from the existing locale tables. Catalogue geometry, pixels of the original four controller icons, button mappings, account state, streaming and storage are unchanged. QR camera preview stops above the footer. Hardware visual validation remains required.
+
+## Publication hold and update channels
+
+Official v0.1.0 is blocked until the maintainer confirms actual playable PS5 cloud streaming on physical Vita hardware. A successful CI build is insufficient. Stable accepts regular releases; Beta also accepts official GitHub prereleases tagged vX.Y.Z-bN, displayed X.Y.Z BN, where X.Y.Z is the originating stable version (0.0.6 B1, B2, B3, then 0.0.7 stable). No automatic downgrade. Verified VPKs use ux0:Downloads/. No release authorized by this change.
