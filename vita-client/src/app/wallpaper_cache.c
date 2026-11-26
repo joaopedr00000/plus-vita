@@ -44,7 +44,7 @@ static void prune(unsigned active,uint64_t now,const atomic_bool *cancel){
     }
 }
 static unsigned char *read_file(const char *path,size_t *len){
-    struct stat st;if(!regular(path,&st)||st.st_size<=0||st.st_size>MAX_SOURCE)return NULL;
+    struct stat st;if(!regular(path,&st)||st.st_size<=0||(uint64_t)st.st_size>MAX_SOURCE)return NULL;
     size_t n=(size_t)st.st_size;unsigned char *data=malloc(n);if(!data)return NULL;
     FILE *f=fopen(path,"rb");if(!f){free(data);return NULL;}
     bool ok=fread(data,1,n,f)==n&&fgetc(f)==EOF&&!ferror(f);fclose(f);
@@ -83,7 +83,7 @@ static void *worker(void *arg){
         if(!exists){format=2;snprintf(source,sizeof(source),SOURCE "/%02u-%u.png",j->id,j->slot+1);exists=regular(source,&st);}
         cached(path,j->id,j->slot);
         if(!exists)remove(path);
-        else if(st.st_size>0&&st.st_size<=MAX_SOURCE&&!atomic_load(&j->cancel)){
+        else if(st.st_size>0&&(uint64_t)st.st_size<=MAX_SOURCE&&!atomic_load(&j->cancel)){
             CacheHeader header={UINT64_C(0x505657414c4c3031),(uint64_t)st.st_mtime,(uint64_t)st.st_size,format,0};
             j->ok=cache_read(path,header,j->output);
             if(!j->ok){size_t n=0;unsigned char *data=read_file(source,&n);

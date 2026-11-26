@@ -668,6 +668,44 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     message(FATAL_ERROR "Pylux selected server ping patch point not found")
   endif()
   string(REPLACE "${PV_PING_OLD}" "${PV_PING_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Con 0.5.2 (7910b068) switched its PS5 Cloud session envelope to the
+  # PC configuration after the October 002.0011 regression. Keep cronos,
+  # protocol 12, Sony-issued entitlement, PS5 OAuth and measured network.
+  # This independently adapted compatibility experiment still requests AVC.
+  set(PV_PS5_CONFIG_OLD [=[c->pscloud ? "qlite" : "psnow", c->pscloud ? "qlite" : "PC"]=])
+  set(PV_PS5_CONFIG_NEW [=["psnow", "PC"]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_CONFIG_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux PS5 configuration patch point not found")
+  endif()
+  string(REPLACE "${PV_PS5_CONFIG_OLD}" "${PV_PS5_CONFIG_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  set(PV_PS5_SPEC_OLD [=[
+		S_STR("model", "portal");
+		S_STR("platform", "qlite");
+		S_STR("gaikaiPlayer", "16.4.0");
+		S_INT("protocolVersion", 12);
+]=])
+  set(PV_PS5_SPEC_NEW [=[
+		S_STR("model", "WINDOWS");
+		S_STR("platform", "PC");
+		S_STR("gaikaiPlayer", "12.5.0");
+		S_INT("protocolVersion", 12);
+		S_BOOL("audioUploadEnabled", false);
+]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_SPEC_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux PS5 session envelope patch point not found")
+  endif()
+  string(REPLACE "${PV_PS5_SPEC_OLD}" "${PV_PS5_SPEC_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # The HTTP identity is part of the same PC-format experiment; OAuth
+  # redirect, scopes, device ID and client IDs remain the PS5 Cloud ones.
+  set(PV_PS5_UA_OLD [=[c.user_agent = c.pscloud ? GK_UA_PSCLOUD : GK_UA_PSNOW;]=])
+  set(PV_PS5_UA_NEW [=[c.user_agent = GK_UA_PSNOW;]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_UA_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux PS5 HTTP identity patch point not found")
+  endif()
+  string(REPLACE "${PV_PS5_UA_OLD}" "${PV_PS5_UA_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
   # this is an experimental capability request, NOT a proven PS5 service profile.
   foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
