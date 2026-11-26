@@ -120,6 +120,7 @@ static void *allocate(void *context)
 	chiaki_log_init(&log,CHIAKI_LOG_INFO | CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR,
 		plus_vita_diagnostic_chiaki_log,NULL);
 	plus_vita_diagnostic_event("allocation.begin",0);
+	plus_vita_diagnostic_event("allocation.service",ps5?2:1);
 	plus_vita_diagnostic_event("allocation.phase",0);
 	ChiakiErrorCode error=chiaki_cloud_provision_session(&config,&play->provision,&log);
 	#if PLUS_VITA_PS5_EXPERIMENTAL

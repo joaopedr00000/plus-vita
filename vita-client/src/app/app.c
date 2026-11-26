@@ -939,8 +939,8 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 	if(app->catalogue_count&&app->matches_count)ps5=app->catalogue[app->matches[app->catalogue_selection]].ps5_stream_id[0]!=0;
 #endif
 	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
-		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
-		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?"Portal":"PC");
+		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264 | Received: %s",
+		stage,http,reasons[d.reason<=21?d.reason:0],native,(d.requested_service==2||(!d.requested_service&&ps5))?"PS5 Cloud":"PS Now",d.received_codec==1?"H.264":d.received_codec==2?"HEVC (unsupported)":"Unknown");
 }
 
 static void attach_stream_diagnostic(PlusVitaApp *app)

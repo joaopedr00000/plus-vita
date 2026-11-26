@@ -1218,6 +1218,7 @@ static void probe_handle_streaminfo(PlusVitaStreamProbe *probe, uint8_t *buf,
 		probe_startup_failed(probe, PLUS_VITA_STREAM_STARTUP_VIDEO_HEADER_INVALID);
 		return;
 	}
+	plus_vita_diagnostic_event("stream.video.codec",probe->video_codec==CHIAKI_CODEC_H264?1:2);
 	if(probe->video_codec != CHIAKI_CODEC_H264
 		|| context.video_header_size > sizeof(probe->video_header))
 	{

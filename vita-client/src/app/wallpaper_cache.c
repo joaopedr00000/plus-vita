@@ -70,7 +70,11 @@ static void cache_write(const char *path,CacheHeader header,const uint32_t *pixe
 static void *worker(void *arg){
     PvWallpaperJob *j=arg;
     (void)mkdir(SOURCE,0700);(void)mkdir(CACHE,0700);
-    uint64_t now=epoch();prune(j->id,now,&j->cancel);
+    uint64_t now=epoch();
+    if(j->previous_id<=PV_THEME_COUNT&&!atomic_load(&j->cancel))stamp(j->previous_id,now);
+    if(now&&(!j->last_prune||now<j->last_prune||now-j->last_prune>=3600u)){
+        prune(j->id,now,&j->cancel);if(!atomic_load(&j->cancel))j->last_prune=now;
+    }
     if(!atomic_load(&j->cancel)){
         stamp(j->id,now);
         char source[128],path[128];struct stat st;unsigned format=1;
@@ -92,11 +96,11 @@ static void *worker(void *arg){
     if(atomic_load(&j->cancel))j->ok=false;
     atomic_store(&j->done,true);return NULL;
 }
-bool pv_wallpaper_start(PvWallpaperJob *j,unsigned id,unsigned slot){
+bool pv_wallpaper_start(PvWallpaperJob *j,unsigned id,unsigned slot,unsigned previous_id){
     if(j->running||id>PV_THEME_COUNT||slot>=PV_THEME_SLOTS)return false;
     if(!j->output)j->output=malloc(PIXEL_BYTES);
     if(!j->output)return false;
-    j->id=id;j->slot=slot;j->ok=false;
+    j->id=id;j->slot=slot;j->previous_id=previous_id;j->ok=false;
     atomic_init(&j->done,false);atomic_init(&j->cancel,false);
     pthread_attr_t attr;if(pthread_attr_init(&attr)!=0)return false;
     int rc=pthread_attr_setstacksize(&attr,512*1024);

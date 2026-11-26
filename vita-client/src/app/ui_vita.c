@@ -374,8 +374,8 @@ int plus_vita_app_run(void)
 	PlusVitaAppView saved_theme=saved_prefs;
 	PvWallpaperJob *wall_job=calloc(1,sizeof(*wall_job));
 	uint32_t *wall_pixels=NULL,*theme_headers=pv_wallpaper_headers();
-	unsigned wall_id=UINT32_MAX,wall_revision=UINT32_MAX,wall_slot=0,wall_attempts=0;
-	uint64_t wall_next=0;
+	unsigned wall_id=UINT32_MAX,wall_revision=UINT32_MAX,wall_slot=0,wall_attempts=0,wall_previous=UINT32_MAX;
+	uint64_t wall_next=0,wall_touch_due=0;
 	bool wall_ready=false;
 	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
 #endif
@@ -408,12 +408,14 @@ int plus_vita_app_run(void)
          * change invalidates old output and never exposes mutable worker memory. */
         if(current.theme_id!=wall_id||current.wallpaper_revision!=wall_revision){
             if(wall_job&&wall_job->running)atomic_store(&wall_job->cancel,true);
-            wall_id=current.theme_id;wall_revision=current.wallpaper_revision;
+            if(wall_id!=current.theme_id)wall_previous=wall_id;
+            wall_id=current.theme_id;wall_revision=current.wallpaper_revision;wall_touch_due=0;
             wall_slot=wall_attempts=0;wall_next=0;wall_ready=false;flow.theme_wallpaper=NULL;flow.dirty=true;
             int idx=pv_theme_logo_index(wall_id);
             flow.theme_wordmark=idx>=0&&theme_headers?theme_headers+(size_t)idx*PV_HEADER_WIDTH*PV_HEADER_HEIGHT:NULL;
         }
         if(wall_job&&pv_wallpaper_poll(wall_job)){
+            if(wall_job->id==wall_id&&!atomic_load(&wall_job->cancel)){wall_touch_due=status_now+UINT64_C(86400000000);wall_previous=UINT32_MAX;}
             if(wall_job->id==wall_id&&!atomic_load(&wall_job->cancel)&&wall_job->ok){
                 if(!wall_pixels)wall_pixels=malloc(PV_WALL_WIDTH*PV_WALL_HEIGHT*sizeof(*wall_pixels));
                 if(wall_pixels){
@@ -428,8 +430,9 @@ int plus_vita_app_run(void)
         }
         if(wall_job&&wall_job->running&&(!workers_idle||current.operation))atomic_store(&wall_job->cancel,true);
         if(wall_job&&!wall_job->running&&workers_idle&&!current.operation&&!flow.splash_active&&status_now>=wall_next
-            &&(!wall_ready||current.theme_rotate)){
-            if(!pv_wallpaper_start(wall_job,wall_id,wall_slot))wall_next=status_now+PV_THEME_ROTATION_US;
+            &&(!wall_ready||current.theme_rotate||status_now>=wall_touch_due)){
+            unsigned slot=(!current.theme_rotate&&wall_ready)?(wall_slot+PV_THEME_SLOTS-1)%PV_THEME_SLOTS:wall_slot;
+            if(!pv_wallpaper_start(wall_job,wall_id,slot,wall_previous))wall_next=status_now+PV_THEME_ROTATION_US;
         }
 		if(current.screen==PLUS_VITA_APP_CATALOGUE && (!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen)){
 			library_status(&flow);last_status=status_now;

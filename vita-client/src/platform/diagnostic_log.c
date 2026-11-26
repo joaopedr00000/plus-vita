@@ -476,14 +476,14 @@ void plus_vita_diagnostic_event(const char *event, int code)
 {
 	static const char *const names[]={"allocation.begin","allocation.complete","allocation.stage","allocation.phase","allocation.http","allocation.reason",
 		"allocation.network.init","allocation.network.release","stream_probe.begin","stream_probe.complete",
-		"stream.video.slice_guard_rejected",
+		"stream.video.slice_guard_rejected","stream.video.codec","allocation.service",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
 		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {
-			if(!strcmp(names[i],"ui.stage")) code=code>=0 && code<=17 ? code : 0;
+			if(!strcmp(names[i],"ui.stage")) code=code>=0 && code<=26 ? code : 0;
 			else if(!strcmp(names[i],"allocation.stage")) code=code>=0 && code<=5 ? code : 0;
 			else if(!strcmp(names[i],"allocation.phase")) code=code>=0 && code<=11 ? code : 0;
 			else if(!strcmp(names[i],"allocation.http")) code=code>=100 && code<=599 ? code : 0;
@@ -496,6 +496,8 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			else if(!strcmp(names[i],"allocation.phase")) {stream_diag.phase=(unsigned)code;stream_diag.http=0;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.http")) {stream_diag.http=(unsigned)code;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.reason")) stream_diag.reason=(unsigned)code;
+            else if(!strcmp(names[i],"allocation.service"))stream_diag.requested_service=code==1||code==2?(unsigned)code:0;
+            else if(!strcmp(names[i],"stream.video.codec"))stream_diag.received_codec=code==1||code==2?(unsigned)code:0;
 			pthread_mutex_unlock(&diagnostic_write_mutex);
 			write_line("EVENT",names[i],code); return;
 		}
