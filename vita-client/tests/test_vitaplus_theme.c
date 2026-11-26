@@ -3,6 +3,7 @@
 #include "../src/app/theme.h"
 #include "../src/app/custom_theme.h"
 #include "../src/app/lan_login_page.h"
+#include "../src/app/i18n.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -73,7 +74,32 @@ int main(void){
     v.preview_eligible=false;
     plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
     assert(pixels[292*960+525]!=0xff123456);
+    /* Compare controller icon pixels (not only colors) with catalogue originals.
+     * Two standard 172px slots start at x=600, glyph centers 612 and 784. */
+    uint32_t glyphs[2][25][25];
+    v=(PlusVitaAppView){.screen=PLUS_VITA_APP_CATALOGUE,.body="0 games"};
+    plus_vita_app_paint(NULL,pixels,960,&v);
+    const int original[2]={800,878};
+    for(unsigned g=0;g<2;g++)for(int y=0;y<25;y++)for(int x=0;x<25;x++)
+        glyphs[g][y][x]=pixels[(508+y)*960+original[g]-12+x];
+    const int centers[2]={612,784};
+    const PlusVitaAppScreen menus[]={PLUS_VITA_APP_WELCOME,PLUS_VITA_APP_SETTINGS,PLUS_VITA_APP_SETUP,PLUS_VITA_APP_ACCOUNT,PLUS_VITA_APP_THEME,PLUS_VITA_APP_STREAM_SETTINGS,PLUS_VITA_APP_CONTROLS,PLUS_VITA_APP_SECURITY,PLUS_VITA_APP_DETAILS,PLUS_VITA_APP_DATACENTERS,PLUS_VITA_APP_REPORTING,PLUS_VITA_APP_STREAM_STOPPED};
     for(unsigned lang=0;lang<19;lang++){
+        for(unsigned k=0;k<sizeof(menus)/sizeof(menus[0]);k++){
+            v=(PlusVitaAppView){.screen=menus[k],.ui_language=lang,.hint=pv_translate(lang,"X  Select     O  Back")};
+            plus_vita_app_paint(NULL,pixels,960,&v);
+            for(unsigned g=0;g<2;g++)for(int y=0;y<25;y++)for(int x=0;x<25;x++){
+                uint32_t expected=glyphs[g][y][x];
+                if(expected==VP_WHITE||expected==VP_GOLD||expected==VP_RGB(105,105,109))
+                    assert(expected==pixels[(508+y)*960+centers[g]-12+x]);
+            }
+        }
+        v=(PlusVitaAppView){.screen=PLUS_VITA_APP_AUTHORIZING,.ui_language=lang,.hint=pv_translate(lang,"O  Cancel")};
+        plus_vita_app_paint(NULL,pixels,960,&v);
+        assert(pixels[508*960+784]==VP_RGB(105,105,109));
+        v.hint=pv_translate(lang,"Please wait");
+        plus_vita_app_paint(NULL,pixels,960,&v);
+        assert(pixels[508*960+784]!=VP_RGB(105,105,109));
         assert(strstr(pv_lan_pages[lang],"background:#161618"));
         assert(strstr(pv_lan_pages[lang],"background:#ffcf40"));
         assert(!strstr(pv_lan_pages[lang],"#0070cc"));

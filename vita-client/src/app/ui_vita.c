@@ -76,6 +76,7 @@ typedef struct {
 	PlusVitaBranding *branding;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	uint32_t *library_logo;
+	unsigned menu_language;
 #endif
 } UiDisplay;
 
@@ -187,7 +188,12 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
 	UiDisplay *d=context;uint32_t *p=d->pixels[d->back];
 #if PLUS_VITA_ADAPTIVE_STREAM
     PlusVitaUiFlow status={0};library_status(&status);
-    PlusVitaAppView chrome={.screen=PLUS_VITA_APP_SETUP_GUIDE,.title=heading,.subtitle="VitaPlus",.body="",.hint="O  Back",.library_logo=d->library_logo,
+    /* The pairing callbacks advertise their permitted actions in the message.
+     * No button hint on automatic return or system keyboard screens. */
+    bool cross=message&&strstr(message,"X "),circle=message&&strstr(message,"O ");
+    PlusVitaAppView chrome={.screen=PLUS_VITA_APP_SETUP_GUIDE,.title=heading,.subtitle="VitaPlus",.body="",
+        .hint=cross&&circle?"X  Select     O  Cancel":circle?"O  Cancel":"",
+        .ui_language=d->menu_language,.library_logo=d->library_logo,
         .clock_valid=status.clock_valid,.clock_hour=status.clock_hour,.clock_minute=status.clock_minute,.battery_valid=status.battery_valid,.battery_percent=status.battery_percent,
         .network_known=status.network_known,.network_connected=status.network_connected};
     plus_vita_app_paint(d->font,p,PITCH,&chrome);
@@ -195,7 +201,7 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
     for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=VP_QR_BG;
     plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,VP_GOLD);
 #endif
-	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,VP_BODY);
+	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?410:camera?58:410},20,true,VP_BODY);
 	if(qr && n>0 && n<=53) {
 		int scale=340/(n+8),size=(n+8)*scale;
 		for(int y=0;y<size;y++)for(int x=0;x<size;x++){
@@ -204,7 +210,7 @@ static bool pair_frame(void *context,const char *heading,const char *message,con
 			p[(100+y)*PITCH+600+x]=dark?RGB(0,0,0):RGB(255,255,255);
 		}
 	}
-	if(camera)for(int y=0;y<360;y++)for(int x=0;x<640;x++)p[(150+y)*PITCH+160+x]=camera[y*640+x]|0xff000000u;
+	if(camera)for(int y=0;y<360;y++)for(int x=0;x<640;x++)p[((PLUS_VITA_ADAPTIVE_STREAM?136:150)+y)*PITCH+160+x]=camera[y*640+x]|0xff000000u;
 	SceDisplayFrameBuf fb={.size=sizeof(fb),.base=p,.pitch=PITCH,.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8,.width=WIDTH,.height=HEIGHT};
 	if(sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME)<0)return false;
 	d->displayed=true;
@@ -438,6 +444,7 @@ int plus_vita_app_run(void)
 		}
 		PlusVitaAppView current=plus_vita_app_view(app);
 #if PLUS_VITA_ADAPTIVE_STREAM
+        display->menu_language=current.ui_language;
 		uint64_t status_now=plus_vita_latency_now_us();
 		if(!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen){
 			library_status(&flow);last_status=status_now;

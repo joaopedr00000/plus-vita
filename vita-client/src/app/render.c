@@ -133,7 +133,12 @@ static void symbol(Canvas *d,int cx,int cy,unsigned type,uint32_t color)
 	if(type==0){rectangle(d,cx-5,cy-5,11,2,color);rectangle(d,cx-5,cy+4,11,2,color);rectangle(d,cx-5,cy-5,2,11,color);rectangle(d,cx+4,cy-5,2,11,color);}
 	else if(type==1){line(d,cx,cy-6,cx-6,cy+5,2,color);line(d,cx,cy-6,cx+6,cy+5,2,color);line(d,cx-6,cy+5,cx+6,cy+5,2,color);}
 	else if(type==2){line(d,cx-5,cy-5,cx+5,cy+5,2,color);line(d,cx+5,cy-5,cx-5,cy+5,2,color);}
-	else ring(d,cx,cy,7,2,color);
+	else if(type==3)ring(d,cx,cy,7,2,color);
+	else {
+		/* Navigation: a small directional control inside the same rim. */
+		rectangle(d,cx-2,cy-7,5,15,color);
+		rectangle(d,cx-7,cy-2,15,5,color);
+	}
 }
 static void library_art(Canvas *d,const PlusVitaCoverImage *image,int x,int y,int w,int h,bool thumbnail)
 {
@@ -274,6 +279,12 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 		text(d,label,b->x+inset,b->y+3,filter?TEXT_HINT:TEXT_MICRO,b->width-inset-5,b->height-4,false,catalogue_button_ink(d,filled));
 	}
 }
+/* Shared native PlayStation glyph: exactly the catalogue's rim and colors. */
+static void control_glyph(Canvas *d,int x,int y,unsigned type)
+{
+    ring(d,x,y,12,1,RGB(105,105,109));
+    symbol(d,x,y,type,type==2?MENU_WHITE:readable(d,MENU_ACCENT));
+}
 static void footer(Canvas *d,const PlusVitaAppView *v)
 {
 	ring(d,25,520,10,1,MENU_MUTED);text(d,"i",22,511,TEXT_HINT,12,22,false,MENU_WHITE);
@@ -282,7 +293,7 @@ static void footer(Canvas *d,const PlusVitaAppView *v)
 	static const char *const labels[]={"Search","Filter","Play","Back"};
 	static const int starts[]={600,703,800,878};
 	for(unsigned j=0;j<4;j++){
-		int x=starts[j];ring(d,x,520,12,1,RGB(105,105,109));symbol(d,x,520,j,j==2?MENU_WHITE:readable(d,MENU_ACCENT));
+		int x=starts[j];control_glyph(d,x,520,j);
 		text(d,localized(d,labels[j]),x+17,509,TEXT_HINT,(j==3?960:starts[j+1])-x-18,28,false,MENU_WHITE);
 	}
 }
@@ -350,6 +361,76 @@ static void menu_card(Canvas *d,const PlusVitaAppView *v,size_t index)
     int inset=b->height>=52?8:b->height>=44?5:2;
     text(d,b->label,b->x+15,b->y+inset,role,b->width-30-reserve,b->height-inset-2,false,catalogue_button_ink(d,filled));
 }
+/* Hints are already localized in the view. Match complete known hints only;
+ * informational notices are not interpreted as button commands. */
+static bool hint_is(Canvas *d,const char *hint,const char *key)
+{
+    return hint&&(!strcmp(hint,key)||!strcmp(hint,localized(d,key)));
+}
+static void hint_part(char out[128],const char *begin,const char *end)
+{
+    if(!begin){out[0]=0;return;}
+    if(!end)end=begin+strlen(begin);
+    size_t n=(size_t)(end-begin);
+    if(n>=128)n=127;
+    memcpy(out,begin,n);out[n]=0;
+}
+static const char *skip_spaces(const char *p)
+{
+    while(*p==' ')p++;
+    return p;
+}
+typedef struct {unsigned type;const char *label;int width;} FooterControl;
+static void menu_footer(Canvas *d,const PlusVitaAppView *v)
+{
+    const char *h=v->hint;
+    if(!h||!*h)return;
+    FooterControl controls[4];unsigned count=0;
+    char select[128],back[128],cancel[128],move[128];
+    const char *pair=localized(d,"X  Select     O  Back");
+    const char *split=strstr(pair,"     ");
+    if(!split||pair[0]!='X'||split[5]!='O') {
+        pair="X  Select     O  Back";split=strstr(pair,"     ");
+    }
+    hint_part(select,skip_spaces(pair+1),split);
+    hint_part(back,skip_spaces(split+6),NULL);
+    const char *cancel_hint=localized(d,"O  Cancel");
+    hint_part(cancel,cancel_hint[0]=='O'?skip_spaces(cancel_hint+1):localized(d,"Cancel"),NULL);
+    const char *move_hint=localized(d,"Left stick  Move     X  Select     O  Back");
+    hint_part(move,move_hint,strstr(move_hint,"     "));
+    bool navigation=hint_is(d,h,"Left stick  Move     X  Select     O  Back")
+        ||hint_is(d,h,"D-pad / left stick  Move     X  Select     O  Back")
+        ||hint_is(d,h,"D-pad / left stick  Move     X  Select     O  Cancel")
+        ||hint_is(d,h,"Left stick  Move     X  Select     O  Back     Square  Save image");
+    bool saving=hint_is(d,h,"Left stick  Move     X  Select     O  Back     Square  Save image");
+    bool cancelling=hint_is(d,h,"D-pad / left stick  Move     X  Select     O  Cancel")
+        ||hint_is(d,h,"X  Select     O  Cancel");
+    if(navigation||cancelling||hint_is(d,h,"X  Select     O  Back")){
+        if(navigation)controls[count++]=(FooterControl){4,move,284};
+        controls[count++]=(FooterControl){2,select,172};
+        controls[count++]=(FooterControl){3,cancelling?cancel:back,172};
+        if(saving)controls[count++]=(FooterControl){0,localized(d,"Save image"),190};
+    }else if(hint_is(d,h,"O  Cancel"))controls[count++]=(FooterControl){3,cancel,172};
+    else if(hint_is(d,h,"O  Back"))controls[count++]=(FooterControl){3,back,172};
+    else if(hint_is(d,h,"X / O  Exit")){
+        controls[count++]=(FooterControl){2,localized(d,"Exit"),172};
+        controls[count++]=(FooterControl){3,localized(d,"Exit"),172};
+    }
+    if(!count){
+        ring(d,25,520,10,1,MENU_MUTED);
+        text(d,"i",22,510,TEXT_HINT,12,25,false,MENU_WHITE);
+        text(d,h,46,508,TEXT_HINT,900,30,false,MENU_WHITE);
+        return;
+    }
+    int x=944;
+    for(unsigned j=0;j<count;j++)x-=controls[j].width;
+    rectangle(d,x-10,507,1,26,RGB(135,135,138));
+    for(unsigned j=0;j<count;j++){
+        control_glyph(d,x+12,520,controls[j].type);
+        text(d,controls[j].label,x+29,509,TEXT_HINT,controls[j].width-33,28,false,MENU_WHITE);
+        x+=controls[j].width;
+    }
+}
 static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 {
     library_background(d);
@@ -362,8 +443,7 @@ static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
     text(d,PLUS_VITA_BUILD_LABEL,828,34,TEXT_MICRO,126,25,false,MENU_MUTED);
     rectangle(d,0,64,960,1,RGB(105,105,109));
     rectangle(d,0,497,960,47,RGB(10,10,12));rectangle(d,0,497,960,1,RGB(105,105,109));
-    ring(d,25,520,10,1,MENU_MUTED);text(d,"i",22,510,TEXT_HINT,12,25,false,MENU_WHITE);
-    text(d,v->hint,46,508,TEXT_HINT,900,30,false,MENU_WHITE);
+    menu_footer(d,v);
 }
 static void menu_paint(Canvas *d,const PlusVitaAppView *v)
 {
@@ -504,7 +584,9 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 			rectangle(display,button->x+button->width-70,button->y+8,52,button->height-16,swatch);
 		}
 	}
+#if !PLUS_VITA_ADAPTIVE_STREAM
 	text(display, view->hint, 64, 509, TEXT_HINT, 832, 28, false, MENU_MUTED);
+#endif
 }
 
 void plus_vita_app_paint(PlusVitaFont *font,uint32_t *pixels,int pitch,const PlusVitaAppView *view)
