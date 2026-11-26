@@ -193,9 +193,9 @@ int main(void)
  PlusVitaUiFlow flow={.app=app,.covers=covers,.dirty=true};
  PlusVitaFont *font=plus_vita_font_create();assert(font);
  const char *first="https://vulcan.dl.playstation.net/0.png";
- tick(&flow,1000);tick(&flow,350999);
+ tick(&flow,1000);tick(&flow,150999);
  assert(atomic_load(&cover_requests)==0);
- tick(&flow,351000);settle(&flow,first,351000,PLUS_VITA_COVER_READY);
+ tick(&flow,151000);settle(&flow,first,151000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==1);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
  assert_preview_art();
@@ -211,8 +211,8 @@ int main(void)
  PlusVitaAppView view=plus_vita_app_view(app);
  assert(view.focus==5 && view.list_count==7);
  char url[512];strcpy(url,view.detail->cover_url);
- tick(&flow,889999);assert(atomic_load(&cover_requests)==1);
- tick(&flow,890000);settle(&flow,url,890000,PLUS_VITA_COVER_READY);
+ tick(&flow,689999);assert(atomic_load(&cover_requests)==1);
+ tick(&flow,690000);settle(&flow,url,690000,PLUS_VITA_COVER_READY);
  assert(atomic_load(&cover_requests)==2);
  assert(plus_vita_ui_flow_paint(&flow,font,pixels,960));
  assert_preview_art();
@@ -225,7 +225,7 @@ int main(void)
  view=plus_vita_app_view(app);assert(view.screen==PLUS_VITA_APP_CATALOGUE);
  while(!plus_vita_covers_close(covers))pause_poll();
  plus_vita_font_free(font);plus_vita_app_destroy(app);
- puts("adaptive library: focused preview, 350ms dwell, cached return, rapid navigation and drag passed");
+ puts("adaptive library: focused preview, 150ms dwell, cached return, rapid navigation and drag passed");
  return 0;
 }
 #endif

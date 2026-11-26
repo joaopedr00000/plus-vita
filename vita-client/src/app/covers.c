@@ -133,7 +133,17 @@ void plus_vita_covers_request(PlusVitaCovers *covers,const char *const *urls,siz
 	for(size_t i=0;i<count;i++) {
 		const char *url=urls[i];
 		if(!plus_vita_cover_url_allowed(url) || plus_vita_covers_find(covers,url)) continue;
-		PlusVitaCoverImage *slot=&covers->slots[covers->next++ % COVER_RAM_SLOTS];
+		/* Keep artwork for the visible request set rather than evicting it
+         * when moving through a long library. Prefer empty slots first. */
+        PlusVitaCoverImage *slot=NULL;
+        for(unsigned j=0;j<COVER_RAM_SLOTS;j++)if(!covers->slots[j].url[0]){slot=&covers->slots[j];break;}
+        if(!slot)for(unsigned j=0;j<COVER_RAM_SLOTS;j++){
+            PlusVitaCoverImage *candidate=&covers->slots[covers->next++ % COVER_RAM_SLOTS];
+            bool keep=false;
+            for(size_t k=0;k<count;k++)if(urls[k]&&!strcmp(candidate->url,urls[k])){keep=true;break;}
+            if(!keep){slot=candidate;break;}
+        }
+        if(!slot)return;
 		memset(slot,0,sizeof(*slot)); strcpy(slot->url,url); slot->state=PLUS_VITA_COVER_LOADING;
 		memset(&covers->output,0,sizeof(covers->output)); strcpy(covers->output.url,url);
 		covers->job_generation=covers->generation; atomic_store(&covers->complete,false); atomic_store(&covers->cancel,false);

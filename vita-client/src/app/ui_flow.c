@@ -58,7 +58,7 @@ PlusVitaAppView view=plus_vita_app_view(flow->app);
 			&& cached && cached->state==PLUS_VITA_COVER_READY;
 		if(flow->now_us<flow->preview_since) flow->preview_since=flow->now_us;
 		bool memory_ready=PLUS_VITA_ADAPTIVE_STREAM && cached && cached->state==PLUS_VITA_COVER_READY;
-		const uint64_t dwell=PLUS_VITA_ADAPTIVE_STREAM ? 350000u : 3000000u;
+		const uint64_t dwell=PLUS_VITA_ADAPTIVE_STREAM ? 150000u : 3000000u;
 		if(view.screen==PLUS_VITA_APP_DETAILS || details_return || memory_ready
 			|| flow->now_us-flow->preview_since>=dwell) {
 			if(!flow->preview_eligible) { flow->preview_eligible=true;changed=true; }
@@ -70,7 +70,7 @@ PlusVitaAppView view=plus_vita_app_view(flow->app);
 			/* Only prefetch visible thumbnails after a stable focus. The single
 			 * worker stays cancellable; the focused cover is always first. */
 			if(PLUS_VITA_ADAPTIVE_STREAM && view.screen==PLUS_VITA_APP_CATALOGUE &&
-				flow->now_us-flow->preview_since>=1200000u){
+				flow->now_us-flow->preview_since>=600000u){
 				for(size_t i=0;i<view.list_count && count<8;i++)
 					if(view.games[i] && strcmp(view.games[i]->cover_url,game->cover_url))
 						urls[count++]=view.games[i]->cover_url;
