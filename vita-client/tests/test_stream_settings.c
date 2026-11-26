@@ -38,7 +38,8 @@ int main(void){
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME);
     assert(v.theme_primary==PV_PRIMARY_DEFAULT&&!v.theme_custom);
     click(app,PLUS_VITA_ACTION_THEME_PRESETS);
-    assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_THEME_PRESETS);
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME_PRESETS&&v.action_count==14&&v.actions[0].height>=90&&v.actions[1].x>v.actions[0].x&&v.actions[4].y>v.actions[0].y);
+    assert(pv_theme_art_index(12)==0&&pv_theme_art_index(29)==3&&pv_theme_art_index(11)==5&&pv_theme_art_index(38)==10);
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME&&v.theme_id==1&&v.theme_primary==pv_presets[1].primary);

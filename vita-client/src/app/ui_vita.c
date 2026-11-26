@@ -184,8 +184,16 @@ static bool draw(UiDisplay *display, PlusVitaUiFlow *flow)
 static bool pair_frame(void *context,const char *heading,const char *message,const unsigned char *qr,int n,const uint32_t *camera)
 {
 	UiDisplay *d=context;uint32_t *p=d->pixels[d->back];
-	for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=VP_QR_BG;
-	plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,VP_GOLD);
+	#if PLUS_VITA_ADAPTIVE_STREAM
+    PlusVitaUiFlow status={0};library_status(&status);
+    PlusVitaAppView chrome={.screen=PLUS_VITA_APP_SETUP_GUIDE,.title=heading,.subtitle="VitaPlus",.body="",.hint="O  Back",.library_logo=d->library_logo,
+        .clock_valid=status.clock_valid,.clock_hour=status.clock_hour,.clock_minute=status.clock_minute,.battery_valid=status.battery_valid,.battery_percent=status.battery_percent,
+        .network_known=status.network_known,.network_connected=status.network_connected};
+    plus_vita_app_paint(d->font,p,PITCH,&chrome);
+#else
+    for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) p[y*PITCH+x]=VP_QR_BG;
+    plus_vita_font_draw(d->font,p,PITCH,heading,(PlusVitaTextBox){32,14,896,54},30,false,VP_GOLD);
+#endif
 	plus_vita_font_draw(d->font,p,PITCH,message,(PlusVitaTextBox){32,76,qr?540:896,qr?420:66},20,true,VP_BODY);
 	if(qr && n>0 && n<=53) {
 		int scale=340/(n+8),size=(n+8)*scale;

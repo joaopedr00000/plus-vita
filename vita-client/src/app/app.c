@@ -155,7 +155,7 @@ static void settings_view(PlusVitaApp *app)
  	app->view.actions[app->view.action_count]=app->view.actions[app->view.action_count-1];
 	app->view.actions[app->view.action_count-1]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME,"Appearance",64,0,832,34};
 	app->view.action_count++;
-	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].x=20+(int)(i%2)*466;app->view.actions[i].y=125+(int)(i/2)*72;app->view.actions[i].width=454;app->view.actions[i].height=64;}
+	for(size_t i=0;i<app->view.action_count;i++){app->view.actions[i].x=20+(int)(i%2)*466;app->view.actions[i].y=136+(int)(i/2)*70;app->view.actions[i].width=454;app->view.actions[i].height=62;}
 	app->view.body="Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled.";
 #endif
 }
@@ -446,6 +446,12 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 #if PLUS_VITA_ADAPTIVE_STREAM
 	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
 	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;view.theme_id=app->theme_id;view.theme_rotate=app->theme_rotate;view.wallpaper_revision=app->wallpaper_revision;
+    if(view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP){
+        int step=view.action_count>6?46:62;
+        for(size_t j=0;j<view.action_count;j++){
+            view.actions[j].x=544;view.actions[j].y=93+(int)j*step;view.actions[j].width=398;view.actions[j].height=step-6;
+        }
+    }
 #endif
 	if(!view.list_total && view.action_count && !(PLUS_VITA_ADAPTIVE_STREAM && view.screen==PLUS_VITA_APP_CATALOGUE)) {
 		view.list_total=view.action_count;view.focus=view.selected;
@@ -454,7 +460,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		size_t capacity=(size_t)((502-view.list_y+6)/view.row_step);
 		if(!capacity) capacity=1;
 		/* The diagnostic font comparison is a horizontal sample toolbar. */
-		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON || (PLUS_VITA_ADAPTIVE_STREAM && (view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS))) capacity=view.action_count;
+		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON || (PLUS_VITA_ADAPTIVE_STREAM && (view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS||view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP))) capacity=view.action_count;
 		view.list_count=capacity<view.list_total ? capacity : view.list_total;
 		list_viewport(view.list_total,view.list_count,view.focus,&view.list_first);
 		if(view.list_count<view.list_total) {
@@ -804,10 +810,35 @@ static bool title_matches(const char *title, const char *query)
 	return false;
 }
 
+static bool grid_screen(PlusVitaAppScreen screen)
+{
+    return PLUS_VITA_ADAPTIVE_STREAM&&(screen==PLUS_VITA_APP_SETTINGS||screen==PLUS_VITA_APP_THEME_PRESETS);
+}
+static void grid_navigate(PlusVitaAppView *v,PlusVitaAppPad pad)
+{
+    if(!v->action_count||v->selected>=v->action_count)return;
+    int dx=0,dy=0;
+    if(pad.buttons&PLUS_VITA_MENU_LEFT)dx=-1;
+    else if(pad.buttons&PLUS_VITA_MENU_RIGHT)dx=1;
+    else if(pad.buttons&PLUS_VITA_MENU_UP)dy=-1;
+    else if(pad.buttons&PLUS_VITA_MENU_DOWN)dy=1;
+    else if(abs((int)pad.left_x-128)>abs((int)pad.left_y-128))dx=pad.left_x<128?-1:1;
+    else dy=pad.left_y<128?-1:1;
+    const PlusVitaAppButton *b=&v->actions[v->selected];
+    int x=b->x+b->width/2,y=b->y+b->height/2,best=1000000;size_t chosen=v->selected;
+    for(size_t j=0;j<v->action_count;j++){
+        const PlusVitaAppButton *q=&v->actions[j];
+        int ax=q->x+q->width/2-x,ay=q->y+q->height/2-y;
+        int along=dx?ax*dx:ay*dy,cross=dx?abs(ay):abs(ax);
+        if(along<=0)continue;
+        int score=along+cross*5;if(score<best){best=score;chosen=j;}
+    }
+    v->selected=chosen;
+}
 static int menu_direction(const PlusVitaApp *app, PlusVitaAppPad pad)
 {
 	uint32_t directions = pad.buttons & (PLUS_VITA_MENU_UP | PLUS_VITA_MENU_DOWN);
-	if(app->view.screen == PLUS_VITA_APP_CATALOGUE)
+	if(app->view.screen == PLUS_VITA_APP_CATALOGUE || grid_screen(app->view.screen))
 		directions |= pad.buttons & (PLUS_VITA_MENU_LEFT | PLUS_VITA_MENU_RIGHT);
 	if(directions) {
 		bool forward = (directions & (PLUS_VITA_MENU_DOWN | PLUS_VITA_MENU_RIGHT)) != 0;
@@ -815,7 +846,7 @@ static int menu_direction(const PlusVitaApp *app, PlusVitaAppPad pad)
 		return forward == backward ? 0 : forward ? 1 : -1;
 	}
 	int axis = pad.left_y;
-	if(app->view.screen == PLUS_VITA_APP_CATALOGUE
+	if((app->view.screen == PLUS_VITA_APP_CATALOGUE||grid_screen(app->view.screen))
 		&& abs((int)pad.left_x - 128) > abs(axis - 128)) axis = pad.left_x;
 	return axis > 180 ? 1 : axis < 76 ? -1 : 0;
 }
@@ -1208,6 +1239,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		else if(pressed & PLUS_VITA_MENU_TRIANGLE) event.kind = PLUS_VITA_ADAPTIVE_STREAM && view->screen==PLUS_VITA_APP_CATALOGUE ? PLUS_VITA_EVENT_PLATFORM_FILTER : PLUS_VITA_EVENT_SEARCH;
 		else if(PLUS_VITA_ADAPTIVE_STREAM && view->screen==PLUS_VITA_APP_CATALOGUE && (pressed & PLUS_VITA_MENU_SQUARE)) event.kind=PLUS_VITA_EVENT_SEARCH;
 		else if(pressed & PLUS_VITA_MENU_CROSS) event.kind = PLUS_VITA_EVENT_ACTIVATE;
+		else if(navigate&&grid_screen(view->screen)){grid_navigate(view,pad);return effect;}
 		else if(navigate) event.kind = direction > 0 ? PLUS_VITA_EVENT_DOWN : PLUS_VITA_EVENT_UP;
 		else return effect;
 	}
