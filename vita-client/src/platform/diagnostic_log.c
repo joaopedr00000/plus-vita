@@ -573,7 +573,8 @@ void plus_vita_diagnostic_metric(const char *name, const PlusVitaLatencyStats *s
 		"decode_prepare","decode","display_wait","submitted_first_packet_to_present",
 		"submitted_ready_to_present","log_write_call","log_mutex_wait","feedback.sample_to_publish",
 		"feedback.publish_to_wake","feedback.sample_to_state_send","feedback.sample_to_history_send",
-		"feedback.state_send_call","feedback.history_send_call"};
+		"feedback.state_send_call","feedback.history_send_call",
+		"benchmark.au_enqueue_to_present","benchmark.presentation_interval"};
 	const char *fixed=known_name(name,names,sizeof(names)/sizeof(names[0]));
 	if(!fixed || !stats) return;
 	char record[512];
@@ -594,7 +595,7 @@ void plus_vita_diagnostic_counter(const char *name, uint64_t count)
 		"feedback_logs_suppressed","input_neutral_consumed","input_neutral_failed","recovery_episodes",
 		"decrypted_video_packets","decrypted_audio_packets","capture_frames","heartbeats_sent",
 		"replay_submitted","replay_displayed","replay_drained","replay_drain_empty",
-		"feedback_state_sends"};
+		"feedback_state_sends","benchmark.min_us"};
 	const char *fixed=known_name(name,names,sizeof(names)/sizeof(names[0]));
 	if(!fixed) return;
 	char record[128];

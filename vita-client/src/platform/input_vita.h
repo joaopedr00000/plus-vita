@@ -15,6 +15,8 @@ typedef struct {
 	PlusVitaControlLayout layout;
 	bool layout_ready;
 	PlusVitaController controller;
+	bool fast_native;
+	unsigned native_poll_budget;
 } PlusVitaInputVita;
 
 /* Shared by the original main-loop path and the independent sampler. */

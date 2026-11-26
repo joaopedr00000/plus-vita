@@ -146,7 +146,23 @@ int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 {
 	PlusVitaInputVita *input = user;
 	SceCtrlData pad = { 0 };
-	int available = plus_vita_controller_read(&input->controller,&pad);
+	int available;
+    /* Port enumeration is not input sampling. Cache only a healthy built-in
+     * handheld device for at most 24 more polls; external/TV paths are unchanged.
+     * A failed read immediately falls back to the full reader. */
+    if(input->fast_native && input->native_poll_budget && input->controller.initialized
+        && !input->controller.tv && !input->controller.external && input->controller.ready
+        && input->controller.device==PLUS_VITA_DEVICE_VITA){
+        input->native_poll_budget--;
+        available=sceCtrlPeekBufferPositive(0,&pad,1);
+        if(available<=0 || (pad.buttons&SCE_CTRL_INTERCEPTED)){
+            input->native_poll_budget=0;
+            available=plus_vita_controller_read(&input->controller,&pad);
+        }
+    }else{
+        available=plus_vita_controller_read(&input->controller,&pad);
+        input->native_poll_budget=available>0&&input->controller.ready&&!input->controller.external&&!input->controller.tv?24:0;
+    }
 	if(available <= 0) return available < 0 ? -1 : 0;
 	const uint32_t chord = SCE_CTRL_START | SCE_CTRL_SELECT;
 	sample->stop_chord = (pad.buttons & chord) == chord;

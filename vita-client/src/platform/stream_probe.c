@@ -1584,7 +1584,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #if PLUS_VITA_INPUT_WORKER
 	PlusVitaInputVita input_vita = { .rear_ready = rear_ready, .front_ready = front_ready,
 		.rear_mid_x = rear_mid_x, .rear_mid_y = rear_mid_y, .front_info = front_info,
-		.layout=probe->controls,.layout_ready=true,
+		.layout=probe->controls,.layout_ready=true,.fast_native=PLUS_VITA_ADAPTIVE_STREAM,
 		.controller=probe->input ? probe->input->controller : (PlusVitaController){0} };
 	if(input_vita.controller.external) {
 		input_vita.controller.neutral_required=true;input_vita.controller.ready=false;
@@ -1973,6 +1973,9 @@ chiaki_mutex_unlock(&probe->mutex);
                         bench_last=display_done_us;
                     }else if(!bench_done&&elapsed>=70000000u){
                         bench_done=true;
+                        plus_vita_diagnostic_metric("benchmark.au_enqueue_to_present",&bench);
+                        plus_vita_diagnostic_metric("benchmark.presentation_interval",&bench_interval);
+                        if(bench.count)plus_vita_diagnostic_counter("benchmark.min_us",bench_min);
                         if(bench.count)CHIAKI_LOGI(probe->log,"Stream probe benchmark 60s samples=%llu min_us=%llu mean_us=%llu p50_upper_us=%llu p95_upper_us=%llu p99_upper_us=%llu max_us=%llu interval_p95_upper_us=%llu",
                             (unsigned long long)bench.count,(unsigned long long)bench_min,
                             (unsigned long long)(bench.total_us/bench.count),
