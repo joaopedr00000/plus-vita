@@ -100,3 +100,29 @@ bool pv_storage_migrate(const char *data){
     for(unsigned j=0;j<sizeof(old)/sizeof(old[0]);j++)if(!move_relative(data,old[j],root,next[j]))return false;
     return join(archive,root,"Logs/Archive")&&archive_logs(data,archive);
 }
+
+/* Do not recurse through ur0 or migrate any unrelated contents. The old key
+ * remains recoverable on error. A rename on the same volume preserves bytes.
+ * When both keys exist, the shared move helper compares before unlinking.
+ * Only remove the old directory when empty. Never promote a temporary key. */
+bool pv_key_storage_migrate(const char *data){
+    if(!data)return false;
+    struct stat st;
+    if(kind(data,&st)!=2)return false;
+    char old[CAP],root[CAP],source[CAP],target[CAP],old_tmp[CAP],new_tmp[CAP];
+    if(!join(old,data,"plus-vita")||!join(root,data,"VitaPlus"))return false;
+    int old_kind=kind(old,&st),new_kind=kind(root,&st);
+    if(old_kind<0||old_kind==1||new_kind<0||new_kind==1)return false;
+    if(!join(source,old,"account.key")||!join(target,root,"account.key")
+        ||!join(old_tmp,old,"account.key.tmp")||!join(new_tmp,root,"account.key.tmp"))return false;
+    struct stat a,b;int ka=kind(source,&a),kb=kind(target,&b);
+    if(ka<0||kb<0||ka==2||kb==2||(ka==1&&a.st_size!=32)||(kb==1&&b.st_size!=32))return false;
+    if(ka==1&&kb==1&&!equal_files(source,target))return false;
+    struct stat c,d;int kc=kind(old_tmp,&c),kd=kind(new_tmp,&d);
+    if(kc<0||kd<0||kc==2||kd==2)return false;
+    if(kc==1&&kd==1&&(c.st_size!=d.st_size||!equal_files(old_tmp,new_tmp)))return false;
+    if(!directory(root))return false;
+    if(!move_entry(source,target,0)||!move_entry(old_tmp,new_tmp,0))return false;
+    if(old_kind==2&&rmdir(old)!=0&&errno!=ENOTEMPTY&&errno!=EEXIST)return false;
+    return true;
+}

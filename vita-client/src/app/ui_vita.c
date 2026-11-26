@@ -326,7 +326,7 @@ static int migration_failed(void)
     UiDisplay *d=calloc(1,sizeof(*d));if(!d)return 1;
     if(!display_open(d)){free(d);return 1;}
     PlusVitaAppView v={.screen=PLUS_VITA_APP_ERROR,.title="Storage migration paused",.subtitle="VitaPlus",
-        .body="A storage error or conflicting file was found. Different files were not overwritten. Back up ux0:data/VitaPlus and the old folders with VitaShell. Restart to retry.",.hint="X / O  Exit"};
+        .body="A storage error or conflicting file was found. Different files were not overwritten. Back up the VitaPlus and plus-vita data folders on ux0 and ur0 with VitaShell. Restart to retry.",.hint="X / O  Exit"};
     plus_vita_app_paint(d->font,d->pixels[0],PITCH,&v);
     SceDisplayFrameBuf fb={.size=sizeof(fb),.base=d->pixels[0],.pitch=PITCH,.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8,.width=WIDTH,.height=HEIGHT};
     if(sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME)>=0){
@@ -349,7 +349,7 @@ static int migration_failed(void)
 int plus_vita_app_run(void)
 {
 #if PLUS_VITA_ADAPTIVE_STREAM
-    if(!pv_storage_migrate("ux0:data"))return migration_failed();
+    if(!pv_storage_migrate("ux0:data")||!pv_key_storage_migrate("ur0:data"))return migration_failed();
 #endif
 	plus_vita_diagnostic_ui_begin();
 	bool log_available = plus_vita_diagnostic_persistence_ok();

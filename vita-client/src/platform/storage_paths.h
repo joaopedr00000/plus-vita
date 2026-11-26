@@ -5,7 +5,7 @@
 #define PV_NEW_STORAGE 1
 #define PV_ROOT "ux0:data/VitaPlus"
 #define PV_ACCOUNT_DIR PV_ROOT "/Account"
-#define PV_KEY_DIR "ur0:data/plus-vita"
+#define PV_KEY_DIR "ur0:data/VitaPlus"
 #define PV_IMPORT_FILE PV_ROOT "/Imports/plus-vita-auth.json"
 #define PV_CONTROLS_FILE PV_ROOT "/Settings/controls.dat"
 #define PV_THEME_FILE PV_ROOT "/Settings/theme.cfg"
