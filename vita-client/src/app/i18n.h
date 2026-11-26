@@ -267,8 +267,30 @@ static const char *pv_lookup(const char *s,size_t len,const char *const *keys,
         if(strlen(keys[k])==len && memcmp(keys[k],s,len)==0)return values[k];
     return NULL;
 }
+static const char *const pv_catalogue_search_hint[PV_LANG_COUNT]={
+    "Square Search / Triangle Filter / X Play / O Back",
+    "Square Search / Triangle Filter / X Play / O Back",
+    "Quadrado Buscar / Triângulo Filtro / X Jogar / O Voltar",
+    "Quadrado Pesquisar / Triângulo Filtro / X Jogar / O Voltar",
+    "Cuadrado Buscar / Triángulo Filtro / X Jugar / O Atrás",
+    "Cuadrado Buscar / Triángulo Filtro / X Jugar / O Atrás",
+    "Viereck Suche / Dreieck Filter / X Spielen / O Zurück",
+    "Carré Recherche / Triangle Filtre / X Jouer / O Retour",
+    "Quadrato Cerca / Triangolo Filtro / X Gioca / O Indietro",
+    "Vierkant Zoeken / Driehoek Filter / X Spelen / O Terug",
+    "Kwadrat Szukaj / Trójkąt Filtr / X Graj / O Wstecz",
+    "Fyrkant Sök / Triangel Filter / X Spela / O Tillbaka",
+    "Kare Ara / Üçgen Filtre / X Oyna / O Geri",
+    "Квадрат Поиск / Треугольник Фильтр / X Играть / O Назад",
+    "四角 検索 / 三角 フィルター / X プレイ / O 戻る",
+    "사각형 검색 / 삼각형 필터 / X 플레이 / O 뒤로",
+    "方块 搜索 / 三角 筛选 / X 游玩 / O 返回",
+    "方塊 搜尋 / 三角 篩選 / X 遊玩 / O 返回",
+    "مربع بحث / مثلث تصفية / X لعب / O رجوع"
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
+    if(!strcmp(s,pv_catalogue_search_hint[0]))return pv_catalogue_search_hint[lang];
     size_t len=strlen(s);
     const char *v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
