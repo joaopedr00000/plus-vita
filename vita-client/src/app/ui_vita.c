@@ -40,6 +40,7 @@
 #include <psp2/net/netctl.h>
 #include "../platform/cover_download.h"
 #include "library_logo.h"
+#include "custom_theme.h"
 #endif
 #include <stdbool.h>
 #include <stdlib.h>
@@ -286,6 +287,22 @@ static int menu_read(PlusVitaController *controller,SceCtrlData *pad)
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "../platform/region_policy.h"
 #include "i18n.h"
+#define PV_THEME_PREFS "ux0:data/plus-vita-theme.cfg"
+static void theme_load(PlusVitaApp *app){
+    FILE *file=fopen(PV_THEME_PREFS,"rb");if(!file)return;
+    char p[8]={0},s[8]={0},extra;unsigned mode=0;uint32_t primary,secondary;
+    int n=fscanf(file,"%u %7s %7s %c",&mode,p,s,&extra);fclose(file);
+    if(n==3&&mode<=1&&pv_theme_hex(p,strlen(p),&primary)&&pv_theme_hex(s,strlen(s),&secondary))
+        plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_LOADED,.theme_custom=mode!=0,.theme_primary=primary,.theme_secondary=secondary});
+}
+static bool theme_save(PlusVitaAppView v){
+    FILE *file=fopen(PV_THEME_PREFS ".tmp","wb");if(!file)return false;
+    bool ok=fprintf(file,"%u %06X %06X\n",(unsigned)v.theme_custom,(unsigned)v.theme_primary,(unsigned)v.theme_secondary)>0;
+    if(fflush(file)!=0)ok=false;
+    if(fclose(file)!=0)ok=false;
+    if(ok&&rename(PV_THEME_PREFS ".tmp",PV_THEME_PREFS)==0)return true;
+    remove(PV_THEME_PREFS ".tmp");return false;
+}
 #define PV_STREAM_PREFS "ux0:data/plus-vita-stream.cfg"
 static void stream_prefs_load(PlusVitaApp *app)
 {
@@ -350,10 +367,11 @@ int plus_vita_app_run(void)
 	bool metadata_reported=false;
 	PlusVitaAppScreen reported_screen=PLUS_VITA_APP_CLOSED;
 	#if PLUS_VITA_ADAPTIVE_STREAM
-	stream_prefs_load(app);
+	stream_prefs_load(app);theme_load(app);
 	PlusVitaAppView saved_prefs=plus_vita_app_view(app);
  	flow.library_logo=display->library_logo;
-	uint64_t last_status=0;
+	uint64_t last_status=0,theme_retry=0;
+	PlusVitaAppView saved_theme=saved_prefs;
 	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
 #endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
@@ -363,6 +381,11 @@ int plus_vita_app_run(void)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
 		PlusVitaAppView prefs=plus_vita_app_view(app);
+		uint64_t theme_now=plus_vita_latency_now_us();
+		if((prefs.theme_custom!=saved_theme.theme_custom||prefs.theme_primary!=saved_theme.theme_primary||prefs.theme_secondary!=saved_theme.theme_secondary)&&theme_now>=theme_retry){
+			if(theme_save(prefs))saved_theme=prefs;
+			else theme_retry=theme_now+2000000u;
+		}
 		if(prefs.stream_profile!=saved_profile||prefs.stream_hud!=saved_hud||prefs.region_mode!=saved_region||prefs.ui_language!=saved_lang){
 			saved_profile=prefs.stream_profile;saved_hud=prefs.stream_hud;saved_region=prefs.region_mode;saved_lang=prefs.ui_language;stream_prefs_save(saved_profile,saved_hud,saved_region,saved_lang);
 		}
@@ -512,15 +535,16 @@ int plus_vita_app_run(void)
 					touched=true;previous_poll=flow.input_since=0;
 				}
 				#endif
-				else if(effect.kind == PLUS_VITA_EFFECT_EDIT_LABEL || effect.kind == PLUS_VITA_EFFECT_EDIT_SEARCH)
+				else if(effect.kind == PLUS_VITA_EFFECT_EDIT_LABEL || effect.kind == PLUS_VITA_EFFECT_EDIT_SEARCH || effect.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY || effect.kind==PLUS_VITA_EFFECT_EDIT_SECONDARY)
 				{
 					char label[129]; PlusVitaCredentialImeResult keyboard;
 					if(effect.kind==PLUS_VITA_EFFECT_EDIT_SEARCH) plus_vita_catalogue_search_read(label,&keyboard);
+					else if(effect.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY||effect.kind==PLUS_VITA_EFFECT_EDIT_SECONDARY)plus_vita_theme_color_read(label,&keyboard);
 					else plus_vita_account_label_read(label, &keyboard);
 					plus_vita_ui_flow_tick(&flow,plus_vita_latency_now_us());
 					PlusVitaAppResult status = !keyboard.initialized ? PLUS_VITA_RESULT_STORAGE_ERROR
 						: !keyboard.accepted ? PLUS_VITA_RESULT_CANCELLED : !keyboard.validated ? PLUS_VITA_RESULT_STORAGE_ERROR : PLUS_VITA_RESULT_OK;
-					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = effect.kind==PLUS_VITA_EFFECT_EDIT_SEARCH ? PLUS_VITA_EVENT_SEARCH_ENTERED : PLUS_VITA_EVENT_LABEL_ENTERED,
+					plus_vita_ui_flow_event(&flow, (PlusVitaAppEvent){ .kind = effect.kind==PLUS_VITA_EFFECT_EDIT_SEARCH ? PLUS_VITA_EVENT_SEARCH_ENTERED : (effect.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY||effect.kind==PLUS_VITA_EFFECT_EDIT_SECONDARY)?PLUS_VITA_EVENT_THEME_ENTERED:PLUS_VITA_EVENT_LABEL_ENTERED,
 						.operation = effect.operation, .status = status, .data = label, .data_size = strlen(label) }, 0);
 					memset(label, 0, sizeof(label));
 					SceCtrlData after = {0};
