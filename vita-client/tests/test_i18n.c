@@ -19,6 +19,14 @@ int main(void){
         char short_buffer[16]="Synthetic";
         assert(!strcmp(pv_translate(l,short_text),"PS5"));
         assert(!strcmp(pv_translate(l,short_buffer),"Synthetic"));
+        for(unsigned k=0;k<11;k++){
+            assert(pv_library_labels[l][k] && *pv_library_labels[l][k]);
+            if(k!=9)assert(!strcmp(pv_translate(l,pv_library_labels[0][k]),pv_library_labels[l][k]));
+        }
+        /* Unavailable is intentionally shared with the existing session table. */
+        for(unsigned k=0;k<PV_SESSION_TEXT_COUNT;k++)
+            if(!strcmp(pv_session_text[0][k],"Unavailable"))
+                assert(!strcmp(pv_translate(l,"Unavailable"),pv_session_text[l][k]));
         for(unsigned k=0;k<PV_TEXT_COUNT;k++)assert(pv_text[l][k]&&*pv_text[l][k]);
         for(unsigned k=0;k<PV_EXTRA_COUNT;k++)assert(pv_extra[l][k]&&*pv_extra[l][k]);
         for(unsigned k=0;k<PV_DYNAMIC_COUNT;k++)assert(pv_dynamic[l][k]&&*pv_dynamic[l][k]);

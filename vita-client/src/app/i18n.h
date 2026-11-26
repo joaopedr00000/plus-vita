@@ -381,7 +381,6 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_ps5_notice,&pv_ps5_notice[lang],1);
     if(!v)v=pv_lookup(s,len,pv_ps5_test,&pv_ps5_test[lang],1);
     if(!v)v=pv_lookup(s,len,pv_library_metrics,&pv_library_metrics[lang],1);
-    if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     if(!v)v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
     if(!v)v=pv_lookup(s,len,pv_dynamic[0],pv_dynamic[lang],PV_DYNAMIC_COUNT);
@@ -393,6 +392,8 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_dc_errors[0],pv_dc_errors[lang],PV_DC_ERRORS_COUNT);
     if(!v)v=pv_lookup(s,len,pv_security[0],pv_security[lang],PV_SECURITY_COUNT);
     if(!v)v=pv_lookup(s,len,pv_auto_vault[0],pv_auto_vault[lang],PV_AUTO_VAULT_COUNT);
+    /* New catalogue labels must not override established menu/session keys. */
+    if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     return v?v:s;
 }
 #endif
