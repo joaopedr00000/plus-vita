@@ -332,11 +332,13 @@ static const char *const pv_ps5_test[PV_LANG_COUNT]={
 };
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
-    if(!strcmp(s,pv_catalogue_search_hint[0]))return pv_catalogue_search_hint[lang];
-    if(!strcmp(s,pv_ps5_notice[0]))return pv_ps5_notice[lang];
-    if(!strcmp(s,pv_ps5_test[0]))return pv_ps5_test[lang];
     size_t len=strlen(s);
-    const char *v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
+    /* Use the same non-inlined, length-checked lookup as the other locale
+     * tables. Vita GCC diagnoses direct strcmp on shorter fixed arrays. */
+    const char *v=pv_lookup(s,len,pv_catalogue_search_hint,&pv_catalogue_search_hint[lang],1);
+    if(!v)v=pv_lookup(s,len,pv_ps5_notice,&pv_ps5_notice[lang],1);
+    if(!v)v=pv_lookup(s,len,pv_ps5_test,&pv_ps5_test[lang],1);
+    if(!v)v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
     if(!v)v=pv_lookup(s,len,pv_dynamic[0],pv_dynamic[lang],PV_DYNAMIC_COUNT);
     if(!v)v=pv_lookup(s,len,pv_filter_text[0],pv_filter_text[lang],2);

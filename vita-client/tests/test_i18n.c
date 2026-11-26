@@ -7,6 +7,16 @@ int main(void){
     assert(pv_language(19)==0);
     for(unsigned l=0;l<PV_LANG_COUNT;l++){
         assert(pv_locale_names[l]&&*pv_locale_names[l]);
+        assert(pv_catalogue_search_hint[l]&&*pv_catalogue_search_hint[l]);
+        assert(pv_ps5_notice[l]&&*pv_ps5_notice[l]);
+        assert(pv_ps5_test[l]&&*pv_ps5_test[l]);
+        assert(!strcmp(pv_translate(l,pv_catalogue_search_hint[0]),pv_catalogue_search_hint[l]));
+        assert(!strcmp(pv_translate(l,pv_ps5_notice[0]),pv_ps5_notice[l]));
+        assert(!strcmp(pv_translate(l,pv_ps5_test[0]),pv_ps5_test[l]));
+        char short_text[4]="PS5";
+        char short_buffer[16]="Synthetic";
+        assert(!strcmp(pv_translate(l,short_text),"PS5"));
+        assert(!strcmp(pv_translate(l,short_buffer),"Synthetic"));
         for(unsigned k=0;k<PV_TEXT_COUNT;k++)assert(pv_text[l][k]&&*pv_text[l][k]);
         for(unsigned k=0;k<PV_EXTRA_COUNT;k++)assert(pv_extra[l][k]&&*pv_extra[l][k]);
         for(unsigned k=0;k<PV_DYNAMIC_COUNT;k++)assert(pv_dynamic[l][k]&&*pv_dynamic[l][k]);
