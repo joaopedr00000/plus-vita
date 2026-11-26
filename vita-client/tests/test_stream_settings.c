@@ -47,6 +47,11 @@ int main(void){
     assert(edit.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY);
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_ENTERED,.operation=edit.operation,.status=PLUS_VITA_RESULT_OK,.data="0088ff",.data_size=6});
     v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff&&v.theme_id==1);
+    click(app,PLUS_VITA_ACTION_WALLPAPERS);
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_WALLPAPERS&&strstr(v.body,"01-1.jpg"));
+    click(app,PLUS_VITA_ACTION_WALLPAPER_RELOAD);
+    assert(plus_vita_app_view(app).wallpaper_revision==1);
+    click(app,PLUS_VITA_ACTION_BACK);
     click(app,PLUS_VITA_ACTION_THEME_RESET);
     v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT&&v.theme_id==0);
     assert(pv_theme_expired(1000000000u+864000u,1000000000u,2,1));

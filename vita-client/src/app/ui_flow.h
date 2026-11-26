@@ -12,6 +12,7 @@ typedef struct {
 	PlusVitaCovers *covers;
 	PlusVitaBranding *branding;
 	const uint32_t *library_logo;
+	const uint32_t *theme_wallpaper,*theme_wordmark;
 	bool clock_valid, battery_valid, network_known, network_connected;
 	unsigned clock_hour, clock_minute, battery_percent;
 	bool startup_started, splash_active, splash_release;

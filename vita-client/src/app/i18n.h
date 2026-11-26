@@ -414,6 +414,27 @@ static const char *const pv_preset_labels[PV_LANG_COUNT][4]={
 {"預設主題","目前主題","桌布輪換：開","桌布輪換：關"},
 {"سمات جاهزة","السمة النشطة","تدوير الخلفيات: تشغيل","تدوير الخلفيات: إيقاف"}
 };
+static const char *const pv_wall_labels[PV_LANG_COUNT][3]={
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Arquivos de papel de parede","Recarregar imagens locais","Use o VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (ou .png). Até 2 MB, 1024 px por lado. Recarregue após copiar. Apague os originais para remover os fundos."},
+{"Arquivos de papel de parede","Recarregar imagens locais","Use o VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (ou .png). Até 2 MB, 1024 px por lado. Recarregue após copiar. Apague os originais para remover os fundos."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."},
+{"Wallpaper files","Reload local images","Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."}
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -438,6 +459,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     if(!v)v=pv_lookup(s,len,pv_theme_labels[0],pv_theme_labels[lang],7);
     if(!v)v=pv_lookup(s,len,pv_preset_labels[0],pv_preset_labels[lang],4);
+    if(!v)v=pv_lookup(s,len,pv_wall_labels[0],pv_wall_labels[lang],3);
     return v?v:s;
 }
 #endif

@@ -40,7 +40,7 @@
 #include <psp2/net/netctl.h>
 #include "../platform/cover_download.h"
 #include "library_logo.h"
-#include "custom_theme.h"
+#include "wallpaper_cache.h"
 #endif
 #include <stdbool.h>
 #include <stdlib.h>
@@ -290,14 +290,14 @@ static int menu_read(PlusVitaController *controller,SceCtrlData *pad)
 #define PV_THEME_PREFS "ux0:data/plus-vita-theme.cfg"
 static void theme_load(PlusVitaApp *app){
     FILE *file=fopen(PV_THEME_PREFS,"rb");if(!file)return;
-    char p[8]={0},s[8]={0},extra;unsigned mode=0;uint32_t primary,secondary;
-    int n=fscanf(file,"%u %7s %7s %c",&mode,p,s,&extra);fclose(file);
-    if(n==3&&mode<=1&&pv_theme_hex(p,strlen(p),&primary)&&pv_theme_hex(s,strlen(s),&secondary))
-        plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_LOADED,.theme_custom=mode!=0,.theme_primary=primary,.theme_secondary=secondary});
+    char p[8]={0},s[8]={0},extra;unsigned mode=0,id=0,rotate=1;uint32_t primary,secondary;
+    int n=fscanf(file,"%u %7s %7s %u %u %c",&mode,p,s,&id,&rotate,&extra);fclose(file);
+    if((n==3||n==5)&&mode<=1&&id<=PV_THEME_COUNT&&rotate<=1&&pv_theme_hex(p,strlen(p),&primary)&&pv_theme_hex(s,strlen(s),&secondary))
+        plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_LOADED,.theme_custom=mode!=0,.theme_primary=primary,.theme_secondary=secondary,.theme_id=id,.theme_rotate=rotate!=0});
 }
 static bool theme_save(PlusVitaAppView v){
     FILE *file=fopen(PV_THEME_PREFS ".tmp","wb");if(!file)return false;
-    bool ok=fprintf(file,"%u %06X %06X\n",(unsigned)v.theme_custom,(unsigned)v.theme_primary,(unsigned)v.theme_secondary)>0;
+    bool ok=fprintf(file,"%u %06X %06X %u %u\n",(unsigned)v.theme_custom,(unsigned)v.theme_primary,(unsigned)v.theme_secondary,v.theme_id,(unsigned)v.theme_rotate)>0;
     if(fflush(file)!=0)ok=false;
     if(fclose(file)!=0)ok=false;
     if(ok&&rename(PV_THEME_PREFS ".tmp",PV_THEME_PREFS)==0)return true;
@@ -372,6 +372,11 @@ int plus_vita_app_run(void)
  	flow.library_logo=display->library_logo;
 	uint64_t last_status=0,theme_retry=0;
 	PlusVitaAppView saved_theme=saved_prefs;
+	PvWallpaperJob *wall_job=calloc(1,sizeof(*wall_job));
+	uint32_t *wall_pixels=NULL,*theme_headers=pv_wallpaper_headers();
+	unsigned wall_id=UINT32_MAX,wall_revision=UINT32_MAX,wall_slot=0,wall_attempts=0;
+	uint64_t wall_next=0;
+	bool wall_ready=false;
 	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
 #endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
@@ -382,7 +387,7 @@ int plus_vita_app_run(void)
 #if PLUS_VITA_ADAPTIVE_STREAM
 		PlusVitaAppView prefs=plus_vita_app_view(app);
 		uint64_t theme_now=plus_vita_latency_now_us();
-		if((prefs.theme_custom!=saved_theme.theme_custom||prefs.theme_primary!=saved_theme.theme_primary||prefs.theme_secondary!=saved_theme.theme_secondary)&&theme_now>=theme_retry){
+		if((prefs.theme_custom!=saved_theme.theme_custom||prefs.theme_primary!=saved_theme.theme_primary||prefs.theme_secondary!=saved_theme.theme_secondary||prefs.theme_id!=saved_theme.theme_id||prefs.theme_rotate!=saved_theme.theme_rotate)&&theme_now>=theme_retry){
 			if(theme_save(prefs))saved_theme=prefs;
 			else theme_retry=theme_now+2000000u;
 		}
@@ -399,6 +404,33 @@ int plus_vita_app_run(void)
 		PlusVitaAppView current=plus_vita_app_view(app);
 #if PLUS_VITA_ADAPTIVE_STREAM
 		uint64_t status_now=plus_vita_latency_now_us();
+		/* Local wallpaper work is isolated from stream workers. A generation
+         * change invalidates old output and never exposes mutable worker memory. */
+        if(current.theme_id!=wall_id||current.wallpaper_revision!=wall_revision){
+            if(wall_job&&wall_job->running)atomic_store(&wall_job->cancel,true);
+            wall_id=current.theme_id;wall_revision=current.wallpaper_revision;
+            wall_slot=wall_attempts=0;wall_next=0;wall_ready=false;flow.theme_wallpaper=NULL;flow.dirty=true;
+            int idx=pv_theme_logo_index(wall_id);
+            flow.theme_wordmark=idx>=0&&theme_headers?theme_headers+(size_t)idx*PV_HEADER_WIDTH*PV_HEADER_HEIGHT:NULL;
+        }
+        if(wall_job&&pv_wallpaper_poll(wall_job)){
+            if(wall_job->id==wall_id&&!atomic_load(&wall_job->cancel)&&wall_job->ok){
+                if(!wall_pixels)wall_pixels=malloc(PV_WALL_WIDTH*PV_WALL_HEIGHT*sizeof(*wall_pixels));
+                if(wall_pixels){
+                    memcpy(wall_pixels,wall_job->output,PV_WALL_WIDTH*PV_WALL_HEIGHT*sizeof(*wall_pixels));
+                    flow.theme_wallpaper=wall_pixels;wall_ready=true;flow.dirty=true;
+                }
+                wall_attempts=0;wall_next=status_now+PV_THEME_ROTATION_US;
+            }else if(!atomic_load(&wall_job->cancel)){
+                wall_attempts++;wall_next=wall_attempts<PV_THEME_SLOTS?status_now+250000u:status_now+PV_THEME_ROTATION_US;
+            }
+            if(!atomic_load(&wall_job->cancel))wall_slot=(wall_slot+1)%PV_THEME_SLOTS;
+        }
+        if(wall_job&&wall_job->running&&(!workers_idle||current.operation))atomic_store(&wall_job->cancel,true);
+        if(wall_job&&!wall_job->running&&workers_idle&&!current.operation&&!flow.splash_active&&status_now>=wall_next
+            &&(!wall_ready||current.theme_rotate)){
+            if(!pv_wallpaper_start(wall_job,wall_id,wall_slot))wall_next=status_now+PV_THEME_ROTATION_US;
+        }
 		if(current.screen==PLUS_VITA_APP_CATALOGUE && (!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen)){
 			library_status(&flow);last_status=status_now;
 		}
@@ -711,6 +743,10 @@ int plus_vita_app_run(void)
 	bool storage_closed = plus_vita_account_close(storage);
 	bool play_closed = plus_vita_play_close(play);
 	bool covers_closed = plus_vita_covers_close(covers);
+#if PLUS_VITA_ADAPTIVE_STREAM
+	if(wall_job&&pv_wallpaper_close(wall_job))free(wall_job);
+	free(wall_pixels);free(theme_headers);
+#endif
 	if(account_closed && storage_closed && play_closed && covers_closed) {
 		if(curl_ready) curl_global_cleanup();
 		if(network_ready && network_owned) plus_vita_network_fini();

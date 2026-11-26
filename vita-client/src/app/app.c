@@ -75,8 +75,8 @@ struct plus_vita_app_t {
 	char locale_label[128];
 	uint32_t theme_primary,theme_secondary;
 	bool theme_custom,theme_rotate;
-	unsigned theme_id,theme_page;
-	char theme_labels[2][128],theme_status[192],theme_page_status[128];
+	unsigned theme_id,theme_page,wallpaper_revision;
+	char theme_labels[2][128],theme_status[192],theme_page_status[128],wallpaper_help[384];
 };
 
 static void welcome(PlusVitaApp *app)
@@ -168,12 +168,23 @@ static void theme_view(PlusVitaApp *app,const char *notice)
     snprintf(app->theme_status,sizeof(app->theme_status),"%s: %s",PV_TR("Active theme"),pv_presets[pv_theme_id(app->theme_id)].name);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_THEME,.title="Appearance",.subtitle="SETTINGS AND HELP",
         .body=notice?notice:app->theme_status,.hint="X  Select     O  Back",
-        .actions={{PLUS_VITA_ACTION_THEME_PRESETS,"Theme presets",64,248,832,36},
-            {PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,290,832,36},
-            {PLUS_VITA_ACTION_SECONDARY,app->theme_labels[1],64,332,832,36},
-            {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,374,832,36},
-            {PLUS_VITA_ACTION_THEME_RESET,"Restore original theme",64,416,832,36},
-            {PLUS_VITA_ACTION_BACK,"Back to settings",64,458,832,36}},.action_count=6};
+        .actions={{PLUS_VITA_ACTION_THEME_PRESETS,"Theme presets",64,238,832,32},
+            {PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,276,832,32},
+            {PLUS_VITA_ACTION_SECONDARY,app->theme_labels[1],64,314,832,32},
+            {PLUS_VITA_ACTION_WALLPAPERS,"Wallpaper files",64,352,832,32},
+            {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,390,832,32},
+            {PLUS_VITA_ACTION_THEME_RESET,"Restore original theme",64,428,832,32},
+            {PLUS_VITA_ACTION_BACK,"Back to settings",64,466,832,32}},.action_count=7};
+}
+static void wallpapers_view(PlusVitaApp *app)
+{
+    snprintf(app->wallpaper_help,sizeof(app->wallpaper_help),
+        PV_TR("Use VitaShell: ux0:data/VitaPlus-Wallpapers/\n%02u-1.jpg, %02u-2.jpg, %02u-3.jpg (or .png). Up to 2 MB, 1024 px per side. Reload after copying. Delete originals to remove backgrounds."),
+        app->theme_id,app->theme_id,app->theme_id);
+    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_WALLPAPERS,.title="Wallpaper files",.subtitle="Appearance",.body=app->wallpaper_help,
+        .hint="X  Select     O  Back",.actions={{PLUS_VITA_ACTION_WALLPAPER_RELOAD,"Reload local images",64,374,832,36},
+        {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,416,832,36},
+        {PLUS_VITA_ACTION_BACK,"Back",64,458,832,36}},.action_count=3};
 }
 static void theme_select(PlusVitaApp *app,unsigned id)
 {
@@ -190,12 +201,13 @@ static void theme_presets_view(PlusVitaApp *app)
     for(unsigned k=0;k<PV_THEME_PAGE;k++){
         unsigned id=app->theme_page*PV_THEME_PAGE+k;
         if(id>PV_THEME_COUNT)break;
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,pv_presets[id].name,64,234+(int)k*32,832,28};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,pv_presets[id].name,64,234+(int)k*32,832,26};
         if(id==app->theme_id)app->view.selected=k;
     }
-    if(app->theme_page)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PREV,"Previous page",64,458,832,28};
-    if(app->theme_page+1<pages)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_NEXT,"Next page",64,490,832,28};
-    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,522,832,28};
+    int y=234+(int)app->view.action_count*32;
+    if(app->theme_page){app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PREV,"Previous page",64,y,832,26};y+=32;}
+    if(app->theme_page+1<pages){app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_NEXT,"Next page",64,y,832,26};y+=32;}
+    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,y,832,26};
 }
 static void stream_settings_view(PlusVitaApp *app)
 {
@@ -434,7 +446,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	view.account_connected=app->connected;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
-	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;view.theme_id=app->theme_id;view.theme_rotate=app->theme_rotate;
+	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;view.theme_id=app->theme_id;view.theme_rotate=app->theme_rotate;view.wallpaper_revision=app->wallpaper_revision;
 #endif
 	if(!view.list_total && view.action_count && !(PLUS_VITA_ADAPTIVE_STREAM && view.screen==PLUS_VITA_APP_CATALOGUE)) {
 		view.list_total=view.action_count;view.focus=view.selected;
@@ -1573,7 +1585,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(view->screen==PLUS_VITA_APP_THEME_PRESETS){theme_view(app,NULL);return effect;}
+		if(view->screen==PLUS_VITA_APP_THEME_PRESETS||view->screen==PLUS_VITA_APP_WALLPAPERS){theme_view(app,NULL);return effect;}
 		if(app->waiting_for==PLUS_VITA_EFFECT_EDIT_PRIMARY||app->waiting_for==PLUS_VITA_EFFECT_EDIT_SECONDARY){app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;theme_view(app,NULL);return effect;}
 #endif
 		if(controls_screen(view->screen)) return edit_controls(app,PLUS_VITA_ACTION_BACK);
@@ -1750,13 +1762,20 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
             else if(action==PLUS_VITA_ACTION_BACK)theme_view(app,NULL);
             return effect;
         }
+        else if(action==PLUS_VITA_ACTION_WALLPAPERS&&view->screen==PLUS_VITA_APP_THEME)wallpapers_view(app);
+        else if(view->screen==PLUS_VITA_APP_WALLPAPERS){
+            if(action==PLUS_VITA_ACTION_WALLPAPER_RELOAD){app->wallpaper_revision++;wallpapers_view(app);}
+            else if(action==PLUS_VITA_ACTION_THEME_ROTATE){app->theme_rotate=!app->theme_rotate;wallpapers_view(app);app->view.selected=1;}
+            else if(action==PLUS_VITA_ACTION_BACK)theme_view(app,NULL);
+            return effect;
+        }
         else if(action==PLUS_VITA_ACTION_THEME_ROTATE&&view->screen==PLUS_VITA_APP_THEME){
-            app->theme_rotate=!app->theme_rotate;theme_view(app,NULL);app->view.selected=3;
+            app->theme_rotate=!app->theme_rotate;theme_view(app,NULL);app->view.selected=4;
         }
         else if(view->screen==PLUS_VITA_APP_THEME&&(action==PLUS_VITA_ACTION_PRIMARY||action==PLUS_VITA_ACTION_SECONDARY))
             return operation(app,action==PLUS_VITA_ACTION_PRIMARY?PLUS_VITA_EFFECT_EDIT_PRIMARY:PLUS_VITA_EFFECT_EDIT_SECONDARY,"Enter a color (RRGGBB).",true);
         else if(view->screen==PLUS_VITA_APP_THEME&&action==PLUS_VITA_ACTION_THEME_RESET){
-            theme_select(app,0);theme_view(app,NULL);
+            theme_select(app,0);app->wallpaper_revision++;theme_view(app,NULL);
         }
 		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
 		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){

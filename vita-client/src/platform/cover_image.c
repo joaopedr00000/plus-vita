@@ -72,3 +72,25 @@ bool plus_vita_cover_decode(const unsigned char *data,size_t size,uint32_t pixel
 	stbi_image_free(rgba);
 	return true;
 }
+
+bool plus_vita_theme_decode(const unsigned char *data,size_t size,uint32_t *pixels,unsigned w,unsigned h,bool crop)
+{
+    if(!data||!pixels||!size||size>2u*1024u*1024u||!w||!h||w>480||h>272)return false;
+    int iw=0,ih=0,ch=0;
+    if(!stbi_info_from_memory(data,(int)size,&iw,&ih,&ch)||iw<1||ih<1||iw>1024||ih>1024)return false;
+    unsigned char *rgba=stbi_load_from_memory(data,(int)size,&iw,&ih,&ch,4);
+    if(!rgba)return false;
+    unsigned sw=(unsigned)iw,sh=(unsigned)ih,x0=0,y0=0;
+    if(crop){
+        if(sw*h>sh*w){unsigned cw=sh*w/h;if(!cw)cw=1;x0=(sw-cw)/2;sw=cw;}
+        else {unsigned hh=sw*h/w;if(!hh)hh=1;y0=(sh-hh)/2;sh=hh;}
+    }
+    for(unsigned y=0;y<h;y++)for(unsigned x=0;x<w;x++){
+        const unsigned char *src=rgba+((y0+y*sh/h)*(unsigned)iw+x0+x*sw/w)*4;
+        unsigned opacity=src[3];
+        uint32_t pixel=0xff000000u;
+        for(unsigned k=0;k<3;k++)pixel|=((src[k]*opacity+16u*(255-opacity))/255u)<<(8*k);
+        pixels[y*w+x]=pixel;
+    }
+    stbi_image_free(rgba);return true;
+}

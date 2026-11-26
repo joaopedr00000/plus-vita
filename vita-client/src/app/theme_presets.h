@@ -4,7 +4,7 @@
 #include "custom_theme.h"
 #define PV_THEME_COUNT 50u
 #define PV_THEME_SLOTS 3u
-#define PV_THEME_PAGE 7u
+#define PV_THEME_PAGE 5u
 #define PV_THEME_RETENTION_SECONDS (10u*24u*60u*60u)
 #define PV_THEME_ROTATION_US UINT64_C(60000000)
 typedef struct { const char *name; uint32_t primary,secondary; } PvThemePreset;
@@ -65,6 +65,6 @@ static const PvThemePreset pv_presets[PV_THEME_COUNT+1]={
 static inline unsigned pv_theme_id(unsigned id){return id<=PV_THEME_COUNT?id:0;}
 static inline int pv_theme_logo_index(unsigned id){return id==1?0:id==12?1:id==42?2:-1;}
 static inline bool pv_theme_expired(uint64_t now,uint64_t last,unsigned id,unsigned active){
-    return id&&id<=PV_THEME_COUNT&&id!=active&&last>=UINT64_C(946684800)&&now>=last&&now-last>=PV_THEME_RETENTION_SECONDS;
+    return id<=PV_THEME_COUNT&&id!=active&&last>=UINT64_C(946684800)&&now>=last&&now-last>=PV_THEME_RETENTION_SECONDS;
 }
 #endif
