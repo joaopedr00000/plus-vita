@@ -129,7 +129,7 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		if(view->detail){
 			text(display,view->detail->name,522,210,TEXT_HEADING,390,136,true,MENU_WHITE);
 			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),522,354,TEXT_CONTROL,390,42,false,MENU_ACCENT);
-		}else text(display,localized(display,"No cloud games found."),48,180,TEXT_BODY,408,120,true,MENU_BODY);
+		}else text(display,localized(display,view->title?view->title:"No cloud games found."),48,180,TEXT_BODY,408,120,true,MENU_BODY);
 		goto draw_actions;
 	}
 #endif
@@ -186,6 +186,13 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		bool pressed = view->touch_pressed && i == view->pressed_index;
 		rounded(display, button->x, button->y, button->width, button->height,
 			pressed ? MENU_PRESSED : selected ? MENU_ACCENT : MENU_BUTTON);
+#if PLUS_VITA_ADAPTIVE_STREAM
+		if(view->screen==PLUS_VITA_APP_CATALOGUE && button->id==PLUS_VITA_ACTION_SEARCH && !selected && !pressed){
+			/* Make the search entry visually distinct from normal menu buttons. */
+			rounded(display,button->x,button->y,button->width,button->height,MENU_ACCENT);
+			rounded(display,button->x+2,button->y+2,button->width-4,button->height-4,MENU_PANEL);
+		}
+#endif
 		bool compact=button->height<48;
 		int inset=button->height<=32 ? 2 : compact ? 4 : 8;
 		text(display,button->label,button->x+20,button->y+inset,
