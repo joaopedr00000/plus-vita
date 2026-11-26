@@ -1939,10 +1939,10 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			break;
 		}
 #if PLUS_VITA_DIAGNOSTIC_APP
-		if(first_display && now - first_display >= PROBE_PREVIEW_MS
+		if(shown.first_display && now - shown.first_display >= PROBE_PREVIEW_MS
 			&& !probe->awaiting_recovery_idr && !probe->recovery_output_pending)
 		{
-			if(displayed >= 2 && probe->audio_frames && now - last_display < 1000
+			if(shown.displayed >= 2 && probe->audio_frames && now - shown.last_display < 1000
 				&& (!PROBE_RECOVERY_FAULT_TEST || (probe->recovery_fault_injected && probe->recovery_resumes)))
 				probe->state = PROBE_COMPLETE;
 			else
@@ -1952,17 +1952,17 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #endif
 		/* Keep actual last_display truthful. A validated recovery IDR gets a
 		 * fresh output deadline, not the stale deadline from before the freeze. */
-		uint64_t output_deadline_base = last_display;
+		uint64_t output_deadline_base = shown.last_display;
 		if(probe->recovery_resumed_ms > output_deadline_base)
 			output_deadline_base = probe->recovery_resumed_ms;
 		uint64_t output_idle_ms = now >= output_deadline_base
 			? now - output_deadline_base : 0;
-		if((!first_display && now - started >= first_frame_timeout)
-			|| (first_display && !probe->awaiting_recovery_idr && output_idle_ms >= 3000))
+		if((!shown.first_display && now - started >= first_frame_timeout)
+			|| (shown.first_display && !probe->awaiting_recovery_idr && output_idle_ms >= 3000))
 		{
 			CHIAKI_LOGE(probe->log,
 				"Stream probe preview frame deadline expired started=%d output_idle_ms=%llu recovery_output_pending=%d queue=%u",
-				first_display ? 1 : 0, (unsigned long long)output_idle_ms,
+				shown.first_display ? 1 : 0, (unsigned long long)output_idle_ms,
 				probe->recovery_output_pending ? 1 : 0, probe->queue_count);
 			err = CHIAKI_ERR_TIMEOUT;
 			break;
@@ -2019,14 +2019,14 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			 * buffer stays writable and will be replaced by the next decode. */
 			bool recovery_output = probe->recovery_output_pending
 				&& recovery_generation_fed == probe->recovery_resumes;
-			bool show = recovery_output || !displayed || probe->queue_count < 2
-				|| sceKernelGetProcessTimeWide() / 1000u - last_display >= 100;
+			bool show = recovery_output || !shown.displayed || probe->queue_count < 2
+				|| sceKernelGetProcessTimeWide() / 1000u - shown.last_display >= 100;
 #if PLUS_VITA_ADAPTIVE_STREAM
 			uint64_t present_now=sceKernelGetProcessTimeWide();
 			uint64_t oldest=probe->queue_count?probe->queue[probe->queue_head].enqueued_us:present_now;
 			show=pv_present_due(probe->queue_count,present_now>=oldest?present_now-oldest:0,
-				present_now/1000u>=last_display?present_now/1000u-last_display:0,
-				recovery_output||!displayed);
+				present_now/1000u>=shown.last_display?present_now/1000u-shown.last_display:0,
+				recovery_output||!shown.displayed);
 #endif
 			if(show)
 			{
@@ -2053,18 +2053,18 @@ chiaki_mutex_unlock(&probe->mutex);
 			else
 				presentation_skips++;
 		}
-		else if(!displayed && probe->video_decode_attempts >= PROBE_DECODE_ATTEMPTS_MAX)
+		else if(!shown.displayed && probe->video_decode_attempts >= PROBE_DECODE_ATTEMPTS_MAX)
 		{
 			CHIAKI_LOGE(probe->log, "Stream probe AVC_NO_OUTPUT after %u submissions", probe->video_decode_attempts);
 			err = CHIAKI_ERR_TIMEOUT;
 		}
 		if(probe->video_decode_attempts <= 6 || probe->video_decode_attempts % 60 == 0)
 			CHIAKI_LOGI(probe->log, "Stream probe timing submitted=%u decoded=%u displayed=%u skipped=%u prepare_us=%llu decode_us=%llu queue=%u queue_wait_us=%llu elapsed_ms=%llu",
-				probe->video_decode_attempts, decoded, displayed, presentation_skips,
+				probe->video_decode_attempts, decoded, shown.displayed, presentation_skips,
 				(unsigned long long)probe->video_decoder.last_prepare_us,
 				(unsigned long long)probe->video_decoder.last_decode_us,
 				probe->queue_count, (unsigned long long)queue_wait_us,
-				(unsigned long long)(first_display ? sceKernelGetProcessTimeWide() / 1000u - first_display : 0));
+				(unsigned long long)(shown.first_display ? sceKernelGetProcessTimeWide() / 1000u - shown.first_display : 0));
 	}
 	/* Retire any confirmed final scanout before final timing is recorded. */
 	if(err==CHIAKI_ERR_SUCCESS&&present.slots.pending>=0)err=probe_finish_presentation(probe,&present,&shown);
@@ -2099,7 +2099,7 @@ chiaki_mutex_unlock(&probe->mutex);
 	}
 	plus_vita_diagnostic_stream_timing_end(&probe->latency.log_write_call,
 		&probe->latency.log_mutex_wait);
-	plus_vita_diagnostic_counter("displayed",displayed);
+	plus_vita_diagnostic_counter("displayed",shown.displayed);
 	plus_vita_diagnostic_counter("submitted",probe->video_decode_attempts);
 	plus_vita_diagnostic_counter("audio_frames",probe->audio_frames);
 	plus_vita_diagnostic_counter("fec_repaired",probe->fec_repaired_frames);
@@ -2136,7 +2136,7 @@ chiaki_mutex_unlock(&probe->mutex);
 		probe->state = PROBE_FAILED;
 	}
 	CHIAKI_LOGI(probe->log, "Stream probe preview summary: displayed=%u submitted=%u complete=%u incomplete=%u stale=%u queue_peak=%u audio=%u restore=0x%08x result=%d",
-		displayed, probe->video_decode_attempts, probe->video_frames,
+		shown.displayed, probe->video_decode_attempts, probe->video_frames,
 		probe->incomplete_frames, probe->stale_packets, probe->queue_peak,
 		probe->audio_frames, native_result, (int)err);
 	CHIAKI_LOGI(probe->log, "Stream probe recovery summary: episodes=%u dropped_dependent=%u awaiting_idr=%d validated_idrs=%u",
@@ -2177,8 +2177,8 @@ chiaki_mutex_unlock(&probe->mutex);
 		decoded, presentation_skips, (unsigned long long)prepare_sum,
 		(unsigned long long)decode_sum, (unsigned long long)decode_max);
 	CHIAKI_LOGI(probe->log, "Stream probe display timing: cpu_scale_us=0 submit_total_us=%llu vblank_total_us=%llu vblank_max_us=%llu queue_wait_max_us=%llu",
-		(unsigned long long)display_sum, (unsigned long long)wait_sum,
-		(unsigned long long)wait_max, (unsigned long long)queue_wait_max);
+		(unsigned long long)shown.display_sum, (unsigned long long)shown.wait_sum,
+		(unsigned long long)shown.wait_max, (unsigned long long)queue_wait_max);
 	return err;
 }
 

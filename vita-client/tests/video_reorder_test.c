@@ -111,8 +111,28 @@ static void configurable_grace(void)
  assert(plus_vita_video_reorder_poll(&w,49000,false).action==PLUS_VITA_VIDEO_REORDER_DROP);
  assert(plus_vita_video_reorder_poll(&w,49001,false).action==PLUS_VITA_VIDEO_REORDER_READY);
 }
+static void latched_adaptive_deadline(void)
+{
+    PlusVitaVideoReorder w={.grace_us=12000};
+    admit(&w,20,1000);int b=admit(&w,21,2000);
+    plus_vita_video_reorder_ready(&w,b,3000);
+    assert(plus_vita_video_reorder_poll(&w,3000,false).action==PLUS_VITA_VIDEO_REORDER_WAIT);
+    assert(plus_vita_video_reorder_wait_ms(&w,3000,8)==8);
+    w.grace_us=4000;
+    assert(plus_vita_video_reorder_wait_ms(&w,12001,8)==2);
+    assert(plus_vita_video_reorder_poll(&w,13999,false).action==PLUS_VITA_VIDEO_REORDER_WAIT);
+    assert(plus_vita_video_reorder_wait_ms(&w,13999,8)==1);
+    assert(plus_vita_video_reorder_poll(&w,14000,false).action==PLUS_VITA_VIDEO_REORDER_DROP);
+    assert(plus_vita_video_reorder_poll(&w,14000,false).action==PLUS_VITA_VIDEO_REORDER_READY);
+    assert(plus_vita_video_reorder_wait_ms(&w,14000,8)==8);
+    admit(&w,22,15000);admit(&w,23,16000);
+    assert(plus_vita_video_reorder_poll(&w,16000,false).action==PLUS_VITA_VIDEO_REORDER_WAIT);
+    assert(plus_vita_video_reorder_wait_ms(&w,16000,8)==4);
+    assert(plus_vita_video_reorder_poll(&w,20000,false).action==PLUS_VITA_VIDEO_REORDER_DROP);
+}
 int main(void)
 {
+    latched_adaptive_deadline();
  configurable_grace();
 	immediate_and_wrap();
 	late_completion();
