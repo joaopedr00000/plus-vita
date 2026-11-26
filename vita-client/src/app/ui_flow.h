@@ -11,6 +11,9 @@ typedef struct {
 	uint64_t diagnostic_operation;
 	PlusVitaCovers *covers;
 	PlusVitaBranding *branding;
+	const uint32_t *library_logo;
+	bool clock_valid, battery_valid, network_known, network_connected;
+	unsigned clock_hour, clock_minute, battery_percent;
 	bool startup_started, splash_active, splash_release;
 	uint64_t splash_started_us;
 	bool touch_held, touch_captured, touch_list, touch_dragging;

@@ -245,6 +245,10 @@ bool plus_vita_ui_flow_paint(PlusVitaUiFlow *flow, PlusVitaFont *font, uint32_t 
 		flow->dirty=false;return true;
 	}
 	PlusVitaAppView view = plus_vita_app_view(flow->app);
+	view.library_logo=flow->library_logo;
+	view.clock_valid=flow->clock_valid;view.clock_hour=flow->clock_hour;view.clock_minute=flow->clock_minute;
+	view.battery_valid=flow->battery_valid;view.battery_percent=flow->battery_percent;
+	view.network_known=flow->network_known;view.network_connected=flow->network_connected;
 	view.preview_eligible=flow->preview_eligible;
 	view.touch_pressed=capture_current(flow,&view);
 	view.pressed_index=flow->touch_index;

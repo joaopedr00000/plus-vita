@@ -784,16 +784,15 @@ static void catalogue_view(PlusVitaApp *app)
 		(unsigned)app->matches_count,(unsigned)app->catalogue_count);
 	snprintf(app->filter_button,sizeof(app->filter_button),PV_TR("Filter: %s"),
 		PV_TR(pv_catalog_filter_name(app->platform_filter)));
-	snprintf(app->search_button,sizeof(app->search_button),PV_TR("Search: %s"),
-		app->search[0]?app->search:PV_TR("All games"));
+	snprintf(app->search_button,sizeof(app->search_button),"%s",app->search[0]?app->search:PV_TR("Search games..."));
 	if(app->matches_count){
 		list_viewport(app->matches_count,7,app->catalogue_selection,&app->catalogue_first);
 		v.list_total=app->matches_count;v.list_first=app->catalogue_first;v.focus=app->catalogue_selection;
-		v.list_x=16;v.list_y=116;v.list_width=366;v.row_step=52;v.list_height=364;
+		v.list_x=14;v.list_y=116;v.list_width=368;v.row_step=51;v.list_height=357;
 		for(size_t j=v.list_first;j<app->matches_count&&j<v.list_first+7;j++){
 			const PlusVitaCatalogEntry *g=&app->catalogue[app->matches[j]];
 			v.games[v.action_count]=g;
-			v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_GAME,g->name,16,116+(int)(j-v.list_first)*52,366,48};
+			v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_GAME,g->name,14,116+(int)(j-v.list_first)*51,368,49};
 		}
 		v.list_count=v.action_count;
 		v.selected=app->catalogue_selection-v.list_first;
@@ -801,13 +800,13 @@ static void catalogue_view(PlusVitaApp *app)
 	}
 	if(!v.detail)v.title=app->search[0]?"No search results.":"No cloud games found.";
 	if(app->search_focus||!v.list_count)v.selected=v.action_count;
-	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_SEARCH,app->search_button,16,64,app->search[0]?214:288,36};
-	if(app->search[0])v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_CLEAR_SEARCH,"Clear search",234,64,70,36};
+	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_SEARCH,app->search_button,21,62,app->search[0]?238:288,32};
+	if(app->search[0])v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_CLEAR_SEARCH,"Clear search",263,62,46,32};
 	for(unsigned filter=0;filter<4;filter++)
-		v.actions[v.action_count++]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+filter),PV_TR(pv_catalog_filter_name(filter)),324+(int)filter*106,64,100,36};
+		v.actions[v.action_count++]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+filter),PV_TR(filter?pv_catalog_filter_name(filter):"All"),343+(int)filter*80,64,70,28};
 	if(v.detail)v.actions[v.action_count++]=(PlusVitaAppButton){v.detail->launch_id_valid?PLUS_VITA_ACTION_PLAY:PLUS_VITA_ACTION_DISABLED,
-		v.detail->launch_id_valid?(pv_catalog_platform(v.detail->platform)==3?"Experimental test":"Play"):"Play unavailable",656,430,288,48};
-	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",832,500,112,34};
+		v.detail->launch_id_valid?(pv_catalog_platform(v.detail->platform)==3?"Experimental test":"Play"):"Play unavailable",672,386,264,46};
+	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",866,500,80,36};
 	app->view=v;
 #else
 	PlusVitaAppView view = {

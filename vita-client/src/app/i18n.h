@@ -351,6 +351,27 @@ static const char *const pv_library_metrics[PV_LANG_COUNT]={
     "遊戲時長：暫無 | 獎盃：暫無",
     "وقت اللعب: غير متاح | الجوائز: غير متاحة"
 };
+static const char *const pv_library_labels[PV_LANG_COUNT][11]={
+{"Game Library","Search games...","All","Search","Filter","Cloud streaming","Status:","Platform:","Game ID:","Unavailable","Check eligibility"},
+{"Game Library","Search games...","All","Search","Filter","Cloud streaming","Status:","Platform:","Game ID:","Unavailable","Check eligibility"},
+{"Biblioteca de jogos","Buscar jogos...","Todos","Buscar","Filtro","Streaming em nuvem","Status:","Plataforma:","ID do jogo:","Indisponível","Verificar acesso"},
+{"Biblioteca de jogos","Pesquisar jogos...","Todos","Pesquisa","Filtro","Streaming na nuvem","Estado:","Plataforma:","ID do jogo:","Indisponível","Verificar acesso"},
+{"Biblioteca de juegos","Buscar juegos...","Todos","Buscar","Filtro","Juego en la nube","Estado:","Plataforma:","ID del juego:","No disponible","Verificar acceso"},
+{"Biblioteca de juegos","Buscar juegos...","Todos","Buscar","Filtro","Juego en la nube","Estado:","Plataforma:","ID del juego:","No disponible","Verificar acceso"},
+{"Spielebibliothek","Spiele suchen...","Alle","Suche","Filter","Cloud-Streaming","Status:","Plattform:","Spiel-ID:","Nicht verfügbar","Zugang prüfen"},
+{"Bibliothèque de jeux","Rechercher...","Tous","Chercher","Filtre","Jeu en streaming","État :","Plateforme :","ID du jeu :","Indisponible","Vérifier accès"},
+{"Libreria giochi","Cerca giochi...","Tutti","Cerca","Filtro","Streaming cloud","Stato:","Piattaforma:","ID gioco:","Non disponibile","Verifica accesso"},
+{"Gamebibliotheek","Zoek games...","Alle","Zoek","Filter","Cloudstreaming","Status:","Platform:","Game-ID:","Niet beschikbaar","Controleer toegang"},
+{"Biblioteka gier","Szukaj gier...","Wszystkie","Szukaj","Filtr","Granie w chmurze","Status:","Platforma:","ID gry:","Niedostępne","Sprawdź dostęp"},
+{"Spelbibliotek","Sök spel...","Alla","Sök","Filter","Molnstreaming","Status:","Plattform:","Spel-ID:","Otillgänglig","Kontrollera åtkomst"},
+{"Oyun kütüphanesi","Oyun ara...","Tümü","Ara","Filtre","Bulut akışı","Durum:","Platform:","Oyun kimliği:","Kullanılamıyor","Erişimi denetle"},
+{"Библиотека игр","Поиск игр...","Все","Поиск","Фильтр","Облачная игра","Статус:","Платформа:","ID игры:","Недоступно","Проверить доступ"},
+{"ゲームライブラリ","ゲームを検索...","すべて","検索","絞込","クラウド配信","状態:","機種:","ゲームID:","利用不可","利用資格を確認"},
+{"게임 라이브러리","게임 검색...","전체","검색","필터","클라우드 스트리밍","상태:","플랫폼:","게임 ID:","사용 불가","이용 자격 확인"},
+{"游戏库","搜索游戏...","全部","搜索","筛选","云串流","状态:","平台:","游戏 ID:","不可用","检查资格"},
+{"遊戲庫","搜尋遊戲...","全部","搜尋","篩選","雲端串流","狀態:","平台:","遊戲 ID:","無法使用","檢查資格"},
+{"مكتبة الألعاب","ابحث عن الألعاب...","الكل","بحث","تصفية","البث السحابي","الحالة:","المنصة:","معرف اللعبة:","غير متاح","تحقق من الأهلية"}
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -360,6 +381,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     if(!v)v=pv_lookup(s,len,pv_ps5_notice,&pv_ps5_notice[lang],1);
     if(!v)v=pv_lookup(s,len,pv_ps5_test,&pv_ps5_test[lang],1);
     if(!v)v=pv_lookup(s,len,pv_library_metrics,&pv_library_metrics[lang],1);
+    if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     if(!v)v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);
     if(!v)v=pv_lookup(s,len,pv_dynamic[0],pv_dynamic[lang],PV_DYNAMIC_COUNT);

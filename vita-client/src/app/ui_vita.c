@@ -34,6 +34,13 @@
 #include <curl/curl.h>
 #include <psp2/sysmodule.h>
 #include <psp2/touch.h>
+#if PLUS_VITA_ADAPTIVE_STREAM
+#include <psp2/rtc.h>
+#include <psp2/power.h>
+#include <psp2/net/netctl.h>
+#include "../platform/cover_download.h"
+#include "library_logo.h"
+#endif
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -64,6 +71,9 @@ typedef struct {
 	PlusVitaFont *font;
 	PlusVitaFont *alternative;
 	PlusVitaBranding *branding;
+#if PLUS_VITA_ADAPTIVE_STREAM
+	uint32_t *library_logo;
+#endif
 } UiDisplay;
 
 /* Never release a buffer until scanout has moved away from it. */
@@ -81,6 +91,9 @@ static bool display_close(UiDisplay *display)
 	plus_vita_font_free(display->alternative);
 	plus_vita_font_free(display->font);
 	plus_vita_branding_free(display->branding);
+#if PLUS_VITA_ADAPTIVE_STREAM
+	free(display->library_logo);
+#endif
 	return true;
 }
 
@@ -110,12 +123,34 @@ static bool display_open(UiDisplay *display)
 #endif
 	if(!display->font) { display_close(display); return false; }
 	display->branding=plus_vita_branding_load("app0:/branding");
+#if PLUS_VITA_ADAPTIVE_STREAM
+	display->library_logo=malloc(128u*128u*sizeof(uint32_t));
+	if(display->library_logo&&!plus_vita_cover_decode(pv_library_logo_jpeg,sizeof(pv_library_logo_jpeg),display->library_logo)){
+		free(display->library_logo);display->library_logo=NULL;
+	}
+#endif
 #if PLUS_VITA_FONT_COMPARISON
 	display->alternative=plus_vita_font_create_alternative("app0:/fonts/NotoSans-Regular.ttf");
 #endif
 	return true;
 }
 
+#if PLUS_VITA_ADAPTIVE_STREAM
+static void library_status(PlusVitaUiFlow *flow)
+{
+	SceDateTime clock={0};
+	bool cv=sceRtcGetCurrentClockLocalTime(&clock)>=0 && clock.hour<24 && clock.minute<60;
+	int battery=scePowerGetBatteryLifePercent(),state=0;
+	bool bv=battery>=0 && battery<=100;
+	bool nk=sceNetCtlInetGetState(&state)>=0, nc=nk&&state==SCE_NETCTL_STATE_CONNECTED;
+	if(flow->clock_valid!=cv || (cv&&(flow->clock_hour!=clock.hour||flow->clock_minute!=clock.minute))
+		|| flow->battery_valid!=bv || (bv&&flow->battery_percent!=(unsigned)battery)
+		|| flow->network_known!=nk || flow->network_connected!=nc)flow->dirty=true;
+	flow->clock_valid=cv;flow->clock_hour=cv?clock.hour:0;flow->clock_minute=cv?clock.minute:0;
+	flow->battery_valid=bv;flow->battery_percent=bv?(unsigned)battery:0;
+	flow->network_known=nk;flow->network_connected=nc;
+}
+#endif
 static bool draw(UiDisplay *display, PlusVitaUiFlow *flow)
 {
 	uint64_t started = plus_vita_latency_now_us();
@@ -317,6 +352,8 @@ int plus_vita_app_run(void)
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	stream_prefs_load(app);
 	PlusVitaAppView saved_prefs=plus_vita_app_view(app);
+ 	flow.library_logo=display->library_logo;
+	uint64_t last_status=0;
 	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
 #endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
@@ -337,6 +374,12 @@ int plus_vita_app_run(void)
 			reported_screen=PLUS_VITA_APP_CLOSED;
 		}
 		PlusVitaAppView current=plus_vita_app_view(app);
+#if PLUS_VITA_ADAPTIVE_STREAM
+		uint64_t status_now=plus_vita_latency_now_us();
+		if(current.screen==PLUS_VITA_APP_CATALOGUE && (!last_status||status_now-last_status>=5000000u||reported_screen!=current.screen)){
+			library_status(&flow);last_status=status_now;
+		}
+#endif
 		if(current.screen!=reported_screen) {
 			plus_vita_diagnostic_event("ui.stage",(int)current.screen);
 			reported_screen=current.screen;

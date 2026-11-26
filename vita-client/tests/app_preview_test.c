@@ -175,8 +175,8 @@ int main(void)
  puts("preview: real transfers, 3000ms boundary, cached dwell, rapid browsing, drag and details return passed");
 }
 #else
-/* The synthetic artwork is a 2:1 red/blue image. The 230x352 well
- * fits it into 230x115 pixels at (410,236), preserving aspect ratio.
+/* The synthetic artwork is a 2:1 red/blue image. The 234x318 well
+ * fits it into 234x117 pixels at (418,222), preserving aspect ratio.
  * Sample both halves away from their shared center and the letterbox. */
 static void assert_preview_art(void)
 {

@@ -74,6 +74,10 @@ typedef struct {
 	unsigned region_mode;
 	unsigned ui_language;
 	unsigned platform_filter;
+	/* Presentation-only data, filled by the native UI, not account metadata. */
+	const uint32_t *library_logo;
+	bool clock_valid, battery_valid, network_known, network_connected;
+	unsigned clock_hour, clock_minute, battery_percent;
 } PlusVitaAppView;
 typedef enum {
 	PLUS_VITA_EVENT_PAD,

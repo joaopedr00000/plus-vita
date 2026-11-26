@@ -9,6 +9,7 @@ static uint32_t pixels[960*544];
 static uint32_t label_colors[2];
 static PlusVitaCoverImage artwork;
 static bool metrics_seen,ps5_seen;
+static uint32_t logo[128*128];
 bool plus_vita_font_draw(PlusVitaFont *font,uint32_t *p,int pitch,const char *value,PlusVitaTextBox box,int size,bool wrap,uint32_t color){
     (void)font;(void)p;(void)pitch;(void)box;(void)size;(void)wrap;
     if(value && !strcmp(value,"First"))label_colors[0]=color;
@@ -34,7 +35,11 @@ int main(void){
     assert(pixels[370*960+80]==VP_GOLD_PRESSED && label_colors[1]==VP_DARK_INK);
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(pixels[108*960+40]==VP_RGB(75,75,78) && pixels[200*960+396]==VP_RGB(75,75,78));
+    assert(pixels[104*960+40]==VP_RGB(75,75,78) && pixels[200*960+395]==VP_RGB(75,75,78));
+    for(unsigned k=0;k<128*128;k++)logo[k]=0xffffffff;
+    v.library_logo=logo;v.clock_valid=true;v.clock_hour=10;v.clock_minute=24;v.battery_valid=true;v.battery_percent=97;v.network_known=true;v.network_connected=true;
+    plus_vita_app_paint(NULL,pixels,960,&v);
+    assert(pixels[25*960+50]==0xffffffff && pixels[15*960+930]==VP_GOLD);
     PlusVitaCatalogEntry game={.name="Synthetic PS5",.platform="PS5",.id="FAKEPPSA1",.launch_id_valid=true,
         .cover_url="https://image.api.playstation.com/test.png"};
     strcpy(artwork.url,game.cover_url);artwork.state=PLUS_VITA_COVER_READY;
