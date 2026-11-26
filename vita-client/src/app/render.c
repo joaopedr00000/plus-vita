@@ -5,6 +5,7 @@
 #include "../platform/build_identity.h"
 #include "../platform/adaptive_stream.h"
 #include "theme.h"
+#include "custom_theme.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
