@@ -288,9 +288,53 @@ static const char *const pv_catalogue_search_hint[PV_LANG_COUNT]={
     "方塊 搜尋 / 三角 篩選 / X 遊玩 / O 返回",
     "مربع بحث / مثلث تصفية / X لعب / O رجوع"
 };
+static const char *const pv_ps5_notice[PV_LANG_COUNT]={
+    "PS5 streaming is not available yet. Support is planned.",
+    "PS5 streaming is not available yet. Support is planned.",
+    "O streaming de PS5 ainda não está disponível. Suporte em desenvolvimento.",
+    "O streaming de PS5 ainda não está disponível. Suporte em desenvolvimento.",
+    "El streaming de PS5 aún no está disponible. Soporte en desarrollo.",
+    "El streaming de PS5 aún no está disponible. Soporte en desarrollo.",
+    "PS5-Streaming noch nicht verfügbar. Unterstützung in Entwicklung.",
+    "Streaming PS5 pas encore disponible. Prise en charge en développement.",
+    "Streaming PS5 non ancora disponibile. Supporto in sviluppo.",
+    "PS5-streaming nog niet beschikbaar. Ondersteuning in ontwikkeling.",
+    "Streaming PS5 jeszcze niedostępny. Obsługa w przygotowaniu.",
+    "PS5-streaming ännu inte tillgänglig. Stöd under utveckling.",
+    "PS5 yayını henüz kullanılamıyor. Destek geliştiriliyor.",
+    "Стриминг PS5 пока недоступен. Поддержка в разработке.",
+    "PS5ストリーミングはまだ利用できません。対応を開発中です。",
+    "PS5 스트리밍은 아직 지원되지 않습니다. 지원 개발 중입니다.",
+    "PS5 串流暂不可用，支持正在开发中。",
+    "PS5 串流尚未開放，支援開發中。",
+    "بث PS5 غير متاح بعد. الدعم قيد التطوير."
+};
+static const char *const pv_ps5_test[PV_LANG_COUNT]={
+    "Experimental test",
+    "Experimental test",
+    "Teste experimental",
+    "Teste experimental",
+    "Prueba experimental",
+    "Prueba experimental",
+    "Experimenteller Test",
+    "Test expérimental",
+    "Test sperimentale",
+    "Experimentele test",
+    "Test eksperymentalny",
+    "Experimentellt test",
+    "Deneysel test",
+    "Экспериментальный тест",
+    "実験的テスト",
+    "실험적 테스트",
+    "实验性测试",
+    "實驗性測試",
+    "اختبار تجريبي"
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     if(!strcmp(s,pv_catalogue_search_hint[0]))return pv_catalogue_search_hint[lang];
+    if(!strcmp(s,pv_ps5_notice[0]))return pv_ps5_notice[lang];
+    if(!strcmp(s,pv_ps5_test[0]))return pv_ps5_test[lang];
     size_t len=strlen(s);
     const char *v=pv_lookup(s,len,pv_text[0],pv_text[lang],PV_TEXT_COUNT);
     if(!v)v=pv_lookup(s,len,pv_extra[0],pv_extra[lang],PV_EXTRA_COUNT);

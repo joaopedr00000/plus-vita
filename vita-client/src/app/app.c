@@ -805,7 +805,7 @@ static void catalogue_view(PlusVitaApp *app)
 	if(app->search[0])v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_CLEAR_SEARCH,"Clear search",320,102,150,42};
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_PLATFORM_FILTER,app->filter_button,514,102,250,42};
 	if(v.detail)v.actions[v.action_count++]=(PlusVitaAppButton){v.detail->launch_id_valid?PLUS_VITA_ACTION_PLAY:PLUS_VITA_ACTION_DISABLED,
-		v.detail->launch_id_valid?"Play":"Play unavailable",514,414,414,48};
+		v.detail->launch_id_valid?(pv_catalog_platform(v.detail->platform)==3?"Experimental test":"Play"):"Play unavailable",514,414,414,48};
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",774,102,154,42};
 	app->view=v;
 #else

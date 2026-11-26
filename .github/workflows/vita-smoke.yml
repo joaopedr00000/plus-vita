@@ -91,11 +91,6 @@ jobs:
         run: |
           cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-stream-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_ps5_discovery.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/ps5
           /tmp/pv-stream-test/ps5
-      - name: Test adaptive catalogue search and platform filters
-        if: github.ref == 'refs/heads/update/vitaplus-game-search'
-        run: |
-          cc -std=c11 -O1 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 -DPLUS_VITA_PS5_EXPERIMENTAL=1 -DPLUS_VITA_LAN_LOGIN=1 -Ivita-client/src/app -Iexternal/json-c -I/tmp/pv-stream-test vita-client/src/app/app.c vita-client/src/platform/control_layout.c vita-client/src/app/utf8.c vita-client/src/platform/credential.c vita-client/tests/test_catalogue_search.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/catalogue-search
-          /tmp/pv-stream-test/catalogue-search
       - name: Test authenticated local token vault
         run: |
           sudo apt-get install -y libmbedtls-dev

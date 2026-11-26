@@ -6,6 +6,7 @@
 #include "theme.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
+#include "catalog_filter.h"
 #endif
 #define WIDTH 960
 #define HEIGHT 544
@@ -126,10 +127,12 @@ void plus_vita_app_paint_with_resources(PlusVitaFont *font,uint32_t *pixels,int 
 		rectangle(display,32,150,446,320,MENU_PANEL);
 		rectangle(display,502,150,426,320,MENU_PANEL);
 		text(display,view->body,522,166,TEXT_HINT,390,30,false,MENU_MUTED);
+		bool ps5=view->detail?pv_catalog_platform(view->detail->platform)==3:view->platform_filter==3;
 		if(view->detail){
-			text(display,view->detail->name,522,210,TEXT_HEADING,390,136,true,MENU_WHITE);
-			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),522,354,TEXT_CONTROL,390,42,false,MENU_ACCENT);
+			text(display,view->detail->name,522,210,TEXT_HEADING,390,ps5?78:136,true,MENU_WHITE);
+			text(display,view->detail->platform[0]?view->detail->platform:localized(display,"Not specified"),522,ps5?290:354,TEXT_CONTROL,390,32,false,MENU_ACCENT);
 		}else text(display,localized(display,view->title?view->title:"No cloud games found."),48,180,TEXT_BODY,408,120,true,MENU_BODY);
+		if(ps5)text(display,localized(display,"PS5 streaming is not available yet. Support is planned."),522,view->detail?324:210,TEXT_COMPACT,390,84,true,MENU_ACCENT);
 		goto draw_actions;
 	}
 #endif

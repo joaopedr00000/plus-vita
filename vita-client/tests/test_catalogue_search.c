@@ -82,6 +82,10 @@ int main(void){
     plus_vita_app_dispatch(a,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.left_x=128,.left_y=128}});
     plus_vita_app_dispatch(a,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD,.pad={.buttons=PLUS_VITA_MENU_TRIANGLE,.left_x=128,.left_y=128}});
     v=plus_vita_app_view(a);assert(v.platform_filter==3&&v.list_total==1&&v.detail&&!strcmp(v.detail->platform,"PS5"));
+    bool experimental=false;
+    for(size_t i=0;i<v.action_count;i++)if(v.actions[i].id==PLUS_VITA_ACTION_PLAY)
+        experimental=!strcmp(v.actions[i].label,"Experimental test");
+    assert(experimental);
     plus_vita_app_destroy(a);
     puts("Catalogue search, combined filters, UTF-8, clear, cancel, focus and shortcuts passed");
     return 0;
