@@ -19,7 +19,6 @@ RESOURCES = {
     'sce_sys/livearea/contents/startup.png': 'vita-client/assets/branding/livearea/startup.png',
     'sce_sys/livearea/contents/template.xml': 'vita-client/assets/branding/livearea/template.xml',
     'branding/splash.pvi': 'vita-client/assets/branding/splash.pvi',
-    'branding/theme-headers.jpg': 'vita-client/assets/branding/theme-headers.jpg',
     'cacert.pem': 'vita-client/cacert.pem',
     'fonts/NotoSans-Regular.ttf': 'vita-client/assets/fonts/NotoSans-Regular.ttf',
     'licenses/opus.txt': 'external/opus-1.6.1/COPYING',

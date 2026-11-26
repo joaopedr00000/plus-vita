@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='plus-vita-publication-') as directory:
     work = Path(directory)
     assert work.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve())
     cases = [
-        ('branding/theme-headers.jpg', baseline['branding/theme-headers.jpg'] + b'fixture', 'package.resource_identity'),
+        ('branding/theme-headers.jpg', b'fixture', 'package.disallowed_resource'),
         ('account.json', b'{}', 'package.disallowed_resource'),
         ('local_probe_ca.der', b'fixture', 'package.disallowed_resource'),
         ('licenses/opus.txt', baseline['licenses/opus.txt']+canary, 'package.private_canary'),

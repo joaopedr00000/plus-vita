@@ -37,29 +37,26 @@ int main(void){
     click(app,PLUS_VITA_ACTION_THEME);
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME);
     assert(v.theme_primary==PV_PRIMARY_DEFAULT&&!v.theme_custom);
-    click(app,PLUS_VITA_ACTION_THEME_PRESETS);
-    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME_PRESETS&&v.action_count==14&&v.actions[0].height>=90&&v.actions[1].x>v.actions[0].x&&v.actions[4].y>v.actions[0].y);
-    assert(pv_theme_art_index(12)==0&&pv_theme_art_index(29)==3&&pv_theme_art_index(11)==5&&pv_theme_art_index(38)==10);
-    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
-    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
-    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_THEME&&v.theme_id==1&&v.theme_primary==pv_presets[1].primary);
-    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
-    PlusVitaAppEffect edit=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
+    assert(v.action_count==6);
+    for(size_t j=0;j<v.action_count;j++)assert(v.actions[j].id!=PLUS_VITA_ACTION_THEME_PRESETS);
+    /* Existing saved colors and wallpaper slot survive the removal of presets. */
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_LOADED,.theme_custom=true,.theme_id=12,.theme_primary=0xc52d29,.theme_secondary=0xc4c8cb,.theme_rotate=true});
+    v=plus_vita_app_view(app);assert(v.theme_id==12&&v.theme_primary==0xc52d29);
+        PlusVitaAppEffect edit=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACTIVATE});
     assert(edit.kind==PLUS_VITA_EFFECT_EDIT_PRIMARY);
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_THEME_ENTERED,.operation=edit.operation,.status=PLUS_VITA_RESULT_OK,.data="0088ff",.data_size=6});
-    v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff&&v.theme_id==1);
+    v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff&&v.theme_id==12);
     click(app,PLUS_VITA_ACTION_WALLPAPERS);
-    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_WALLPAPERS&&strstr(v.body,"01-1.jpg"));
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_WALLPAPERS&&strstr(v.body,"12-1.jpg"));
     click(app,PLUS_VITA_ACTION_WALLPAPER_RELOAD);
     assert(plus_vita_app_view(app).wallpaper_revision==1);
     click(app,PLUS_VITA_ACTION_BACK);
     click(app,PLUS_VITA_ACTION_THEME_RESET);
-    v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT&&v.theme_id==0);
+    v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT&&v.theme_id==12);
     assert(pv_theme_expired(1000000000u+864000u,1000000000u,2,1));
     assert(!pv_theme_expired(1000000000u+864000u,1000000000u,1,1));
     assert(!pv_theme_expired(1000000000u+863999u,1000000000u,2,1));
     assert(!pv_theme_expired(999999999u,1000000000u,2,1));
-    assert(pv_theme_logo_index(1)==0&&pv_theme_logo_index(12)==1&&pv_theme_logo_index(42)==2&&pv_theme_logo_index(2)<0);
     plus_vita_app_destroy(app);
     puts("Streaming profiles, localized labels and menu navigation passed");return 0;
 }

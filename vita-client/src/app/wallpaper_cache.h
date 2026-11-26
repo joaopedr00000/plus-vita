@@ -6,8 +6,6 @@
 #include <pthread.h>
 #define PV_WALL_WIDTH 480u
 #define PV_WALL_HEIGHT 272u
-#define PV_HEADER_WIDTH 96u
-#define PV_HEADER_HEIGHT 72u
 typedef struct {
     pthread_t thread;
     atomic_bool done,cancel;
@@ -19,5 +17,4 @@ typedef struct {
 bool pv_wallpaper_start(PvWallpaperJob *job,unsigned id,unsigned slot,unsigned previous_id);
 bool pv_wallpaper_poll(PvWallpaperJob *job);
 bool pv_wallpaper_close(PvWallpaperJob *job);
-uint32_t *pv_wallpaper_headers(void);
 #endif

@@ -411,7 +411,7 @@ int plus_vita_app_run(void)
 	uint64_t last_status=0,theme_retry=0;
 	PlusVitaAppView saved_theme=saved_prefs;
 	PvWallpaperJob *wall_job=calloc(1,sizeof(*wall_job));
-	uint32_t *wall_pixels=NULL,*theme_headers=pv_wallpaper_headers();
+	uint32_t *wall_pixels=NULL;
 	unsigned wall_id=UINT32_MAX,wall_revision=UINT32_MAX,wall_slot=0,wall_attempts=0,wall_previous=UINT32_MAX;
 	uint64_t wall_next=0,wall_touch_due=0;
 	bool wall_ready=false;
@@ -449,7 +449,6 @@ int plus_vita_app_run(void)
             if(wall_id!=current.theme_id)wall_previous=wall_id;
             wall_id=current.theme_id;wall_revision=current.wallpaper_revision;wall_touch_due=0;
             wall_slot=wall_attempts=0;wall_next=0;wall_ready=false;flow.theme_wallpaper=NULL;flow.dirty=true;
-            flow.theme_wordmark=theme_headers;
         }
         if(wall_job&&pv_wallpaper_poll(wall_job)){
             if(wall_job->id==wall_id&&!atomic_load(&wall_job->cancel)){wall_touch_due=status_now+UINT64_C(86400000000);wall_previous=UINT32_MAX;}
@@ -785,7 +784,7 @@ int plus_vita_app_run(void)
 	bool covers_closed = plus_vita_covers_close(covers);
 #if PLUS_VITA_ADAPTIVE_STREAM
 	if(wall_job&&pv_wallpaper_close(wall_job))free(wall_job);
-	free(wall_pixels);free(theme_headers);
+	free(wall_pixels);
 #endif
 	if(account_closed && storage_closed && play_closed && covers_closed) {
 		if(curl_ready) curl_global_cleanup();

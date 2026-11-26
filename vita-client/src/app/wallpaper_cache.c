@@ -117,10 +117,3 @@ bool pv_wallpaper_close(PvWallpaperJob *j){
     if(j->running)return false;
     free(j->output);j->output=NULL;return true;
 }
-uint32_t *pv_wallpaper_headers(void){
-    size_t n=0;unsigned char *data=read_file("app0:/branding/theme-headers.jpg",&n);
-    if(!data)return NULL;
-    uint32_t *out=malloc(PV_HEADER_WIDTH*PV_HEADER_HEIGHT*sizeof(*out));
-    if(out&&!plus_vita_theme_decode(data,n,out,PV_HEADER_WIDTH,PV_HEADER_HEIGHT,false)){free(out);out=NULL;}
-    free(data);return out;
-}

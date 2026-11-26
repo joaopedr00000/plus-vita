@@ -75,8 +75,8 @@ struct plus_vita_app_t {
 	char locale_label[128];
 	uint32_t theme_primary,theme_secondary;
 	bool theme_custom,theme_rotate;
-	unsigned theme_id,theme_page,wallpaper_revision;
-	char theme_labels[2][128],theme_status[192],theme_page_status[128],wallpaper_help[384];
+	unsigned theme_id,wallpaper_revision;
+	char theme_labels[2][128],theme_status[192],wallpaper_help[384];
 };
 
 static void welcome(PlusVitaApp *app)
@@ -165,16 +165,15 @@ static void theme_view(PlusVitaApp *app,const char *notice)
 {
     snprintf(app->theme_labels[0],sizeof(app->theme_labels[0]),"%s: #%06X",PV_TR("Primary color"),(unsigned)app->theme_primary);
     snprintf(app->theme_labels[1],sizeof(app->theme_labels[1]),"%s: #%06X",PV_TR("Secondary color"),(unsigned)app->theme_secondary);
-    snprintf(app->theme_status,sizeof(app->theme_status),"%s: %s",PV_TR("Active theme"),pv_presets[pv_theme_id(app->theme_id)].name);
+    snprintf(app->theme_status,sizeof(app->theme_status),"%s",PV_TR("Choose your colors and optional wallpaper."));
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_THEME,.title="Appearance",.subtitle="SETTINGS AND HELP",
         .body=notice?notice:app->theme_status,.hint="X  Select     O  Back",
-        .actions={{PLUS_VITA_ACTION_THEME_PRESETS,"Theme presets",64,238,832,32},
-            {PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,276,832,32},
-            {PLUS_VITA_ACTION_SECONDARY,app->theme_labels[1],64,314,832,32},
-            {PLUS_VITA_ACTION_WALLPAPERS,"Wallpaper files",64,352,832,32},
-            {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,390,832,32},
-            {PLUS_VITA_ACTION_THEME_RESET,"Restore original theme",64,428,832,32},
-            {PLUS_VITA_ACTION_BACK,"Back to settings",64,466,832,32}},.action_count=7};
+        .actions={{PLUS_VITA_ACTION_PRIMARY,app->theme_labels[0],64,182,832,44},
+            {PLUS_VITA_ACTION_SECONDARY,app->theme_labels[1],64,234,832,44},
+            {PLUS_VITA_ACTION_WALLPAPERS,"Wallpaper files",64,286,832,44},
+            {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,338,832,44},
+            {PLUS_VITA_ACTION_THEME_RESET,"Restore original theme",64,390,832,44},
+            {PLUS_VITA_ACTION_BACK,"Back to settings",64,442,832,44}},.action_count=6};
 }
 static void wallpapers_view(PlusVitaApp *app)
 {
@@ -186,27 +185,12 @@ static void wallpapers_view(PlusVitaApp *app)
         {PLUS_VITA_ACTION_THEME_ROTATE,app->theme_rotate?"Wallpaper rotation: On":"Wallpaper rotation: Off",64,416,832,36},
         {PLUS_VITA_ACTION_BACK,"Back",64,458,832,36}},.action_count=3};
 }
-static void theme_select(PlusVitaApp *app,unsigned id)
+static void theme_reset(PlusVitaApp *app)
 {
-    app->theme_id=pv_theme_id(id);app->theme_custom=app->theme_id!=0;
-    app->theme_primary=pv_presets[app->theme_id].primary;app->theme_secondary=pv_presets[app->theme_id].secondary;
-}
-static void theme_presets_view(PlusVitaApp *app)
-{
-    const unsigned pages=(PV_THEME_COUNT+1+PV_THEME_PAGE-1)/PV_THEME_PAGE;
-    if(app->theme_page>=pages)app->theme_page=0;
-    snprintf(app->theme_page_status,sizeof(app->theme_page_status),"%s %u/%u - %s",PV_TR("Theme presets"),app->theme_page+1,pages,pv_presets[app->theme_id].name);
-    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_THEME_PRESETS,.title="Theme presets",.subtitle="Appearance",
-        .body=app->theme_page_status,.hint="X  Select     O  Back"};
-    for(unsigned k=0;k<PV_THEME_PAGE;k++){
-        unsigned id=app->theme_page*PV_THEME_PAGE+k;
-        if(id>PV_THEME_COUNT)break;
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,pv_presets[id].name,18+(int)(k%4)*176,126+(int)(k/4)*106,166,98};
-        if(id==app->theme_id)app->view.selected=k;
-    }
-    if(app->theme_page)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PREV,"Previous page",18,452,218,38};
-    if(app->theme_page+1<pages)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_NEXT,"Next page",244,452,218,38};
-    app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",470,452,252,38};
+    /* Preserve the existing wallpaper slot, including legacy IDs, and its
+     * files. Restoring colors must not discard a user's local image. */
+    app->theme_custom=false;
+    app->theme_primary=PV_PRIMARY_DEFAULT;app->theme_secondary=PV_SECONDARY_DEFAULT;
 }
 static void stream_settings_view(PlusVitaApp *app)
 {
@@ -460,7 +444,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		size_t capacity=(size_t)((502-view.list_y+6)/view.row_step);
 		if(!capacity) capacity=1;
 		/* The diagnostic font comparison is a horizontal sample toolbar. */
-		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON || (PLUS_VITA_ADAPTIVE_STREAM && (view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS||view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP))) capacity=view.action_count;
+		if(view.screen==PLUS_VITA_APP_FONT_COMPARISON || (PLUS_VITA_ADAPTIVE_STREAM && (view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP))) capacity=view.action_count;
 		view.list_count=capacity<view.list_total ? capacity : view.list_total;
 		list_viewport(view.list_total,view.list_count,view.focus,&view.list_first);
 		if(view.list_count<view.list_total) {
@@ -472,7 +456,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 		}
 		const PlusVitaAppButton *last=&view.actions[view.action_count-1];
 		view.list_height=last->y+last->height-view.list_y;
-        if(PLUS_VITA_ADAPTIVE_STREAM&&(view.screen==PLUS_VITA_APP_SETTINGS||view.screen==PLUS_VITA_APP_THEME_PRESETS))view.list_height=490-view.list_y;
+        if(PLUS_VITA_ADAPTIVE_STREAM&&(view.screen==PLUS_VITA_APP_SETTINGS))view.list_height=490-view.list_y;
 	}
 	#if PLUS_VITA_ADAPTIVE_STREAM
 	if(view.screen!=PLUS_VITA_APP_DETAILS && ((view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)||(!app->label[0]&&!app->online_id[0])))view.title=pv_translate(app->ui_language,view.title);
@@ -812,7 +796,7 @@ static bool title_matches(const char *title, const char *query)
 
 static bool grid_screen(PlusVitaAppScreen screen)
 {
-    return PLUS_VITA_ADAPTIVE_STREAM&&(screen==PLUS_VITA_APP_SETTINGS||screen==PLUS_VITA_APP_THEME_PRESETS);
+    return PLUS_VITA_ADAPTIVE_STREAM&&(screen==PLUS_VITA_APP_SETTINGS);
 }
 static void grid_navigate(PlusVitaAppView *v,PlusVitaAppPad pad)
 {
@@ -1119,7 +1103,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
     if(event.kind==PLUS_VITA_EVENT_THEME_LOADED){
         if(event.theme_primary<=0xffffffu&&event.theme_secondary<=0xffffffu){
             app->theme_id=pv_theme_id(event.theme_id);app->theme_rotate=event.theme_rotate;
-            app->theme_custom=event.theme_custom||app->theme_id!=0;
+            app->theme_custom=event.theme_custom;
             app->theme_primary=app->theme_custom?event.theme_primary:PV_PRIMARY_DEFAULT;
             app->theme_secondary=app->theme_custom?event.theme_secondary:PV_SECONDARY_DEFAULT;
         }
@@ -1135,7 +1119,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
             theme_view(app,"Invalid color. Enter exactly six hexadecimal digits.");return effect;
         }
         if(primary)app->theme_primary=rgb;else app->theme_secondary=rgb;
-        app->theme_custom=true;theme_view(app,NULL);app->view.selected=primary?1:2;return effect;
+        app->theme_custom=true;theme_view(app,NULL);app->view.selected=primary?0:1;return effect;
     }
 	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
 		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);app->ui_language=pv_language(event.ui_language);return effect;
@@ -1617,7 +1601,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(view->screen==PLUS_VITA_APP_THEME_PRESETS||view->screen==PLUS_VITA_APP_WALLPAPERS){theme_view(app,NULL);return effect;}
+		if(view->screen==PLUS_VITA_APP_WALLPAPERS){theme_view(app,NULL);return effect;}
 		if(app->waiting_for==PLUS_VITA_EFFECT_EDIT_PRIMARY||app->waiting_for==PLUS_VITA_EFFECT_EDIT_SECONDARY){app->pending_operation=0;app->waiting_for=PLUS_VITA_EFFECT_NONE;theme_view(app,NULL);return effect;}
 #endif
 		if(controls_screen(view->screen)) return edit_controls(app,PLUS_VITA_ACTION_BACK);
@@ -1782,18 +1766,6 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		}
 #endif
         else if(action==PLUS_VITA_ACTION_THEME && view->screen==PLUS_VITA_APP_SETTINGS)theme_view(app,NULL);
-        else if(action==PLUS_VITA_ACTION_THEME_PRESETS&&view->screen==PLUS_VITA_APP_THEME){
-            app->theme_page=app->theme_id/PV_THEME_PAGE;theme_presets_view(app);
-        }
-        else if(view->screen==PLUS_VITA_APP_THEME_PRESETS){
-            if(action==PLUS_VITA_ACTION_THEME_PICK){
-                unsigned id=app->theme_page*PV_THEME_PAGE+(unsigned)view->selected;
-                if(id<=PV_THEME_COUNT){theme_select(app,id);theme_view(app,NULL);}
-            }else if(action==PLUS_VITA_ACTION_THEME_NEXT){app->theme_page++;theme_presets_view(app);}
-            else if(action==PLUS_VITA_ACTION_THEME_PREV&&app->theme_page){app->theme_page--;theme_presets_view(app);}
-            else if(action==PLUS_VITA_ACTION_BACK)theme_view(app,NULL);
-            return effect;
-        }
         else if(action==PLUS_VITA_ACTION_WALLPAPERS&&view->screen==PLUS_VITA_APP_THEME)wallpapers_view(app);
         else if(view->screen==PLUS_VITA_APP_WALLPAPERS){
             if(action==PLUS_VITA_ACTION_WALLPAPER_RELOAD){app->wallpaper_revision++;wallpapers_view(app);}
@@ -1802,12 +1774,12 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
             return effect;
         }
         else if(action==PLUS_VITA_ACTION_THEME_ROTATE&&view->screen==PLUS_VITA_APP_THEME){
-            app->theme_rotate=!app->theme_rotate;theme_view(app,NULL);app->view.selected=4;
+            app->theme_rotate=!app->theme_rotate;theme_view(app,NULL);app->view.selected=3;
         }
         else if(view->screen==PLUS_VITA_APP_THEME&&(action==PLUS_VITA_ACTION_PRIMARY||action==PLUS_VITA_ACTION_SECONDARY))
             return operation(app,action==PLUS_VITA_ACTION_PRIMARY?PLUS_VITA_EFFECT_EDIT_PRIMARY:PLUS_VITA_EFFECT_EDIT_SECONDARY,"Enter a color (RRGGBB).",true);
         else if(view->screen==PLUS_VITA_APP_THEME&&action==PLUS_VITA_ACTION_THEME_RESET){
-            theme_select(app,0);app->wallpaper_revision++;theme_view(app,NULL);
+            theme_reset(app);theme_view(app,NULL);
         }
 		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
 		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){

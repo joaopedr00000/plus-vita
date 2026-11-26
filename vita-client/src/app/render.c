@@ -6,7 +6,6 @@
 #include "../platform/adaptive_stream.h"
 #include "theme.h"
 #include "theme_presets.h"
-#include "theme_motifs.h"
 #if PLUS_VITA_ADAPTIVE_STREAM
 #include "i18n.h"
 #include "catalog_filter.h"
@@ -181,67 +180,6 @@ static uint32_t primary(Canvas *d,uint32_t fallback){return d->custom?d->primary
 static uint32_t secondary(Canvas *d,uint32_t fallback){return d->custom?d->secondary:fallback;}
 static uint32_t tint(Canvas *d,uint32_t fallback,unsigned amount){return d->custom?mix(RGB(18,18,20),d->secondary,amount):fallback;}
 static uint32_t readable(Canvas *d,uint32_t fallback){return d->custom?mix(d->primary,RGB(255,255,255),125):fallback;}
-static void theme_motif(Canvas *d,unsigned id,int x,int y,int size,uint32_t color,int thick)
-{
-    if(!id||id>PV_THEME_COUNT)return;
-    const PvThemeMotif *m=&pv_theme_motifs[id];
-    for(unsigned k=0;k<m->count;k++){
-        const PvThemeLine *l=&m->lines[k];
-        line(d,x+l->x0*size/16,y+l->y0*size/16,x+l->x1*size/16,y+l->y1*size/16,thick,color);
-    }
-}
-static void disk(Canvas *d,int cx,int cy,int rad,uint32_t color)
-{
-    for(int y=-rad;y<=rad;y++)for(int x=-rad;x<=rad;x++)if(x*x+y*y<=rad*rad)rectangle(d,cx+x,cy+y,1,1,color);
-}
-static void theme_icon(Canvas *d,const PlusVitaAppView *v,unsigned id,int x,int y,int size)
-{
-    int art=pv_theme_art_index(id);
-    if(art>=0&&v->theme_wordmark){
-        for(int row=0;row<size;row++)for(int col=0;col<size;col++){
-            unsigned sx=(unsigned)(art%4)*24+(unsigned)(col*24/size),sy=(unsigned)(art/4)*24+(unsigned)(row*24/size);
-            rectangle(d,x+col,y+row,1,1,v->theme_wordmark[sy*96+sx]);
-        }
-        return;
-    }
-    uint32_t c=pv_theme_pixel(pv_presets[pv_theme_id(id)].primary),s=pv_theme_pixel(pv_presets[pv_theme_id(id)].secondary);
-    int cx=x+size/2,cy=y+size/2,k=size/4;
-    round_gradient(d,x,y,size,size,7,mix(RGB(15,15,18),c,74),mix(RGB(9,9,11),s,45));
-    if(id==0){
-        if(v->library_logo){for(int row=0;row<size;row++)for(int col=0;col<size;col++)rectangle(d,x+col,y+row,1,1,v->library_logo[(row*128/size)*128+col*128/size]);}
-        else {disk(d,cx,cy-3,k,MENU_WHITE);rounded(d,x+size/5,cy,size*3/5,size/5,MENU_WHITE);}
-    }else if(id==1){
-        /* Compact cloud-shaped Vice City easter egg, never a banner. */
-        disk(d,cx,cy-k/2,k,mix(c,s,120));disk(d,cx-k,cy,k/2,c);disk(d,cx+k,cy,k/2,s);
-        rounded(d,cx-k*2,cy,size-2,size/5,mix(c,s,120));
-        rounded(d,cx-k,cy-k/2,k*2,k,RGB(15,15,20));
-        line(d,cx-k/2,cy-k/2,cx,cy+k/3,2,RGB(255,175,214));line(d,cx,cy+k/3,cx+k/2,cy-k/2,2,RGB(255,175,214));
-        rectangle(d,cx+k-3,cy+k/2,6,8,MENU_ACCENT);
-    }else if(id==7){
-        disk(d,cx,cy,k+3,MENU_WHITE);for(int yy=-k-3;yy<0;yy++)for(int xx=-k-3;xx<=k+3;xx++)if(xx*xx+yy*yy<=(k+3)*(k+3))rectangle(d,cx+xx,cy+yy,1,1,RGB(222,40,39));
-        rectangle(d,cx-k-3,cy-1,2*k+7,3,RGB(20,20,23));disk(d,cx,cy,5,RGB(20,20,23));disk(d,cx,cy,3,MENU_WHITE);
-    }else if(id==17){
-        disk(d,cx,cy,k+3,RGB(255,150,20));for(int j=0;j<4;j++){int xx=cx+(j%2?4:-4),yy=cy+(j/2?4:-4);rectangle(d,xx-2,yy-1,5,3,RGB(187,28,22));rectangle(d,xx-1,yy-2,3,5,RGB(187,28,22));}
-    }else if(id==16){ring(d,cx,cy,k+4,5,RGB(255,216,53));ring(d,cx,cy,k+1,1,RGB(255,249,173));}
-    else if(id==9){rectangle(d,cx-k,cy-k,2*k,2*k,RGB(126,83,51));rectangle(d,cx-k,cy-k,2*k,k/2,RGB(83,176,51));for(int j=0;j<5;j++)rectangle(d,cx-k+j*(k*2/5),cy-k/2+(j%2)*4,3,4,RGB(76,124,39));}
-    else if(id==6){
-        disk(d,cx,cy-3,k+4,RGB(231,45,40));rounded(d,cx-k,cy+1,k*2,k+5,RGB(244,217,170));
-        disk(d,cx-k/2,cy-k/2,4,MENU_WHITE);disk(d,cx+k/2,cy-k/2,4,MENU_WHITE);disk(d,cx,cy-k+1,3,MENU_WHITE);
-        rectangle(d,cx-4,cy+3,2,5,RGB(28,24,24));rectangle(d,cx+3,cy+3,2,5,RGB(28,24,24));
-    }else if(id==19){
-        disk(d,cx,cy,k+4,RGB(226,170,71));rounded(d,cx-k-5,cy+1,(k+5)*2,7,RGB(232,184,84));rectangle(d,cx-k,cy-1,2*k,4,RGB(187,32,40));
-    }else if(id==25){
-        for(int j=0;j<4;j++){disk(d,cx+(j%2?5:-5),cy+(j/2?5:-5),7,RGB(120,205,90));}
-        line(d,cx,cy,cx-3,cy+k+7,3,MENU_WHITE);
-    }else if(id==39){
-        ring(d,cx,cy,k+3,4,MENU_WHITE);disk(d,cx,cy-k-3,4,RGB(230,83,32));disk(d,cx-k-2,cy+k/2,4,RGB(230,83,32));disk(d,cx+k+2,cy+k/2,4,RGB(230,83,32));
-    }else if(id==34||id==40){
-        outline(d,x+5,cy-k+1,size-10,2*k,6,MENU_WHITE,RGB(19,19,22),RGB(19,19,22));rectangle(d,cx-k+3,cy-k+4,2*k-6,2*k-7,c);disk(d,x+9,cy,2,MENU_WHITE);disk(d,x+size-9,cy,2,MENU_WHITE);
-    }else if(id==20){for(int yy=0;yy<4;yy++)for(int xx=0;xx<4;xx++)rectangle(d,x+size/6+xx*(size/6),y+size/6+yy*(size/6),size/6,size/6,((xx+yy)%2)?RGB(15,18,18):RGB(32,170,117));}
-    else if(id==28){ring(d,cx,cy,k+4,5,RGB(78,230,66));ring(d,cx,cy,k-2,3,RGB(172,255,70));ring(d,cx,cy,k/2,2,RGB(95,219,232));}
-    else if(id>=46){ring(d,x+size/4,cy+k/2,k/2+2,3,MENU_WHITE);ring(d,x+size*3/4,cy+k/2,k/2+2,3,MENU_WHITE);line(d,x+size/4,cy+k/2,cx,cy-k/2,3,c);line(d,cx,cy-k/2,x+size*3/4,cy+k/2,3,c);line(d,cx,cy-k/2,cx+k,cy-k,3,MENU_WHITE);}
-    else theme_motif(d,id,x+size/8,y+size/8,size*3/4,mix(c,MENU_WHITE,150),size>40?3:2);
-}
 static void local_wallpaper(Canvas *d,const PlusVitaAppView *v)
 {
     if(!v->theme_wallpaper)return;
@@ -250,8 +188,7 @@ static void local_wallpaper(Canvas *d,const PlusVitaAppView *v)
 }
 static void theme_header(Canvas *d,const PlusVitaAppView *v)
 {
-    if(v->theme_id==1||v->theme_id==2||v->theme_id==12||v->theme_id==42)theme_icon(d,v,v->theme_id,29,6,45);
-    else library_logo(d,v->library_logo);
+    library_logo(d,v->library_logo);
     text(d,"VitaPlus",99,11,TEXT_TITLE,127,39,false,MENU_WHITE);
 }
 static void library_background(Canvas *d)
@@ -291,6 +228,17 @@ static void library_status(Canvas *d,const PlusVitaAppView *v)
 		rectangle(d,927,11,(int)(22u*(v->battery_percent>100?100:v->battery_percent)/100u),10,readable(d,MENU_ACCENT));
 	}
 }
+/* One native button surface for the library and every general menu.
+ * Preserve the library's exact colors, corner radii and focus treatment. */
+static void catalogue_button_surface(Canvas *d,const PlusVitaAppButton *b,bool focus,bool filled,int rad)
+{
+    uint32_t edge=(filled||focus)?primary(d,RGB(255,216,125)):RGB(119,119,123);
+    outline(d,b->x,b->y,b->width,b->height,rad,edge,filled?primary(d,RGB(255,216,126)):RGB(36,36,38),filled?secondary(d,RGB(185,137,44)):RGB(21,21,23));
+}
+static uint32_t catalogue_button_ink(Canvas *d,bool filled)
+{
+    return filled?(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK):MENU_WHITE;
+}
 static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCovers *covers,size_t index)
 {
 	const PlusVitaAppButton *b=&v->actions[index];
@@ -313,9 +261,7 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 	bool active=filter&&(unsigned)(b->id-PLUS_VITA_ACTION_FILTER_ALL)==v->platform_filter;
 	bool play=b->id==PLUS_VITA_ACTION_PLAY;
 	bool filled=active||play||pressed;
-	uint32_t edge=(filled||focus)?primary(d,RGB(255,216,125)):RGB(119,119,123);
-	int rad=filter?14:9;
-	outline(d,b->x,b->y,b->width,b->height,rad,edge,filled?primary(d,RGB(255,216,126)):RGB(36,36,38),filled?secondary(d,RGB(185,137,44)):RGB(21,21,23));
+	catalogue_button_surface(d,b,focus,filled,filter?14:9);
 	const char *label=b->id==PLUS_VITA_ACTION_CLEAR_SEARCH?"X":b->label;
 	if(b->id==PLUS_VITA_ACTION_SEARCH){
 		ring(d,b->x+19,b->y+13,7,2,MENU_MUTED);line(d,b->x+24,b->y+18,b->x+30,b->y+24,2,MENU_MUTED);
@@ -331,7 +277,7 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 		}else text(d,label,cx+15,b->y+8,TEXT_TITLE,b->width-115,38,false,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
 	}else {
 		int inset=filter?15:10;
-		text(d,label,b->x+inset,b->y+3,filter?TEXT_HINT:TEXT_MICRO,b->width-inset-5,b->height-4,false,filled?(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK):MENU_WHITE);
+		text(d,label,b->x+inset,b->y+3,filter?TEXT_HINT:TEXT_MICRO,b->width-inset-5,b->height-4,false,catalogue_button_ink(d,filled));
 	}
 }
 static void footer(Canvas *d,const PlusVitaAppView *v)
@@ -391,49 +337,24 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 }
 /* All non-library screens use the same header, dark cards, ribbons and footer.
  * Hitboxes come from the application model, never from a static screenshot. */
-static void menu_icon(Canvas *d,PlusVitaAppAction id,int x,int y,uint32_t c)
-{
-    if(id==PLUS_VITA_ACTION_THEME||id==PLUS_VITA_ACTION_THEME_PRESETS){disk(d,x,y,11,c);disk(d,x+4,y+4,4,RGB(23,23,25));for(int j=0;j<3;j++)disk(d,x-6+j*5,y-4+(j%2)*3,2,RGB(23,23,25));}
-    else if(id==PLUS_VITA_ACTION_PRIMARY||id==PLUS_VITA_ACTION_SECONDARY){ring(d,x,y+2,9,2,c);line(d,x,y-13,x-7,y-4,2,c);line(d,x,y-13,x+7,y-4,2,c);}
-    else if(id==PLUS_VITA_ACTION_WALLPAPERS){outline(d,x-12,y-9,25,19,3,c,RGB(25,25,27),RGB(25,25,27));disk(d,x+5,y-4,2,c);line(d,x-10,y+7,x-3,y-2,2,c);line(d,x-3,y-2,x+7,y+7,2,c);}
-    else if(id==PLUS_VITA_ACTION_CONTROLS||id==PLUS_VITA_ACTION_CONTROL_LAYOUT){outline(d,x-13,y-8,27,17,7,c,RGB(25,25,27),RGB(25,25,27));line(d,x-7,y-4,x-7,y+4,2,c);line(d,x-11,y,x-3,y,2,c);disk(d,x+6,y-2,2,c);disk(d,x+9,y+3,2,c);}
-    else if(id==PLUS_VITA_ACTION_STREAM_SETTINGS||id==PLUS_VITA_ACTION_REGION){ring(d,x,y,12,2,c);ring(d,x,y,7,2,c);disk(d,x,y,2,c);}
-    else if(id==PLUS_VITA_ACTION_ACCOUNT||id==PLUS_VITA_ACTION_SETUP){ring(d,x,y-5,5,2,c);ring(d,x,y+8,10,2,c);}
-    else if(id==PLUS_VITA_ACTION_SECURITY){outline(d,x-10,y-2,21,14,3,c,RGB(25,25,27),RGB(25,25,27));ring(d,x,y-5,7,2,c);}
-    else if(id==PLUS_VITA_ACTION_REPORTING){line(d,x-13,y,x-7,y,2,c);line(d,x-7,y,x-3,y-10,2,c);line(d,x-3,y-10,x+3,y+10,2,c);line(d,x+3,y+10,x+7,y,2,c);line(d,x+7,y,x+13,y,2,c);}
-    else if(id==PLUS_VITA_ACTION_BACK||id==PLUS_VITA_ACTION_THEME_PREV){line(d,x+7,y,x-7,y,2,c);line(d,x-7,y,x,y-7,2,c);line(d,x-7,y,x,y+7,2,c);}
-    else if(id==PLUS_VITA_ACTION_THEME_NEXT){line(d,x-7,y,x+7,y,2,c);line(d,x+7,y,x,y-7,2,c);line(d,x+7,y,x,y+7,2,c);}
-    else {ring(d,x,y,10,2,c);line(d,x,y-4,x,y+5,2,c);disk(d,x,y-7,1,c);}
-}
 static void menu_card(Canvas *d,const PlusVitaAppView *v,size_t index)
 {
     const PlusVitaAppButton *b=&v->actions[index];
     bool focus=index==v->selected,pressed=v->touch_pressed&&index==v->pressed_index;
-    bool highlighted=focus||pressed;
-    uint32_t border=highlighted?readable(d,MENU_ACCENT):RGB(91,91,96);
-    uint32_t top=highlighted?mix(RGB(20,20,23),primary(d,MENU_ACCENT),96):RGB(34,34,37);
-    uint32_t bot=highlighted?mix(RGB(16,16,18),secondary(d,RGB(185,137,44)),65):RGB(17,17,19);
-    outline(d,b->x,b->y,b->width,b->height,9,border,top,bot);
-    if(highlighted&&b->height>=30)round_gradient(d,b->x+3,b->y+3,b->width-6,2,1,border,mix(border,top,90));
-    if(b->id==PLUS_VITA_ACTION_THEME_PICK){
-        unsigned id=0;for(unsigned j=0;j<=PV_THEME_COUNT;j++)if(!strcmp(b->label,pv_presets[j].name)){id=j;break;}
-        theme_icon(d,v,id,b->x+(b->width-42)/2,b->y+4,42);
-        text(d,b->label,b->x+7,b->y+49,TEXT_HINT,b->width-14,b->height-50,true,MENU_WHITE);
-        if(id==v->theme_id){disk(d,b->x+b->width-14,b->y+13,5,readable(d,MENU_ACCENT));}
-        return;
-    }
-    int icon=b->height>=32&&b->width>=145?1:0;
-    if(icon)menu_icon(d,b->id,b->x+24,b->y+b->height/2,highlighted?readable(d,MENU_ACCENT):MENU_WHITE);
-    int inset=icon?46:12;
-    TextRole role=b->height<32?TEXT_MICRO:b->height<45?TEXT_HINT:TEXT_COMPACT;
-    int y=b->y+(b->height>=60?17:b->height>=40?6:1);
+    /* Same active fill as the library's Play/filter buttons; no extra strokes,
+     * invented symbols, or decorative arrows. Touch and pad hitboxes unchanged. */
+    bool filled=focus||pressed;
+    catalogue_button_surface(d,b,focus,filled,9);
     int reserve=0;
     if(b->id==PLUS_VITA_ACTION_PRIMARY||b->id==PLUS_VITA_ACTION_SECONDARY){
         reserve=64;uint32_t swatch=pv_theme_pixel(b->id==PLUS_VITA_ACTION_PRIMARY?v->theme_primary:v->theme_secondary);
-        outline(d,b->x+b->width-58,b->y+5,44,b->height-10,5,MENU_WHITE,swatch,swatch);
+        outline(d,b->x+b->width-58,b->y+7,44,b->height-14,5,RGB(119,119,123),swatch,swatch);
     }
-    text(d,b->label,b->x+inset,y,role,b->width-inset-12-reserve-(b->height>=45&&reserve==0?16:0),b->y+b->height-y-2,b->height>=46&&b->height<60,MENU_WHITE);
-    if(b->height>=45&&b->width>=180&&reserve==0){line(d,b->x+b->width-20,b->y+b->height/2-5,b->x+b->width-15,b->y+b->height/2,2,MENU_MUTED);line(d,b->x+b->width-15,b->y+b->height/2,b->x+b->width-20,b->y+b->height/2+5,2,MENU_MUTED);}
+    TextRole role=b->height<32?TEXT_MICRO:b->height<40?TEXT_HINT:TEXT_COMPACT;
+    /* Native PVF glyph metrics can be taller than the nominal pixel size.
+     * Leave nearly the entire row available for accents and descenders. */
+    int inset=b->height>=52?8:b->height>=44?5:2;
+    text(d,b->label,b->x+15,b->y+inset,role,b->width-30-reserve,b->height-inset-2,false,catalogue_button_ink(d,filled));
 }
 static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 {
@@ -453,20 +374,9 @@ static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 static void menu_paint(Canvas *d,const PlusVitaAppView *v)
 {
     menu_chrome(d,v);
-    if(v->screen==PLUS_VITA_APP_THEME_PRESETS){
-        text(d,v->body,18,78,TEXT_BODY,704,40,false,MENU_WHITE);
-        outline(d,732,126,212,364,10,RGB(91,91,96),RGB(29,29,32),RGB(14,14,16));
-        text(d,localized(d,"Active theme"),746,142,TEXT_HINT,184,28,false,MENU_MUTED);
-        text(d,pv_presets[pv_theme_id(v->theme_id)].name,746,174,TEXT_BODY,184,56,true,MENU_WHITE);
-        text(d,localized(d,"Primary color"),746,238,TEXT_HINT,184,28,false,MENU_WHITE);
-        text(d,localized(d,"Secondary color"),746,312,TEXT_HINT,184,28,false,MENU_WHITE);
-        char hex[16];snprintf(hex,sizeof(hex),"#%06X",(unsigned)v->theme_primary);outline(d,746,266,184,35,6,RGB(85,85,89),RGB(25,25,28),RGB(18,18,20));rectangle(d,754,273,20,20,pv_theme_pixel(v->theme_primary));text(d,hex,782,271,TEXT_HINT,144,28,false,MENU_WHITE);
-        snprintf(hex,sizeof(hex),"#%06X",(unsigned)v->theme_secondary);outline(d,746,340,184,35,6,RGB(85,85,89),RGB(25,25,28),RGB(18,18,20));rectangle(d,754,347,20,20,pv_theme_pixel(v->theme_secondary));text(d,hex,782,345,TEXT_HINT,144,28,false,MENU_WHITE);
-        text(d,localized(d,"X  Select     O  Back"),746,405,TEXT_HINT,184,68,true,MENU_MUTED);
-    }else if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
+    if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){    }else if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
         outline(d,18,78,508,412,12,RGB(91,91,96),RGB(30,30,33),RGB(14,14,16));
-        menu_icon(d,PLUS_VITA_ACTION_ACCOUNT,58,112,readable(d,MENU_ACCENT));
-        text(d,v->title?v->title:"VitaPlus",84,94,TEXT_TITLE,426,42,false,MENU_WHITE);
+        text(d,v->title?v->title:"VitaPlus",36,94,TEXT_TITLE,474,44,false,MENU_WHITE);
         rectangle(d,32,148,480,1,RGB(73,73,77));
         text(d,v->body,36,165,TEXT_BODY,472,220,true,MENU_BODY);
         if(v->screen==PLUS_VITA_APP_ACCOUNT){
@@ -475,9 +385,8 @@ static void menu_paint(Canvas *d,const PlusVitaAppView *v)
         }
     }else{
         int bottom=v->action_count?v->actions[0].y-8:480;
-        if(bottom>90) {
-            outline(d,18,77,924,bottom-77,9,RGB(62,62,65),RGB(26,26,29),RGB(15,15,17));
-            text(d,v->body,32,85,bottom<150?TEXT_MICRO:TEXT_COMPACT,896,bottom-88,true,MENU_BODY);
+        if(bottom>106&&v->body&&v->body[0]) {
+            text(d,v->body,64,83,bottom<150?TEXT_MICRO:TEXT_COMPACT,832,bottom-85,true,MENU_BODY);
         }
     }
     for(size_t j=0;j<v->action_count;j++)menu_card(d,v,j);

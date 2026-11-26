@@ -9,14 +9,13 @@
 static uint32_t pixels[960*544];
 static uint32_t label_colors[2];
 static PlusVitaCoverImage artwork;
-static bool metrics_seen,ps5_seen,theme_label_seen,status_seen;
+static bool metrics_seen,ps5_seen,status_seen;
 static uint32_t logo[128*128];
 bool plus_vita_font_draw(PlusVitaFont *font,uint32_t *p,int pitch,const char *value,PlusVitaTextBox box,int size,bool wrap,uint32_t color){
     (void)font;(void)p;(void)pitch;(void)box;(void)size;(void)wrap;
     if(value && !strcmp(value,"First"))label_colors[0]=color;
     if(value && !strcmp(value,"Second"))label_colors[1]=color;
     if(value && strstr(value,"Playtime: unavailable"))metrics_seen=true;
-    if(value && !strcmp(value,"Red Dead Redemption 2")){assert(box.height>=45&&color==VP_WHITE);theme_label_seen=true;}
     if(value && !strcmp(value,"97%"))status_seen=true;
     if(value && strstr(value,"PS5 streaming is not available yet"))ps5_seen=true;
     return true;
@@ -29,23 +28,23 @@ int main(void){
         .actions={{PLUS_VITA_ACTION_SETUP,"First",64,300,500,44},{PLUS_VITA_ACTION_SETTINGS,"Second",64,350,500,44}}};
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[64*960+40]==VP_RGB(105,105,109));
-    assert(pixels[300*960+110]==VP_GOLD && label_colors[0]==VP_WHITE);
-    assert(pixels[350*960+110]==VP_RGB(91,91,96) && label_colors[1]==VP_WHITE);
+    assert(pixels[300*960+110]==VP_RGB(255,216,125) && label_colors[0]==VP_DARK_INK);
+    assert(pixels[350*960+110]==VP_RGB(119,119,123) && label_colors[1]==VP_WHITE);
     v.selected=1;v.touch_pressed=true;v.pressed_index=1;
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[300*960+110]==VP_RGB(91,91,96) && label_colors[0]==VP_WHITE);
-    assert(pixels[350*960+110]==VP_GOLD && label_colors[1]==VP_WHITE);
+    assert(pixels[350*960+110]==VP_RGB(255,216,125) && label_colors[1]==VP_DARK_INK);
     v.theme_custom=true;v.theme_primary=0x2277ff;v.theme_secondary=0xa000cc;
     v.selected=0;v.touch_pressed=false;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(label_colors[0]==VP_WHITE && label_colors[1]==VP_WHITE);
+    assert(label_colors[1]==VP_WHITE);
     v.theme_primary=0;v.theme_secondary=0xffffff;
     plus_vita_app_paint(NULL,pixels,960,&v);
-    assert(label_colors[0]==VP_WHITE && label_colors[1]==VP_WHITE);
+    assert(label_colors[1]==VP_WHITE);
     v.theme_custom=false;
-    v.screen=PLUS_VITA_APP_THEME_PRESETS;v.theme_id=3;v.battery_valid=true;v.battery_percent=97;v.action_count=1;
-    v.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_THEME_PICK,"Red Dead Redemption 2",18,126,166,98};
-    plus_vita_app_paint(NULL,pixels,960,&v);assert(theme_label_seen&&status_seen);
+    v.screen=PLUS_VITA_APP_THEME;v.theme_id=12;v.battery_valid=true;v.battery_percent=97;v.action_count=1;
+    v.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_PRIMARY,"First",64,182,832,44};
+    plus_vita_app_paint(NULL,pixels,960,&v);assert(status_seen&&label_colors[0]==VP_DARK_INK);
     v.theme_id=0;
     v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
     plus_vita_app_paint(NULL,pixels,960,&v);
