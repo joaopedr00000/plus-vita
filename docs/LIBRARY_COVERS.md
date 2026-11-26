@@ -1,6 +1,6 @@
-# Library and cover preview — development branch
+# Library and cover preview — VitaPlus v0.0.5
 
-Based on the published v0.0.4. No release replacement.
+Included in v0.0.5, based on v0.0.4. Earlier release packages remain unchanged.
 
 - Compact title library on the left; search and platform filter stay above it.
 - Right panel: cover, title, platform, catalogue identifier (when valid), availability and PS5 warning.
