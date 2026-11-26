@@ -163,7 +163,7 @@ static bool flow_event(PlusVitaUiFlow *flow, PlusVitaAppEvent event, uint64_t sa
 	}
 	if(flow->transition_active && (event.kind==PLUS_VITA_EVENT_TOUCH || event.kind==PLUS_VITA_EVENT_ACTIVATE
 		|| event.kind==PLUS_VITA_EVENT_UP || event.kind==PLUS_VITA_EVENT_DOWN
-		|| event.kind==PLUS_VITA_EVENT_BACK || event.kind==PLUS_VITA_EVENT_SEARCH)) return false;
+		|| event.kind==PLUS_VITA_EVENT_BACK || event.kind==PLUS_VITA_EVENT_SEARCH || event.kind==PLUS_VITA_EVENT_PLATFORM_FILTER)) return false;
 	if(event.kind==PLUS_VITA_EVENT_PAD && (flow->splash_active || flow->splash_release)) {
 		plus_vita_app_dispatch(flow->app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad=event.pad});
 		if(flow->splash_active && (event.pad.buttons&PLUS_VITA_MENU_CROSS)) { finish_splash(flow);return true; }
@@ -175,7 +175,7 @@ static bool flow_event(PlusVitaUiFlow *flow, PlusVitaAppEvent event, uint64_t sa
 		finish_splash(flow);return true;
 	}
 	if(flow->splash_active && (event.kind==PLUS_VITA_EVENT_BACK || event.kind==PLUS_VITA_EVENT_UP
-		|| event.kind==PLUS_VITA_EVENT_DOWN || event.kind==PLUS_VITA_EVENT_SEARCH)) return false;
+		|| event.kind==PLUS_VITA_EVENT_DOWN || event.kind==PLUS_VITA_EVENT_SEARCH || event.kind==PLUS_VITA_EVENT_PLATFORM_FILTER)) return false;
 	if(flow->splash_active && event.kind==PLUS_VITA_EVENT_INTERRUPTED && event.status==PLUS_VITA_RESULT_SLEEP)
 		finish_splash(flow);
 	if(event.kind==PLUS_VITA_EVENT_INTERRUPTED || event.kind==PLUS_VITA_EVENT_PAD_RESET) {
