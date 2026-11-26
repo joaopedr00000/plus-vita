@@ -231,7 +231,8 @@ static void theme_icon(Canvas *d,const PlusVitaAppView *v,unsigned id,int x,int 
     }else if(id==19){
         disk(d,cx,cy,k+4,RGB(226,170,71));rounded(d,cx-k-5,cy+1,(k+5)*2,7,RGB(232,184,84));rectangle(d,cx-k,cy-1,2*k,4,RGB(187,32,40));
     }else if(id==25){
-        for(int j=0;j<4;j++)disk(d,cx+(j%2?5:-5),cy+(j/2?5:-5),7,RGB(120,205,90));line(d,cx,cy,cx-3,cy+k+7,3,MENU_WHITE);
+        for(int j=0;j<4;j++){disk(d,cx+(j%2?5:-5),cy+(j/2?5:-5),7,RGB(120,205,90));}
+        line(d,cx,cy,cx-3,cy+k+7,3,MENU_WHITE);
     }else if(id==39){
         ring(d,cx,cy,k+3,4,MENU_WHITE);disk(d,cx,cy-k-3,4,RGB(230,83,32));disk(d,cx-k-2,cy+k/2,4,RGB(230,83,32));disk(d,cx+k+2,cy+k/2,4,RGB(230,83,32));
     }else if(id==34||id==40){
