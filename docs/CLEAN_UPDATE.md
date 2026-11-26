@@ -20,3 +20,5 @@ The catalogue's existing circular PlayStation button artwork is reused in native
 ## Publication hold and update channels
 
 Official v0.1.0 is blocked until the maintainer confirms actual playable PS5 cloud streaming on physical Vita hardware. A successful CI build is insufficient. Stable accepts regular releases; Beta also accepts official GitHub prereleases tagged vX.Y.Z-bN, displayed X.Y.Z BN, where X.Y.Z is the originating stable version (0.0.6 B1, B2, B3, then 0.0.7 stable). No automatic downgrade. Verified VPKs use ux0:Downloads/. No release authorized by this change.
+
+The updater downloads to a unique temporary .part file in ux0:Downloads, checks size, SHA-256 and VPK title ID PLVTB0001, then replaces the dedicated VitaPlus-update.vpk slot only if the previous file is a recognized VitaPlus package. Unrelated Downloads files are never touched. If promotion fails the VPK is preserved. Native promotion of the running title and reuse of its own installed head.bin require physical-console testing; missing header or promoter error falls back to the retained VPK. No deletion of installed application or account data is attempted.
