@@ -43,6 +43,27 @@ int main(void){
     v=plus_vita_app_view(app);assert(v.theme_custom&&v.theme_primary==0x0088ff);
     click(app,PLUS_VITA_ACTION_THEME_RESET);
     v=plus_vita_app_view(app);assert(!v.theme_custom&&v.theme_primary==PV_PRIMARY_DEFAULT);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_BACK});
+    for(unsigned j=0;j<10;j++)plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+    click(app,PLUS_VITA_ACTION_UPDATES);
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_UPDATES);
+    assert(!strcmp(v.title,"Atualizações"));
+    PvUpdateReport report={.state=PV_UP_AVAILABLE,.automatic=true,.version="0.0.5 B2",.notes="Example notes"};
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UPDATE_REPORT,.update_report=&report});
+    v=plus_vita_app_view(app);assert(strstr(v.body,"0.0.5 B2"));
+    bool download=false;
+    for(size_t j=0;j<v.action_count;j++)if(v.actions[j].id==PLUS_VITA_ACTION_UPDATE_DOWNLOAD)download=true;
+    assert(download);
+    report.state=PV_UP_DOWNLOADING;report.progress=64;
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UPDATE_REPORT,.update_report=&report});
+    v=plus_vita_app_view(app);assert(v.update_downloading&&v.update_progress==64&&v.action_count==1);
+    PlusVitaAppEffect cancel=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_BACK});
+    assert(cancel.kind==PLUS_VITA_EFFECT_UPDATE&&cancel.update_command==PV_UP_CMD_CANCEL);
+    report.state=PV_UP_READY;
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UPDATE_REPORT,.update_report=&report});
+    v=plus_vita_app_view(app);bool install=false;
+    for(size_t j=0;j<v.action_count;j++)if(v.actions[j].id==PLUS_VITA_ACTION_UPDATE_INSTALL)install=true;
+    assert(install);
     plus_vita_app_destroy(app);
     puts("Streaming profiles, localized labels and menu navigation passed");return 0;
 }

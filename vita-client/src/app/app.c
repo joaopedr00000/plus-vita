@@ -131,7 +131,7 @@ static void welcome(PlusVitaApp *app)
 static void settings_view(PlusVitaApp *app)
 {
 	snprintf(app->settings_status, sizeof(app->settings_status), "Version %s.\nSession log: %s.\nYour sign-in files stay on this Vita.",
-		PLUS_VITA_APP_VERSION, app->log_available ? "available at " PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable");
+		PLUS_VITA_DISPLAY_VERSION, app->log_available ? "available at " PLUS_VITA_DIAGNOSTIC_VITA_PATH : "unavailable");
 	app->view = (PlusVitaAppView){ .screen = PLUS_VITA_APP_SETTINGS,
 		.title = "Settings and help.", .subtitle = "VITAPLUS", .body = app->settings_status,
 		.hint = "Left stick  Move     X  Select     O  Back",
@@ -189,7 +189,7 @@ static void update_view(PlusVitaApp *app){
         while(n&&offset+n<len&&((unsigned char)q->notes[offset+n]&0xc0)==0x80)n--;
         memcpy(notes,q->notes+offset,n);
     }
-    snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s%s%s",PV_TR("Installed:"),PLUS_VITA_APP_VERSION,PV_TR(status[st]),q->version[0]?" ":"",q->version);
+    snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s%s%s",PV_TR("Installed:"),PLUS_VITA_DISPLAY_VERSION,PV_TR(status[st]),q->version[0]?" ":"",q->version);
     size_t used=strlen(app->update_body);
     if(!update_busy(q->state)&&notes[0])snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
