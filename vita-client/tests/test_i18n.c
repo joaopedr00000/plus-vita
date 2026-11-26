@@ -66,6 +66,15 @@ int main(void){
         }
         assert(!strcmp(pv_translate(l,"Game title 123"),"Game title 123"));
     }
+    for(unsigned l=0;l<PV_LANG_COUNT;l++)for(unsigned k=0;k<3;k++){
+        assert(pv_region_text[l][k]&&*pv_region_text[l][k]);
+        assert(!strcmp(pv_translate(l,pv_region_text[0][k]),pv_region_text[l][k]));
+        if(l>1)assert(strcmp(pv_region_text[l][k],pv_region_text[0][k]));
+    }
+    assert(!strcmp(pv_translate(2,"Regional discovery (account only): On"),"Busca regional (região da conta): Ativada"));
+    assert(!strcmp(pv_translate(2,"Regional discovery (account only): Off"),"Busca regional (região da conta): Desativada"));
+    assert(!strcmp(pv_translate(2,"Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled."),"A busca regional será aplicada no próximo login, apenas na região da sua conta. A disponibilidade dos jogos é definida pela Sony."));
+    assert(!strcmp(pv_translate(4,"Regional discovery (account only): On"),"Búsqueda regional (región de la cuenta): Activada"));
     assert(!strcmp(pv_translate(2,"Back"),"Voltar"));
     assert(!strcmp(pv_translate(2,"Loading cover"),"Carregando capa"));
     assert(!strcmp(pv_translate(2,"X  Select     O  Back"),"X  Selecionar     O  Voltar"));

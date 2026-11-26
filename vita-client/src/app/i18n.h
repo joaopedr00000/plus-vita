@@ -393,6 +393,27 @@ static const char *const pv_theme_labels[PV_LANG_COUNT][7]={
 {"外觀","主色","輔色","恢復原始主題","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."},
 {"المظهر","اللون الأساسي","اللون الثانوي","استعادة المظهر الأصلي","Choose any RGB color using six hexadecimal digits (RRGGBB).","Invalid color. Enter exactly six hexadecimal digits.","Enter a color (RRGGBB)."}
 };
+static const char *const pv_region_text[PV_LANG_COUNT][3]={
+{"Regional discovery (account only): On","Regional discovery (account only): Off","Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled."},
+{"Regional discovery (account only): On","Regional discovery (account only): Off","Regional discovery applies at next sign-in using your authenticated account region only. Cloud eligibility remains server controlled."},
+{"Busca regional (região da conta): Ativada","Busca regional (região da conta): Desativada","A busca regional será aplicada no próximo login, apenas na região da sua conta. A disponibilidade dos jogos é definida pela Sony."},
+{"Pesquisa regional (região da conta): Ativada","Pesquisa regional (região da conta): Desativada","A pesquisa regional será aplicada no próximo início de sessão, apenas na região da sua conta. A disponibilidade dos jogos é definida pela Sony."},
+{"Búsqueda regional (región de la cuenta): Activada","Búsqueda regional (región de la cuenta): Desactivada","La búsqueda regional se aplica al volver a iniciar sesión, solo en la región de tu cuenta. Sony determina la disponibilidad de los juegos."},
+{"Búsqueda regional (región de la cuenta): Activada","Búsqueda regional (región de la cuenta): Desactivada","La búsqueda regional se aplica al volver a iniciar sesión, solo en la región de tu cuenta. Sony determina la disponibilidad de los juegos."},
+{"Regionale Suche (Kontoregion): An","Regionale Suche (Kontoregion): Aus","Die regionale Suche gilt ab der nächsten Anmeldung nur für deine Kontoregion. Sony bestimmt die Spielverfügbarkeit."},
+{"Recherche régionale (région du compte) : activée","Recherche régionale (région du compte) : désactivée","La recherche régionale s’applique à la prochaine connexion, uniquement dans la région du compte. Sony détermine la disponibilité des jeux."},
+{"Ricerca regionale (regione dell’account): attiva","Ricerca regionale (regione dell’account): disattiva","La ricerca regionale si applica al prossimo accesso, solo nella regione dell’account. Sony determina la disponibilità dei giochi."},
+{"Regionaal zoeken (accountregio): aan","Regionaal zoeken (accountregio): uit","Regionaal zoeken geldt vanaf de volgende aanmelding, alleen in je accountregio. Sony bepaalt de beschikbaarheid van games."},
+{"Wyszukiwanie regionalne (region konta): wł.","Wyszukiwanie regionalne (region konta): wył.","Wyszukiwanie regionalne działa od następnego logowania, tylko w regionie konta. Sony określa dostępność gier."},
+{"Regional sökning (kontoregion): På","Regional sökning (kontoregion): Av","Regional sökning gäller vid nästa inloggning, endast i kontots region. Sony avgör vilka spel som är tillgängliga."},
+{"Bölgesel arama (hesap bölgesi): Açık","Bölgesel arama (hesap bölgesi): Kapalı","Bölgesel arama sonraki oturum açmada yalnızca hesap bölgenize uygulanır. Oyunların kullanılabilirliğini Sony belirler."},
+{"Региональный поиск (регион аккаунта): Вкл.","Региональный поиск (регион аккаунта): Выкл.","Региональный поиск применяется при следующем входе только в регионе аккаунта. Доступность игр определяет Sony."},
+{"地域検索（アカウント地域のみ）：オン","地域検索（アカウント地域のみ）：オフ","地域検索は次回のログインからアカウントの地域にのみ適用されます。ゲームの利用可否はSonyが決定します。"},
+{"지역 검색(계정 지역만): 켜짐","지역 검색(계정 지역만): 꺼짐","지역 검색은 다음 로그인부터 계정 지역에만 적용됩니다. 게임 이용 가능 여부는 Sony에서 결정합니다."},
+{"区域搜索（仅账户地区）：开启","区域搜索（仅账户地区）：关闭","区域搜索将在下次登录时生效，仅适用于账户所在地区。游戏可用性由 Sony 决定。"},
+{"區域搜尋（僅帳戶地區）：開啟","區域搜尋（僅帳戶地區）：關閉","區域搜尋將於下次登入生效，僅適用於帳戶所在區域。遊戲可用性由 Sony 決定。"},
+{"البحث الإقليمي (منطقة الحساب فقط): تشغيل","البحث الإقليمي (منطقة الحساب فقط): إيقاف","يُطبق البحث الإقليمي عند تسجيل الدخول التالي في منطقة الحساب فقط. تحدد Sony توفر الألعاب."}
+};
 static inline const char *pv_translate(unsigned lang,const char *s){
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
@@ -416,6 +437,7 @@ static inline const char *pv_translate(unsigned lang,const char *s){
     /* New catalogue labels must not override established menu/session keys. */
     if(!v)v=pv_lookup(s,len,pv_library_labels[0],pv_library_labels[lang],11);
     if(!v)v=pv_lookup(s,len,pv_theme_labels[0],pv_theme_labels[lang],7);
+    if(!v)v=pv_lookup(s,len,pv_region_text[0],pv_region_text[lang],3);
     return v?v:s;
 }
 #endif
