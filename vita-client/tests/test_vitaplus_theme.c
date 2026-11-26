@@ -55,8 +55,8 @@ int main(void){
     plus_vita_app_paint(NULL,pixels,960,&v);assert(status_seen&&label_colors[0]==VP_DARK_INK);
     v.screen=PLUS_VITA_APP_ACCOUNT;v.body="Account test details";v.actions[0]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",544,93,398,56};
     plus_vita_app_paint(NULL,pixels,960,&v);assert(account_body_seen);
-    v.theme_id=0;
-    v.screen=PLUS_VITA_APP_CATALOGUE;v.action_count=0;
+    /* A catalogue view has its own count in body, not the previous account details. */
+    v=(PlusVitaAppView){.screen=PLUS_VITA_APP_CATALOGUE,.title="No cloud games found.",.body="0 games",.subtitle="Game Library",.hint="Back"};
     plus_vita_app_paint(NULL,pixels,960,&v);
     assert(pixels[104*960+40]==VP_RGB(75,75,78) && pixels[200*960+395]==VP_RGB(75,75,78));
     for(unsigned k=0;k<128*128;k++)logo[k]=0xffffffff;
