@@ -47,7 +47,7 @@ int main(void){
         assert(plus_vita_app_view(app).stream_options==(old^(1u<<j)));
         assert(plus_vita_app_view(app).focus==j&&plus_vita_app_view(app).body&&strlen(plus_vita_app_view(app).body)>50);
     }
-    assert(plus_vita_app_view(app).stream_options==0);
+    assert(plus_vita_app_view(app).stream_options==(PV_OPT_ALL^PV_OPT_DEFAULT));
     /* Test explicit zero preference and independent HUD state. */
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_OPTIONS,.stream_options=0});
     assert(plus_vita_app_view(app).stream_options==0);

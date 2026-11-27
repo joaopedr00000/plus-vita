@@ -21,7 +21,7 @@ static unsigned sequence, output_count, log_delay, slow_output, initial_units;
 static unsigned first_pcm_delay;
 static unsigned native_block, expected_block, open_attempts, period_remainder;
 static bool reject_small_block;
-static unsigned options=PV_OPT_DEFAULT;
+static unsigned options=PV_OPT_ALL; /* Exercise all experimental paths explicitly. */
 static char final_timing[2048], final_summary[1024];
 
 uint64_t sceKernelGetProcessTimeWide(void) { return atomic_load(&now_us); }
@@ -149,7 +149,7 @@ int main(void)
 	reject_small_block=false;
 	uint64_t quality=run("adaptive 15 Mbps / 200ms startup",200000,0,0,false,false,15000);
 	assert(quality<140000 && field(final_summary,"queue_peak=")<=12 && field(final_summary,"dropped=")>0);
-	options=PV_OPT_DEFAULT&~PV_OPT_AUDIO_SMALL;
+	options=PV_OPT_DEFAULT;
     uint64_t large=run("6 Mbps / small audio blocks disabled",200000,0,0,false,false,6000);
     assert(large<110000 && native_block==960);
     options=0;

@@ -15,7 +15,8 @@
 #define PV_OPT_AUDIO_BOUND (1u<<9)
 #define PV_OPT_COUNT 10u
 #define PV_OPT_ALL ((1u<<PV_OPT_COUNT)-1u)
-#define PV_OPT_DEFAULT PV_OPT_ALL
+#define PV_OPT_DEFAULT (PV_OPT_VIDEO_CATCHUP|PV_OPT_AUDIO_ADAPT|PV_OPT_PCM_TRIM|PV_OPT_FAST_INPUT)
+/* Keep new B4 experiments and diagnostic overhead opt-in. */
 static inline bool pv_opt(unsigned flags,unsigned bit){return (flags&bit)!=0;}
 static inline bool pv_options_valid(unsigned flags){return !(flags&~PV_OPT_ALL);}
 static inline unsigned pv_options_sanitize(unsigned flags){return pv_options_valid(flags)?flags:PV_OPT_DEFAULT;}
