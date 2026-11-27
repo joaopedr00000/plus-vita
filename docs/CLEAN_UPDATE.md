@@ -38,3 +38,7 @@ Settings > Streaming > Advanced streaming options provides independent checkboxe
 The advanced streaming screen now uses a catalogue-style split layout: scrollable checkboxes on the left, persistent contextual explanation on the right. Moving focus updates the translated title and explanation without toggling; activating a checkbox preserves focus. Descriptions explain effects, off behavior and experimental caveats; no measured hardware latency is claimed.
 
 B4 automatic push builds are paused at the maintainer's request. The workflow remains manually dispatchable only for this branch; no automatic publication. New default mask and regression fixtures were prepared without running a build. Explicit saved option masks are not overwritten.
+
+## v0.0.6 stable-channel release
+
+Explicit maintainer approval to compile and publish v0.0.6 for B3 internal-updater testing. Source includes B4 options, contextual help, solid indicators and conservative defaults. APP_VER 00.27, title ID PLVTB0001, canonical tag v0.0.6, asset VitaPlus-v0.0.6.vpk and SHA256SUMS.txt. Only the new release branch has a publication job; the original B4 remains paused. Native self-install and PS5 video still require hardware validation. v0.1.0 remains blocked.
