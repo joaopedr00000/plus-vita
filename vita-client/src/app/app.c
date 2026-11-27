@@ -71,6 +71,7 @@ struct plus_vita_app_t {
 	unsigned requested_kbps;
 #endif
 	unsigned region_mode,ui_language;
+	unsigned stream_options;
 	bool regional_catalogue;
 	char locale_label[128];
 	uint32_t theme_primary,theme_secondary;
@@ -235,8 +236,21 @@ static void stream_settings_view(PlusVitaApp *app)
 		.actions={{PLUS_VITA_ACTION_STREAM_LOW,"Low latency - 6 Mbps",64,274,832,40},
 			{PLUS_VITA_ACTION_STREAM_BALANCED,"Balanced - 10 Mbps",64,318,832,40},
 			{PLUS_VITA_ACTION_STREAM_MAX,"Maximum quality - 15 Mbps",64,362,832,40},
-			{PLUS_VITA_ACTION_BACK,"Back to settings",64,406,832,40}},
-		.action_count=4,.selected=profile==6000?0:profile==10000?1:2};
+			{PLUS_VITA_ACTION_STREAM_OPTIONS,"Advanced streaming options",64,406,832,40},
+			{PLUS_VITA_ACTION_BACK,"Back to settings",64,450,832,40}},
+		.action_count=5,.selected=profile==6000?0:profile==10000?1:2};
+}
+static const char *const pv_option_labels[PV_OPT_COUNT]={"Adaptive packet reordering","Adaptive video catch-up","Triple video buffering (experimental)","Adaptive audio buffering","Gentle PCM correction","Smaller audio blocks (experimental)","Fast native gamepad","Worker CPU affinity (experimental)","60-second benchmark","Bounded audio backlog"};
+static const char *const pv_option_help[PV_OPT_COUNT]={"Learn from recovered and expired packets. Off: fixed B3 reorder window.","Prefer recent decoded pictures. Off: original presentation policy; reference protection stays enabled.","Overlap decoding and scanout. Off: synchronous double buffer. Uses extra memory.","Adjust the software audio target after underruns. Off: fixed profile buffer.","Shorten excess PCM by 1-2%. Off: original samples, possible backlog.","512 samples in Low Latency only. Off: 960 samples; native fallback remains.","Cache healthy handheld controller enumeration. Off: full native polling; 4 ms worker stays active.","Allow audio and input worker affinity. Off: scheduler defaults.","Measure local submission-to-display timing after warmup. Not physical input lag.","Limit compressed audio backlog. Off: wider B3 margin; no unbounded queue."};
+static void stream_options_view(PlusVitaApp *app,size_t selected){
+    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_OPTIONS,.title="Advanced streaming options",.subtitle="SETTINGS AND HELP",
+        .body="Toggle individual options. Changes apply to the next stream.",.hint="X  Select     O  Back"};
+    for(unsigned j=0;j<PV_OPT_COUNT;j++)app->view.actions[j]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j),pv_option_labels[j],64,172+(int)j*40,832,34};
+    app->view.actions[PV_OPT_COUNT]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_HUD,"Diagnostic HUD",64,172+(int)PV_OPT_COUNT*40,832,34};
+    app->view.actions[PV_OPT_COUNT+1]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_DEFAULTS,"Restore recommended options",64,172+(int)(PV_OPT_COUNT+1)*40,832,34};
+    app->view.actions[PV_OPT_COUNT+2]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,172+(int)(PV_OPT_COUNT+2)*40,832,34};
+    app->view.action_count=PV_OPT_COUNT+3;
+    app->view.selected=selected<app->view.action_count?selected:0;
 }
 #endif
 
@@ -442,6 +456,7 @@ PlusVitaApp *plus_vita_app_create(void)
 	app->remember = true;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	app->theme_primary=PV_PRIMARY_DEFAULT;app->theme_secondary=PV_SECONDARY_DEFAULT;
+	app->stream_options=PV_OPT_DEFAULT;
 #endif
 	plus_vita_control_layout_defaults(&app->controls);
 	welcome(app);
@@ -460,7 +475,7 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	memcpy(view.artwork_metadata,app->artwork_metadata,sizeof(view.artwork_metadata));
 	view.account_connected=app->connected;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
+	view.stream_profile=pv_profile_cap(app->bitrate_kbps);view.stream_options=app->stream_options;view.stream_hud=app->hud;view.region_mode=app->region_mode;view.ui_language=app->ui_language;
 	view.theme_primary=app->theme_primary;view.theme_secondary=app->theme_secondary;view.theme_custom=app->theme_custom;
 	view.update_progress=app->update.progress;view.update_downloading=app->update.state==PV_UP_DOWNLOADING;
     if(view.screen==PLUS_VITA_APP_ACCOUNT||view.screen==PLUS_VITA_APP_SETUP){
@@ -494,6 +509,11 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	if(view.screen!=PLUS_VITA_APP_DETAILS && ((view.screen!=PLUS_VITA_APP_ACCOUNT&&view.screen!=PLUS_VITA_APP_AUTHORIZING)||(!app->label[0]&&!app->online_id[0])))view.title=pv_translate(app->ui_language,view.title);
 	view.subtitle=pv_translate(app->ui_language,view.subtitle);
 	view.hint=pv_translate(app->ui_language,view.hint);
+	if(view.screen==PLUS_VITA_APP_STREAM_OPTIONS){
+        if(view.focus<PV_OPT_COUNT)view.body=pv_option_help[view.focus];
+        else if(view.focus==PV_OPT_COUNT)view.body="Show streaming performance statistics. Changes apply to the next stream.";
+        else view.body="Toggle individual options. Changes apply to the next stream.";
+    }
 	view.body=pv_translate(app->ui_language,view.body);
 	for(size_t i=0;i<view.action_count;i++)if(view.actions[i].id!=PLUS_VITA_ACTION_GAME&&view.actions[i].id!=PLUS_VITA_ACTION_DATACENTER)view.actions[i].label=pv_translate(app->ui_language,view.actions[i].label);
 	#endif
@@ -1145,6 +1165,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
         if(primary)app->theme_primary=rgb;else app->theme_secondary=rgb;
         app->theme_custom=true;theme_view(app,NULL);app->view.selected=primary?0:1;return effect;
     }
+	if(event.kind==PLUS_VITA_EVENT_STREAM_OPTIONS){app->stream_options=pv_options_sanitize(event.stream_options);return effect;}
 	if(event.kind==PLUS_VITA_EVENT_STREAM_SETTINGS) {
 		app->bitrate_kbps=pv_profile_cap(event.stream_profile);app->hud=event.stream_hud;app->region_mode=pv_region_mode(event.region_mode);app->ui_language=pv_language(event.ui_language);return effect;
 	}
@@ -1451,7 +1472,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			effect.game=app->catalogue[app->matches[app->catalogue_selection]];effect.controls=app->controls;
 			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",app->selected_dc);
 			app->requested_kbps=pv_retry_rate(app->bitrate_kbps,app->requested_kbps);
-			effect.bitrate_kbps=app->requested_kbps;effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;
+			effect.bitrate_kbps=app->requested_kbps;effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;effect.stream_options=app->stream_options;
 			return effect;
 		}
 #endif
@@ -1624,7 +1645,8 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(view->screen==PLUS_VITA_APP_UPDATES){
+		if(view->screen==PLUS_VITA_APP_STREAM_OPTIONS){stream_settings_view(app);return effect;}
+        if(view->screen==PLUS_VITA_APP_UPDATES){
             if(app->update.state==PV_UP_INSTALLING)return effect;
             if(update_busy(app->update.state))return update_effect(app,PV_UP_CMD_CANCEL);
             app->pending_operation=0;settings_view(app);return effect;
@@ -1706,7 +1728,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				effect.game=game; effect.controls=app->controls;
 				snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",app->datacenters[index]);
 				effect.bitrate_kbps=app->bitrate_kbps;
-				effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;
+				effect.profile_kbps=app->bitrate_kbps;effect.hud=app->hud;effect.stream_options=app->stream_options;
 				app->requested_kbps=effect.bitrate_kbps;app->auto_retry=false;
 				snprintf(app->selected_dc,sizeof(app->selected_dc),"%s",effect.datacenter);
 				return effect;
@@ -1723,7 +1745,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 			app->dc_count=app->dc_page=0;app->dc_notice=NULL;app->selected_dc[0]=0;app->auto_retry=false;
 			snprintf(effect.datacenter,sizeof(effect.datacenter),"%s",PLUS_VITA_DC_DISCOVER);
 			effect.bitrate_kbps=app->bitrate_kbps ? app->bitrate_kbps : (PLUS_VITA_ADAPTIVE_STREAM ? 15000 : 8000);
-			effect.profile_kbps=effect.bitrate_kbps;effect.hud=app->hud;
+			effect.profile_kbps=effect.bitrate_kbps;effect.hud=app->hud;effect.stream_options=app->stream_options;
 #endif
 			return effect;
 		}
@@ -1814,6 +1836,15 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
             app->theme_custom=false;app->theme_primary=PV_PRIMARY_DEFAULT;app->theme_secondary=PV_SECONDARY_DEFAULT;theme_view(app,NULL);
         }
 		else if(action==PLUS_VITA_ACTION_STREAM_SETTINGS && view->screen==PLUS_VITA_APP_SETTINGS) stream_settings_view(app);
+        else if(action==PLUS_VITA_ACTION_STREAM_OPTIONS&&view->screen==PLUS_VITA_APP_STREAM_SETTINGS)stream_options_view(app,0);
+        else if(view->screen==PLUS_VITA_APP_STREAM_OPTIONS){
+            size_t selected=view->selected;
+            if(action>=PLUS_VITA_ACTION_OPT_REORDER&&action<=PLUS_VITA_ACTION_OPT_AUDIO_BOUND)app->stream_options^=1u<<(action-PLUS_VITA_ACTION_OPT_REORDER);
+            else if(action==PLUS_VITA_ACTION_OPT_HUD)app->hud=!app->hud;
+            else if(action==PLUS_VITA_ACTION_OPT_DEFAULTS){app->stream_options=PV_OPT_DEFAULT;app->hud=false;}
+            else if(action==PLUS_VITA_ACTION_BACK){stream_settings_view(app);return effect;}
+            stream_options_view(app,selected);return effect;
+        }
 		else if(view->screen==PLUS_VITA_APP_STREAM_SETTINGS && (action==PLUS_VITA_ACTION_STREAM_LOW||action==PLUS_VITA_ACTION_STREAM_BALANCED||action==PLUS_VITA_ACTION_STREAM_MAX)){
 			app->bitrate_kbps=action==PLUS_VITA_ACTION_STREAM_LOW?6000:action==PLUS_VITA_ACTION_STREAM_BALANCED?10000:15000;
 			stream_settings_view(app);

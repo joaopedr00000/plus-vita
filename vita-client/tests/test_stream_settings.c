@@ -23,6 +23,25 @@ int main(void){
     v=plus_vita_app_view(app);assert(v.selected==0 && v.stream_profile==6000 && strstr(v.body,"6 Mbps"));
     click(app,PLUS_VITA_ACTION_STREAM_MAX);
     v=plus_vita_app_view(app);assert(v.selected==2 && v.stream_profile==15000 && strstr(v.body,"15 Mbps"));
+    click(app,PLUS_VITA_ACTION_STREAM_OPTIONS);
+    v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_STREAM_OPTIONS&&v.stream_options==PV_OPT_DEFAULT);
+    assert(!strcmp(v.title,"Opções avançadas de streaming"));
+    for(unsigned j=0;j<PV_OPT_COUNT;j++){
+        PlusVitaAppAction id=(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j);
+        for(unsigned k=0;k<13;k++){
+            v=plus_vita_app_view(app);bool visible=false;
+            for(size_t m=0;m<v.action_count;m++)if(v.actions[m].id==id)visible=true;
+            if(visible)break;
+            plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+        }
+        unsigned old=plus_vita_app_view(app).stream_options;click(app,id);
+        assert(plus_vita_app_view(app).stream_options==(old^(1u<<j)));
+    }
+    assert(plus_vita_app_view(app).stream_options==0);
+    for(unsigned j=0;j<13;j++)plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+    click(app,PLUS_VITA_ACTION_OPT_DEFAULTS);assert(plus_vita_app_view(app).stream_options==PV_OPT_DEFAULT);
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_BACK});
+    assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_STREAM_SETTINGS);
     click(app,PLUS_VITA_ACTION_BACK);
     assert(plus_vita_app_view(app).screen==PLUS_VITA_APP_SETTINGS);
     click(app,PLUS_VITA_ACTION_STREAM_SETTINGS);

@@ -9,6 +9,7 @@
 #include "video_fec.h"
 #include "video_reorder.h"
 #include "adaptive_stream.h"
+#include "stream_options.h"
 #include "diagnostic_log.h"
 #include "feedback_latency.h"
 #include "input_vita.h"
@@ -184,7 +185,7 @@ typedef struct plus_vita_stream_probe_t
 	unsigned int queue_head;
 	unsigned int queue_count;
 	unsigned int queue_peak;
-	unsigned profile_kbps, local_queue_resyncs;
+	unsigned profile_kbps, local_queue_resyncs,options;
 	uint64_t video_rx_bytes;
 	unsigned int incomplete_frames;
 	unsigned int stale_packets;
@@ -1189,7 +1190,7 @@ static void probe_handle_streaminfo(PlusVitaStreamProbe *probe, uint8_t *buf,
 	chiaki_audio_header_load(&output_audio, context.audio_header);
 	if(!probe->capture_only)
 		#if PLUS_VITA_ADAPTIVE_STREAM
-		probe->audio_playback=plus_vita_audio_start_profile(&output_audio,probe->log,probe->profile_kbps);
+		probe->audio_playback=plus_vita_audio_start_options(&output_audio,probe->log,probe->profile_kbps,probe->options);
 #else
 		probe->audio_playback=plus_vita_audio_start(&output_audio,probe->log);
 #endif
@@ -1573,6 +1574,7 @@ static ChiakiErrorCode probe_finish_presentation(PlusVitaStreamProbe *probe,
     if(native_result >= 0)
     {
 #if PLUS_VITA_ADAPTIVE_STREAM
+                    if(pv_opt(probe->options,PV_OPT_BENCHMARK)){
                     if(!s->bench_start)s->bench_start=display_done_us;
                     uint64_t elapsed=display_done_us>=s->bench_start?display_done_us-s->bench_start:0;
                     if(!s->bench_done&&elapsed>=10000000u&&elapsed<70000000u){
@@ -1593,6 +1595,7 @@ static ChiakiErrorCode probe_finish_presentation(PlusVitaStreamProbe *probe,
                             (unsigned long long)plus_vita_latency_percentile_upper(&s->bench,95),
                             (unsigned long long)plus_vita_latency_percentile_upper(&s->bench,99),
                             (unsigned long long)s->bench.max_us,(unsigned long long)plus_vita_latency_percentile_upper(&s->bench_interval,95));
+                    }
                     }
 #endif
     	/* Native output can belong to an earlier AU. These spans
@@ -1635,7 +1638,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #endif
 	unsigned int controller_updates = 0;
 	chiaki_mutex_unlock(&probe->mutex);
-	int native_result = PLUS_VITA_ADAPTIVE_STREAM ? plus_vita_video_present_pipeline_init(&present) : plus_vita_video_present_init(&present);
+	int native_result = PLUS_VITA_ADAPTIVE_STREAM && pv_opt(probe->options,PV_OPT_TRIPLE) ? plus_vita_video_present_pipeline_init(&present) : plus_vita_video_present_init(&present);
 	SceTouchSamplingState rear_sampling_prev = SCE_TOUCH_SAMPLING_STATE_STOP;
 	bool rear_sampling_known = sceTouchGetSamplingState(
 		SCE_TOUCH_PORT_BACK, &rear_sampling_prev) >= 0;
@@ -1659,7 +1662,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #if PLUS_VITA_INPUT_WORKER
 	PlusVitaInputVita input_vita = { .rear_ready = rear_ready, .front_ready = front_ready,
 		.rear_mid_x = rear_mid_x, .rear_mid_y = rear_mid_y, .front_info = front_info,
-		.layout=probe->controls,.layout_ready=true,.fast_native=PLUS_VITA_ADAPTIVE_STREAM,
+		.layout=probe->controls,.layout_ready=true,.fast_native=PLUS_VITA_ADAPTIVE_STREAM&&pv_opt(probe->options,PV_OPT_FAST_INPUT),
 		.controller=probe->input ? probe->input->controller : (PlusVitaController){0} };
 	if(input_vita.controller.external) {
 		input_vita.controller.neutral_required=true;input_vita.controller.ready=false;
@@ -1737,8 +1740,8 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 					rear_ready ? 1 : 0, front_ready ? 1 : 0);
 #if PLUS_VITA_INPUT_WORKER
 				chiaki_mutex_unlock(&probe->mutex);
-				feedback_err = plus_vita_input_worker_start(&input_worker, &controller_feedback,
-					plus_vita_input_vita_read, &input_vita);
+				feedback_err = plus_vita_input_worker_start_options(&input_worker, &controller_feedback,
+					plus_vita_input_vita_read, &input_vita,pv_opt(probe->options,PV_OPT_AFFINITY));
 				probe_preview_lock(probe);
 				if(feedback_err != CHIAKI_ERR_SUCCESS) { err = feedback_err; break; }
 				CHIAKI_LOGI(probe->log, "Stream probe independent input started period_us=%u control_transition_logs=off aggregate_counters=on",
@@ -1867,7 +1870,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 		#if PLUS_VITA_ADAPTIVE_STREAM
 		if(now-hud_at>=1000) {
 			unsigned saved=probe->reorder_saved_frames-hud_saved,expired=probe->reorder_expired_frames+probe->reorder_missing_frames-hud_expired;
-			probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);
+			if(pv_opt(probe->options,PV_OPT_REORDER))probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);
 			unsigned rx=(unsigned)((probe->video_rx_bytes-hud_rx)*8/(now-hud_at));
 			unsigned fps=(unsigned)((uint64_t)(shown.displayed-hud_frames)*1000/(now-hud_at));
 			uint64_t stamp=sceKernelGetProcessTimeWide();
@@ -2024,7 +2027,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #if PLUS_VITA_ADAPTIVE_STREAM
 			uint64_t present_now=sceKernelGetProcessTimeWide();
 			uint64_t oldest=probe->queue_count?probe->queue[probe->queue_head].enqueued_us:present_now;
-			show=pv_present_due(probe->queue_count,present_now>=oldest?present_now-oldest:0,
+			if(pv_opt(probe->options,PV_OPT_VIDEO_CATCHUP))show=pv_present_due(probe->queue_count,present_now>=oldest?present_now-oldest:0,
 				present_now/1000u>=shown.last_display?present_now/1000u-shown.last_display:0,
 				recovery_output||!shown.displayed);
 #endif
@@ -2499,7 +2502,9 @@ ChiakiErrorCode plus_vita_stream_probe_with_pump(const ChiakiCloudProvisionResul
 	if(input)input->playback_started=false;
 	probe.profile_kbps=pv_profile_cap(input?input->profile_kbps:15000);
 #if PLUS_VITA_ADAPTIVE_STREAM
-	probe.video_reorder.grace_us=pv_profile_reorder_initial(probe.profile_kbps);
+	probe.options=input?pv_options_sanitize(input->options):PV_OPT_DEFAULT;
+	probe.video_reorder.grace_us=pv_opt(probe.options,PV_OPT_REORDER)?pv_profile_reorder_initial(probe.profile_kbps):(probe.profile_kbps==6000?16000:probe.profile_kbps==10000?24000:32000);
+	CHIAKI_LOGI(log,"Stream probe options mask=0x%x reorder_initial_us=%u",probe.options,probe.video_reorder.grace_us);
 #endif
 	if(input && plus_vita_control_layout_valid(&input->layout)) probe.controls=input->layout;
 	else plus_vita_control_layout_defaults(&probe.controls);

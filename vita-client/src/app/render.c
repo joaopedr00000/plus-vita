@@ -351,6 +351,13 @@ static void menu_card(Canvas *d,const PlusVitaAppView *v,size_t index)
     bool filled=focus||pressed;
     catalogue_button_surface(d,b,focus,filled,9);
     int reserve=0;
+    if(v->screen==PLUS_VITA_APP_STREAM_OPTIONS&&b->id>=PLUS_VITA_ACTION_OPT_REORDER&&b->id<=PLUS_VITA_ACTION_OPT_HUD){
+        bool checked=b->id==PLUS_VITA_ACTION_OPT_HUD?v->stream_hud:pv_opt(v->stream_options,1u<<(b->id-PLUS_VITA_ACTION_OPT_REORDER));
+        int x=b->x+b->width-44,y=b->y+(b->height-22)/2;reserve=52;
+        uint32_t ink=catalogue_button_ink(d,filled);
+        outline(d,x,y,22,22,4,ink,RGB(27,27,30),RGB(27,27,30));
+        if(checked){rectangle(d,x+5,y+10,5,4,RGB(240,211,111));rectangle(d,x+9,y+8,4,7,RGB(240,211,111));rectangle(d,x+13,y+5,4,8,RGB(240,211,111));}
+    }
     if(b->id==PLUS_VITA_ACTION_PRIMARY||b->id==PLUS_VITA_ACTION_SECONDARY){
         reserve=64;uint32_t swatch=pv_theme_pixel(b->id==PLUS_VITA_ACTION_PRIMARY?v->theme_primary:v->theme_secondary);
         outline(d,b->x+b->width-58,b->y+7,44,b->height-14,5,RGB(119,119,123),swatch,swatch);

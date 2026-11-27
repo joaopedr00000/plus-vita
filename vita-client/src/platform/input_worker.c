@@ -15,7 +15,7 @@ struct PlusVitaInputWorker {
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	pthread_t thread;
-	bool stop;
+	bool stop,affinity;
 	PlusVitaInputStatus status;
 	PlusVitaInputStats stats; /* Worker-owned until join. */
 };
@@ -64,7 +64,7 @@ static void release_controls(PlusVitaInputWorker *w)
 static void *input_thread(void *user)
 {
 	PlusVitaInputWorker *w = user;
-	(void)pv_stream_worker_affinity(false);
+	if(w->affinity)(void)pv_stream_worker_affinity(false);
 	ChiakiControllerState previous;
 	chiaki_controller_state_set_idle(&previous);
 	uint64_t next = plus_vita_latency_now_us(), last_poll = 0;
@@ -145,15 +145,15 @@ static void *input_thread(void *user)
 	return NULL;
 }
 
-ChiakiErrorCode plus_vita_input_worker_start(PlusVitaInputWorker **result,
-	ChiakiFeedbackSender *sender, PlusVitaInputRead read, void *user)
+ChiakiErrorCode plus_vita_input_worker_start_options(PlusVitaInputWorker **result,
+	ChiakiFeedbackSender *sender, PlusVitaInputRead read, void *user,bool affinity)
 {
 	if(!result) return CHIAKI_ERR_INVALID_DATA;
 	*result = NULL;
 	if(!sender || !read) return CHIAKI_ERR_INVALID_DATA;
 	PlusVitaInputWorker *w = calloc(1, sizeof(*w));
 	if(!w) return CHIAKI_ERR_MEMORY;
-	w->sender = sender; w->read = read; w->user = user;
+	w->sender = sender; w->read = read; w->user = user;w->affinity=affinity;
 	if(pthread_mutex_init(&w->mutex, NULL)) { free(w); return CHIAKI_ERR_THREAD; }
 	if(pthread_cond_init(&w->cond, NULL)) goto error_mutex;
 	pthread_attr_t attr;
@@ -171,6 +171,8 @@ error_mutex:
 	free(w);
 	return CHIAKI_ERR_THREAD;
 }
+
+ChiakiErrorCode plus_vita_input_worker_start(PlusVitaInputWorker **result,ChiakiFeedbackSender *sender,PlusVitaInputRead read,void *user){return plus_vita_input_worker_start_options(result,sender,read,user,true);}
 
 PlusVitaInputStatus plus_vita_input_worker_status(PlusVitaInputWorker *w)
 {

@@ -13,6 +13,7 @@ typedef struct {
 	PlusVitaControlLayout layout;
 	PlusVitaController controller;
 	unsigned profile_kbps;
+	unsigned options;
 	bool playback_started;
 	bool hud;
 	void (*paint_hud)(void *context,uint32_t *pixels,const char *line);

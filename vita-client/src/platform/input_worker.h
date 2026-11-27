@@ -36,6 +36,7 @@ typedef struct {
 /* The feedback sender outlives this worker, including stop/join. */
 ChiakiErrorCode plus_vita_input_worker_start(PlusVitaInputWorker **result,
 	ChiakiFeedbackSender *sender, PlusVitaInputRead read, void *user);
+ChiakiErrorCode plus_vita_input_worker_start_options(PlusVitaInputWorker **result,ChiakiFeedbackSender *sender,PlusVitaInputRead read,void *user,bool affinity);
 PlusVitaInputStatus plus_vita_input_worker_status(PlusVitaInputWorker *worker);
 /* Interrupt sleep, join, copy final stats and release ownership. A failed join
  * is retried once; a second failure terminates the process before unsafe teardown.

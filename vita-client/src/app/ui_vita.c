@@ -321,6 +321,17 @@ static bool theme_save(PlusVitaAppView v){
     remove(PV_THEME_PREFS ".tmp");return false;
 }
 #define PV_STREAM_PREFS PV_STREAM_FILE
+static void stream_options_load(PlusVitaApp *app){
+    unsigned flags=PV_OPT_DEFAULT;char buf[80]={0};FILE *f=fopen(PV_STREAM_OPTIONS_FILE,"rb");
+    if(f){size_t n=fread(buf,1,sizeof(buf)-1,f);if(n<sizeof(buf)-1&&feof(f)&&!ferror(f))pv_options_parse(buf,&flags);fclose(f);}
+    plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_OPTIONS,.stream_options=flags});
+}
+static bool stream_options_save(unsigned flags){
+    FILE *f=fopen(PV_STREAM_OPTIONS_FILE ".tmp","wb");if(!f)return false;
+    bool ok=fprintf(f,"1 %u\n",flags)>0;if(fclose(f)!=0)ok=false;
+    if(ok&&rename(PV_STREAM_OPTIONS_FILE ".tmp",PV_STREAM_OPTIONS_FILE)==0)return true;
+    remove(PV_STREAM_OPTIONS_FILE ".tmp");return false;
+}
 static void stream_prefs_load(PlusVitaApp *app)
 {
 	unsigned profile=15000,hud=0,region=0,lang=0;char extra=0;
@@ -417,12 +428,13 @@ int plus_vita_app_run(void)
 	bool metadata_reported=false;
 	PlusVitaAppScreen reported_screen=PLUS_VITA_APP_CLOSED;
 	#if PLUS_VITA_ADAPTIVE_STREAM
-	stream_prefs_load(app);theme_load(app);
+	stream_prefs_load(app);stream_options_load(app);theme_load(app);
 	PlusVitaAppView saved_prefs=plus_vita_app_view(app);
  	flow.library_logo=display->library_logo;
 	uint64_t last_status=0,theme_retry=0;
 	PlusVitaAppView saved_theme=saved_prefs;
 	unsigned saved_profile=saved_prefs.stream_profile,saved_region=saved_prefs.region_mode,saved_lang=saved_prefs.ui_language;bool saved_hud=saved_prefs.stream_hud;
+    unsigned saved_options=saved_prefs.stream_options;uint64_t options_retry=0;
 #endif
 	plus_vita_ui_flow_start(&flow,display->branding,plus_vita_latency_now_us(),log_available);
 	int result = 0;
@@ -436,6 +448,9 @@ int plus_vita_app_run(void)
 			if(theme_save(prefs))saved_theme=prefs;
 			else theme_retry=theme_now+2000000u;
 		}
+		if(prefs.stream_options!=saved_options&&theme_now>=options_retry){
+            if(stream_options_save(prefs.stream_options))saved_options=prefs.stream_options;else options_retry=theme_now+2000000u;
+        }
 		if(prefs.stream_profile!=saved_profile||prefs.stream_hud!=saved_hud||prefs.region_mode!=saved_region||prefs.ui_language!=saved_lang){
 			saved_profile=prefs.stream_profile;saved_hud=prefs.stream_hud;saved_region=prefs.region_mode;saved_lang=prefs.ui_language;stream_prefs_save(saved_profile,saved_hud,saved_region,saved_lang);
 		}
@@ -634,7 +649,7 @@ int plus_vita_app_run(void)
 				else if(effect.kind==PLUS_VITA_EFFECT_PLAY)
 				{
 					session_input.layout=effect.controls;
-					session_input.profile_kbps=effect.profile_kbps;session_input.hud=effect.hud;session_input.playback_started=false;
+					session_input.profile_kbps=effect.profile_kbps;session_input.options=effect.stream_options;session_input.hud=effect.hud;session_input.playback_started=false;
 #if PLUS_VITA_ADAPTIVE_STREAM
 					session_input.paint_hud=performance_hud;session_input.hud_context=display;
 #endif

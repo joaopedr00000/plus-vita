@@ -10,6 +10,7 @@
 
 #include "adaptive_stream.h"
 #include "stream_affinity.h"
+#include "stream_options.h"
 #define AUDIO_QUEUE 32
 #define AUDIO_UNIT_MAX 255
 #define AUDIO_BLOCK 960
@@ -30,7 +31,7 @@ struct plus_vita_audio_playback_t {
 	bool sequence_valid;
 	uint16_t sequence;
 	int16_t block[AUDIO_BLOCK * 2];
-	unsigned fill,block_frames;
+	unsigned fill,block_frames,options;
 	unsigned pcm_peak[2], tone_blocks;
 	uint64_t pcm_samples[2], pcm_nonzero[2], pcm_square_sum[2];
 	/* Arrival counters are updated by the receive callback under mutex. */
@@ -118,7 +119,7 @@ static bool audio_output(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned 
 static void *audio_worker(void *user)
 {
 	PlusVitaAudioPlayback *a = user;
-	CHIAKI_LOGI(a->log,"Stream probe audio affinity result=%d",pv_stream_worker_affinity(true));
+	if(pv_opt(a->options,PV_OPT_AFFINITY))CHIAKI_LOGI(a->log,"Stream probe audio affinity result=%d",pv_stream_worker_affinity(true));
 	CHIAKI_LOGI(a->log, "Stream probe audio worker entered stack=262144; creating decoder");
 	int error;
 	a->decoder = opus_decoder_create(48000, a->channels, &error);
@@ -160,7 +161,7 @@ static void *audio_worker(void *user)
 		pthread_mutex_lock(&a->mutex);
 		#if PLUS_VITA_ADAPTIVE_STREAM
 		if(a->prebuffer_base && !a->count && a->decoded && !a->audio_buffering) {
-			a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,true);
+			if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,true);
 			a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;a->fill=0;
 		}
 		while(!a->stop && a->audio_buffering && a->count<a->prebuffer_target)
@@ -185,7 +186,7 @@ static void *audio_worker(void *user)
 		unsigned target_snapshot=a->prebuffer_target;
 #endif
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(a->prebuffer_base && ++a->clean_audio_units>=2000) {
+		if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT)&&a->prebuffer_base && ++a->clean_audio_units>=2000) {
 			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,false);
 		}
 #endif
@@ -245,7 +246,7 @@ static void *audio_worker(void *user)
 			audio_log_timing(a, "periodic");
 		}
 		#if PLUS_VITA_ADAPTIVE_STREAM
-		unsigned trim=pv_pcm_trim(queue_after_pop,target_snapshot,stable_pcm,(unsigned)n);
+		unsigned trim=pv_opt(a->options,PV_OPT_PCM_TRIM)?pv_pcm_trim(queue_after_pop,target_snapshot,stable_pcm,(unsigned)n):0;
 		n=(int)pv_pcm_shorten(pcm,(unsigned)n,(unsigned)a->channels,trim);
 		#endif
 		if(!audio_output(a, pcm, (unsigned)n)) goto failed;
@@ -258,16 +259,16 @@ failed:
 	return NULL;
 }
 
-PlusVitaAudioPlayback *plus_vita_audio_start_profile(const ChiakiAudioHeader *h, ChiakiLog *log,unsigned cap_kbps)
+PlusVitaAudioPlayback *plus_vita_audio_start_options(const ChiakiAudioHeader *h, ChiakiLog *log,unsigned cap_kbps,unsigned options)
 {
 	CHIAKI_LOGI(log, "Stream probe audio header channels=%u rate=%u bits=%u samples=%u", h->channels, h->rate, h->bits, h->frame_size);
 	if(h->rate != 48000 || h->bits != 16 || h->frame_size != 480 || (h->channels != 1 && h->channels != 2)) return NULL;
 	PlusVitaAudioPlayback *a = calloc(1, sizeof(*a));
 	if(!a) return NULL;
-	a->log = log; a->channels = h->channels; a->port = -1;
+	a->log = log; a->channels = h->channels; a->port = -1;a->options=pv_options_sanitize(options);
 a->block_frames=AUDIO_BLOCK;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	a->block_frames=cap_kbps?pv_audio_block(cap_kbps):AUDIO_BLOCK;
+	a->block_frames=cap_kbps&&pv_opt(a->options,PV_OPT_AUDIO_SMALL)?pv_audio_block(cap_kbps):AUDIO_BLOCK;
 	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
 #else
 	(void)cap_kbps;
@@ -288,6 +289,8 @@ free_cond: pthread_cond_destroy(&a->cond);
 free_mutex: pthread_mutex_destroy(&a->mutex);
 free_audio: free(a); return NULL;
 }
+
+PlusVitaAudioPlayback *plus_vita_audio_start_profile(const ChiakiAudioHeader *h,ChiakiLog *log,unsigned cap_kbps){return plus_vita_audio_start_options(h,log,cap_kbps,PV_OPT_DEFAULT);}
 
 PlusVitaAudioPlayback *plus_vita_audio_start(const ChiakiAudioHeader *h,ChiakiLog *log)
 {
@@ -310,7 +313,7 @@ bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uin
 	a->arrived++;
 	unsigned queue_limit=AUDIO_QUEUE;
 #if PLUS_VITA_ADAPTIVE_STREAM
-	if(a->prebuffer_base)queue_limit=pv_audio_queue_limit(a->prebuffer_target);
+	if(a->prebuffer_base)queue_limit=pv_audio_queue_limit(a->prebuffer_target)+(pv_opt(a->options,PV_OPT_AUDIO_BOUND)?0:1);
 #endif
 	while(a->count >= queue_limit) {
 		unsigned carry = a->queue[a->head].local_drops_before + 1;

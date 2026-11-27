@@ -4,5 +4,6 @@
 typedef struct plus_vita_audio_playback_t PlusVitaAudioPlayback;
 PlusVitaAudioPlayback *plus_vita_audio_start(const ChiakiAudioHeader *header, ChiakiLog *log);
 PlusVitaAudioPlayback *plus_vita_audio_start_profile(const ChiakiAudioHeader *header,ChiakiLog *log,unsigned cap_kbps);
+PlusVitaAudioPlayback *plus_vita_audio_start_options(const ChiakiAudioHeader *header,ChiakiLog *log,unsigned cap_kbps,unsigned options);
 bool plus_vita_audio_push(PlusVitaAudioPlayback *audio, uint16_t sequence, const uint8_t *data, size_t size);
 bool plus_vita_audio_stop(PlusVitaAudioPlayback *audio);
