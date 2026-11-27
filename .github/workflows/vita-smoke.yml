@@ -119,4 +119,13 @@ jobs:
         run: |
           python3 tools/publication_gate.py --vpk build/vita/plus_vita_smoke.vpk
           python3 tools/test-publication-gate.py build/vita/plus_vita_smoke.vpk
-      # Publishing a downloadable VPK remains gated by the privacy audit in #22.
+      # Test candidates only: never upload diagnostics or create a public release here.
+      # The anonymous package and synthetic leak checks above must succeed first.
+      - name: Upload verified VPK for hardware testing
+        if: matrix.release == 'ON' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VitaPlus-test-vpk
+          path: build/vita/plus_vita_smoke.vpk
+          if-no-files-found: error
+          retention-days: 3
