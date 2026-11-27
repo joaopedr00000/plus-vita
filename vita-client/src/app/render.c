@@ -455,7 +455,15 @@ static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 static void menu_paint(Canvas *d,const PlusVitaAppView *v)
 {
     menu_chrome(d,v);
-    if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
+    if(v->screen==PLUS_VITA_APP_STREAM_OPTIONS){
+        outline(d,592,78,348,412,12,RGB(91,91,96),RGB(30,30,33),RGB(14,14,16));
+        text(d,localized(d,"About this option"),608,92,TEXT_HINT,316,30,false,readable(d,MENU_ACCENT));
+        rectangle(d,608,126,316,1,RGB(73,73,77));
+        if(v->selected<v->action_count)text(d,v->actions[v->selected].label,608,137,TEXT_COMPACT,316,74,true,MENU_WHITE);
+        text(d,v->body,608,216,TEXT_HINT,316,226,true,MENU_BODY);
+        rectangle(d,608,450,316,1,RGB(73,73,77));
+        text(d,localized(d,"Applies to the next stream"),608,457,TEXT_MICRO,316,27,false,MENU_MUTED);
+    }else if(v->screen==PLUS_VITA_APP_ACCOUNT||v->screen==PLUS_VITA_APP_SETUP){
         outline(d,18,78,508,412,12,RGB(91,91,96),RGB(30,30,33),RGB(14,14,16));
         text(d,v->title?v->title:"VitaPlus",36,94,TEXT_TITLE,474,44,false,MENU_WHITE);
         rectangle(d,32,148,480,1,RGB(73,73,77));

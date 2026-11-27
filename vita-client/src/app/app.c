@@ -241,14 +241,14 @@ static void stream_settings_view(PlusVitaApp *app)
 		.action_count=5,.selected=profile==6000?0:profile==10000?1:2};
 }
 static const char *const pv_option_labels[PV_OPT_COUNT]={"Adaptive packet reordering","Adaptive video catch-up","Triple video buffering (experimental)","Adaptive audio buffering","Gentle PCM correction","Smaller audio blocks (experimental)","Fast native gamepad","Worker CPU affinity (experimental)","60-second benchmark","Bounded audio backlog"};
-static const char *const pv_option_help[PV_OPT_COUNT]={"Learn from recovered and expired packets. Off: fixed B3 reorder window.","Prefer recent decoded pictures. Off: original presentation policy; reference protection stays enabled.","Overlap decoding and scanout. Off: synchronous double buffer. Uses extra memory.","Adjust the software audio target after underruns. Off: fixed profile buffer.","Shorten excess PCM by 1-2%. Off: original samples, possible backlog.","512 samples in Low Latency only. Off: 960 samples; native fallback remains.","Cache healthy handheld controller enumeration. Off: full native polling; 4 ms worker stays active.","Allow audio and input worker affinity. Off: scheduler defaults.","Measure local submission-to-display timing after warmup. Not physical input lag.","Limit compressed audio backlog. Off: wider B3 margin; no unbounded queue."};
+static const char *const pv_option_help[PV_OPT_COUNT]={"Adapts how long video waits for late packets (4-30 ms, depending on profile and recovery). Less waiting can lower delay; unstable Wi-Fi may need more time. Off: fixed B3 window (16/24/32 ms).","Prioritizes timely decoded pictures when the queue grows, without dropping compressed H.264 references. Try off if motion looks uneven. Error recovery stays active.","Uses a third video surface to overlap decoding and display. Can reduce waiting but uses more video memory. Off: two synchronous buffers. Experimental; automatic two-buffer fallback.","Starts at 40/40/60 ms for the three profiles. Raises the target after underruns, up to 110 ms, and reduces it when stable. Off: fixed target. Try off to compare stutter and delay.","Shortens excess queued PCM by up to 1-2% during stable playback. Can reduce audio delay with small pitch or speed changes. Off: original samples. Startup and refill are excluded.","Uses 512 samples (10.7 ms) instead of 960 (20 ms) in Low Latency only. Can reduce output delay; may increase audio workload. Off or unsupported port: 960 samples.","Reduces repeated controller enumeration for the built-in Vita pad while keeping 4 ms polling. External controllers retain compatibility. Off: full native polling on every read.","Allows audio and input threads to use selected CPU cores. May reduce contention, but benefits depend on scheduling. Off: default scheduler. Experimental.","Records 60 seconds of local video timing after 10 seconds of warmup. Compare mean, P95 and P99 in the logs. Does not measure total button-to-screen latency. Off: no benchmark.","Reduces the compressed audio queue margin by one 10 ms unit to limit accumulated delay. Off: wider B3 margin; both modes keep a bounded queue."};
 static void stream_options_view(PlusVitaApp *app,size_t selected){
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_OPTIONS,.title="Advanced streaming options",.subtitle="SETTINGS AND HELP",
         .body="Toggle individual options. Changes apply to the next stream.",.hint="X  Select     O  Back"};
-    for(unsigned j=0;j<PV_OPT_COUNT;j++)app->view.actions[j]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j),pv_option_labels[j],64,172+(int)j*40,832,34};
-    app->view.actions[PV_OPT_COUNT]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_HUD,"Diagnostic HUD",64,172+(int)PV_OPT_COUNT*40,832,34};
-    app->view.actions[PV_OPT_COUNT+1]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_DEFAULTS,"Restore recommended options",64,172+(int)(PV_OPT_COUNT+1)*40,832,34};
-    app->view.actions[PV_OPT_COUNT+2]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,172+(int)(PV_OPT_COUNT+2)*40,832,34};
+    for(unsigned j=0;j<PV_OPT_COUNT;j++)app->view.actions[j]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j),pv_option_labels[j],24,86+(int)j*40,542,34};
+    app->view.actions[PV_OPT_COUNT]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_HUD,"Diagnostic HUD",24,86+(int)PV_OPT_COUNT*40,542,34};
+    app->view.actions[PV_OPT_COUNT+1]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_DEFAULTS,"Restore recommended options",24,86+(int)(PV_OPT_COUNT+1)*40,542,34};
+    app->view.actions[PV_OPT_COUNT+2]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",24,86+(int)(PV_OPT_COUNT+2)*40,542,34};
     app->view.action_count=PV_OPT_COUNT+3;
     app->view.selected=selected<app->view.action_count?selected:0;
 }
@@ -511,8 +511,9 @@ PlusVitaAppView plus_vita_app_view(const PlusVitaApp *app) {
 	view.hint=pv_translate(app->ui_language,view.hint);
 	if(view.screen==PLUS_VITA_APP_STREAM_OPTIONS){
         if(view.focus<PV_OPT_COUNT)view.body=pv_option_help[view.focus];
-        else if(view.focus==PV_OPT_COUNT)view.body="Show streaming performance statistics. Changes apply to the next stream.";
-        else view.body="Toggle individual options. Changes apply to the next stream.";
+        else if(view.focus==PV_OPT_COUNT)view.body="Shows streaming statistics over the game image, including FPS, bitrate and local video timing. Turn off for an unobstructed picture. Changes apply next session.";
+        else if(view.focus==PV_OPT_COUNT+1)view.body="Restores all B4 optimization checkboxes to their recommended defaults and disables the diagnostic HUD. Does not change bitrate, controls, account or theme.";
+        else view.body="Returns to the streaming profiles. Options are saved automatically and used the next time you start a stream.";
     }
 	view.body=pv_translate(app->ui_language,view.body);
 	for(size_t i=0;i<view.action_count;i++)if(view.actions[i].id!=PLUS_VITA_ACTION_GAME&&view.actions[i].id!=PLUS_VITA_ACTION_DATACENTER)view.actions[i].label=pv_translate(app->ui_language,view.actions[i].label);

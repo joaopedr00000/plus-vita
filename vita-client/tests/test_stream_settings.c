@@ -26,6 +26,15 @@ int main(void){
     click(app,PLUS_VITA_ACTION_STREAM_OPTIONS);
     v=plus_vita_app_view(app);assert(v.screen==PLUS_VITA_APP_STREAM_OPTIONS&&v.stream_options==PV_OPT_DEFAULT);
     assert(!strcmp(v.title,"Opções avançadas de streaming"));
+    assert(strstr(v.body,"4 a 30 ms")&&v.actions[0].width==542);
+    const char *last_help=v.body;
+    for(unsigned j=1;j<PV_OPT_COUNT+3;j++){
+        plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_DOWN});
+        v=plus_vita_app_view(app);assert(v.focus==j&&v.body&&strlen(v.body)>50&&strcmp(v.body,last_help));
+        assert(v.stream_options==PV_OPT_DEFAULT);last_help=v.body;
+    }
+    for(unsigned j=0;j<PV_OPT_COUNT+3;j++)plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_UP});
+    assert(plus_vita_app_view(app).focus==0);
     for(unsigned j=0;j<PV_OPT_COUNT;j++){
         PlusVitaAppAction id=(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j);
         for(unsigned k=0;k<13;k++){
@@ -36,6 +45,7 @@ int main(void){
         }
         unsigned old=plus_vita_app_view(app).stream_options;click(app,id);
         assert(plus_vita_app_view(app).stream_options==(old^(1u<<j)));
+        assert(plus_vita_app_view(app).focus==j&&plus_vita_app_view(app).body&&strlen(plus_vita_app_view(app).body)>50);
     }
     assert(plus_vita_app_view(app).stream_options==0);
     /* Test explicit zero preference and independent HUD state. */
