@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define AUTH_URL_PREFIX "https://ca.account.sony.com/api/v1/oauth/authorize?smcid=pc%3Apsnow&applicationId=psnow&response_type=code&scope=kamaji%3Acommerce_native%20kamaji%3Acommerce_container%20kamaji%3Alists%20kamaji%3As2s.subscriptionsPremium.get&client_id=bc6b0777-abb5-40da-92ca-e133cf18e989&redirect_uri=https%3A%2F%2Fpsnow.playstation.com%2Fapp%2F2.2.0%2F133%2F5cdcc037d%2Fgrc-response.html&service_entity=urn%3Aservice-entity%3Apsn&prompt=none&renderMode=mobilePortrait&hidePageElements=forgotPasswordLink&displayFooter=none&disableLinks=qriocityLink&mid=PSNOW&duid="
 #define AUTH_URL_SUFFIX "&layout_type=popup&service_logo=ps&tp_psn=true&noEVBlock=true"
@@ -201,6 +202,12 @@ static const char *infer_catalog_platform(const char *id)
 	return "Unknown";
 }
 
+static bool catalog_owned(struct json_object *row){
+    struct json_object *owned=NULL,*feature=NULL;
+    return json_object_object_get_ex(row,"isOwned",&owned)&&json_object_is_type(owned,json_type_boolean)&&json_object_get_boolean(owned)
+        &&(!json_object_object_get_ex(row,"feature_type",&feature)||json_object_get_int(feature)!=1);
+}
+
 static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 	struct json_object *item)
 {
@@ -214,6 +221,7 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 	result->native_titles = grown;
 	PlusVitaCatalogEntry *entry = &grown[result->native_titles_count++];
 	memset(entry, 0, sizeof(*entry));
+	entry->in_library=catalog_owned(item);
 	const char *name = catalog_string(item, name_keys);
 	const char *id = catalog_string(item, id_keys);
 	const char *platform = catalog_string(item, platform_keys);
@@ -305,17 +313,29 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 			static const char *const platform_keys[]={"platform",NULL};
 			static const char *const stream_keys[]={"streamIdentifier",NULL};
 			static const char *const category_keys[]={"category",NULL};
+            static const char *const product_keys[]={"productId","product_id",NULL};
+            static const char *const catalog_keys[]={"catalogProductId",NULL};
 			for(size_t i=0;i<json_object_array_length(games) && result->native_titles_count<4096;i++) {
 				struct json_object *row=json_object_array_get_idx(games,i);
 				if(!row || !json_object_is_type(row,json_type_object)) continue;
 				const char *service=catalog_string(row,service_keys), *platform=catalog_string(row,platform_keys);
 				const char *stream=catalog_string(row,stream_keys), *category=catalog_string(row,category_keys);
+                /* Do not change the proven PS3/PS4 launch identifiers. Match
+                 * only exact provider identifiers and an identical platform.
+                 * Do not expose purchase-only rows as playable cloud games. */
+                if(service&&!strcmp(service,"psnow")&&platform&&(!strcmp(platform,"ps3")||!strcmp(platform,"ps4"))&&catalog_owned(row)&&category&&(!strcmp(category,"owned")||!strcmp(category,"streamable"))){
+                    const char *pid=catalog_string(row,product_keys),*cat=catalog_string(row,catalog_keys);
+                    for(unsigned n=0;n<result->native_titles_count;n++){
+                        PlusVitaCatalogEntry *existing=&result->native_titles[n];
+                        if(!strcasecmp(existing->platform,platform)&&((pid&&!strcmp(existing->id,pid))||(cat&&!strcmp(existing->id,cat))||(stream&&!strcmp(existing->id,stream))))existing->in_library=true;
+                    }
+                }
 				if(!service || strcmp(service,"pscloud") || !platform || strcmp(platform,"ps5")
 					|| !category || (strcmp(category,"owned") && strcmp(category,"streamable"))
 					|| !plus_vita_cloud_identifier_valid(stream)) continue;
 				bool duplicate=false;
 				for(unsigned n=0;n<result->native_titles_count;n++)
-					if(!strcmp(result->native_titles[n].ps5_stream_id,stream)) duplicate=true;
+					if(!strcmp(result->native_titles[n].ps5_stream_id,stream)){duplicate=true;if(catalog_owned(row))result->native_titles[n].in_library=true;}
 				if(duplicate) continue;
 				if(!append_catalog_entry(result,row)) {complete=false;break;}
 				PlusVitaCatalogEntry *entry=&result->native_titles[result->native_titles_count-1];
@@ -493,9 +513,17 @@ static void fetch_owned_entitlements(const PlusVitaCredential *credential,
 			ok = false;
 		unsigned int page_count = ok
 			? (unsigned int)json_object_array_length(entitlements) : 0;
-		for(unsigned int i = 0; i < page_count; i++)
-			if(entitlement_is_game(json_object_array_get_idx(entitlements, i)))
-				result->owned_game_count++;
+        for(unsigned int i=0;i<page_count;i++){
+            struct json_object *ent=json_object_array_get_idx(entitlements,i);
+            if(!entitlement_is_game(ent))continue;
+            result->owned_game_count++;
+            struct json_object *pid=NULL,*ft=NULL;
+            if(!json_object_object_get_ex(ent,"product_id",&pid)||!json_object_is_type(pid,json_type_string)||
+               !json_object_object_get_ex(ent,"feature_type",&ft)||!json_object_is_type(ft,json_type_int)||json_object_get_int(ft)<=1)continue;
+            const char *id=json_object_get_string(pid);
+            if(!id||(size_t)json_object_get_string_len(pid)!=strlen(id))continue;
+            for(unsigned n=0;n<result->native_titles_count;n++)if(!strcmp(result->native_titles[n].id,id)&&result->native_titles[n].launch_id_valid)result->native_titles[n].in_library=true;
+        }
 		result->owned_entitlement_count += page_count;
 		result->owned_page_count++;
 		if(root) json_object_put(root);
@@ -508,6 +536,7 @@ static void fetch_owned_entitlements(const PlusVitaCredential *credential,
 		}
 		if(page_count < OWNED_PAGE_SIZE)
 			break;
+        if(page==199)result->owned_complete=false;
 	}
 	secure_clear(bearer, strlen(bearer));
 	free(bearer);

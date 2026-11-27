@@ -2,6 +2,7 @@
 #include "updater_vita.h"
 #include "update_policy.h"
 #include "update_package.h"
+#include "update_head.h"
 #include "curl_resolve.h"
 #include <curl/curl.h>
 #include <json_object.h>
@@ -39,6 +40,9 @@ struct PvUpdater {
     PvUpdateReport report;
     Candidate candidate;
     PvUpdateState result;
+    unsigned install_stage;
+    int install_error;
+    bool install_unsafe;
 };
 typedef struct {PvUpdater *u;FILE *file;char *mem;size_t cap,used;long status;bool progress;} Sink;
 static bool is_dir(const char *p){struct stat s;return stat(p,&s)==0&&S_ISDIR(s.st_mode);}
@@ -200,48 +204,89 @@ static PvUpdateState download(PvUpdater *u){
     if(!ok){unlink(part);c->path[0]=0;return PV_UP_ERROR;}
     strcpy(c->path,VPK);return PV_UP_READY;
 }
-/* The installed homebrew's promoter header belongs to this same title.
- * Prefer the installed header rather than embedding a foreign package blob.
- * If unavailable, fail closed and preserve the VPK for VitaShell. */
-static bool stage_header(const char *root){
-    char folder[180],path[200];
-    snprintf(folder,sizeof(folder),"%s/sce_sys/package",root);
-    if(!ensure_dir(folder))return false;
-    snprintf(path,sizeof(path),"%s/head.bin",folder);
-    FILE *in=fopen("app0:sce_sys/package/head.bin","rb");if(!in)return false;
-    int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
-    if(fd<0){fclose(in);return false;}
-    FILE *out=fdopen(fd,"wb");if(!out){close(fd);fclose(in);return false;}
-    unsigned char buf[4096];size_t total=0;bool ok=true;
-    while(ok){size_t n=fread(buf,1,sizeof(buf),in);if(!n)break;total+=n;ok=total<=65536&&fwrite(buf,1,n,out)==n;}
-    ok=ok&&!ferror(in)&&total>=256;fclose(in);if(fclose(out)!=0)ok=false;
-    return ok;
+/* Prepare the same-title native header again, using the target SFO content
+ * identifier. A missing template fails safely; VitaShell remains the fallback. */
+static uint32_t sfo_le(const unsigned char *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
+static bool read_small(const char *p,unsigned char *buf,size_t cap,size_t *n){
+    FILE *f=fopen(p,"rb");if(!f)return false;
+    *n=fread(buf,1,cap,f);bool ok=!ferror(f)&&*n<cap&&feof(f);fclose(f);return ok;
 }
+static bool sfo_value(const unsigned char *b,size_t n,const char *wanted,char *out,size_t cap){
+    if(n<20||memcmp(b,"\0PSF",4))return false;
+    uint32_t keys=sfo_le(b+8),data=sfo_le(b+12),count=sfo_le(b+16);
+    if(count>128||20u+count*16u>keys||keys>=data||data>n)return false;
+    for(uint32_t j=0;j<count;j++){
+        const unsigned char *e=b+20+j*16;uint32_t ko=e[0]|(unsigned)e[1]<<8,len=sfo_le(e+4),off=sfo_le(e+12);
+        if(ko>=data-keys||off>n-data||len>n-data-off)return false;
+        const char *key=(const char *)b+keys+ko;if(!memchr(key,0,data-keys-ko))return false;
+        if(!strcmp(key,wanted)){
+            if(!len||len>cap||!memchr(b+data+off,0,len))return false;
+            memcpy(out,b+data+off,len);return true;
+        }
+    }
+    return false;
+}
+static bool sha1(const unsigned char *data,size_t n,unsigned char out[20]){
+    const mbedtls_md_info_t *md=mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
+    return md&&mbedtls_md(md,data,n,out)==0;
+}
+static bool stage_header(const char *root,char appver[16]){
+    char folder[180],path[200],content[48]={0},title[16]={0};
+    unsigned char sfo[8192];size_t n=0;
+    snprintf(path,sizeof(path),"%s/sce_sys/param.sfo",root);
+    if(!read_small(path,sfo,sizeof(sfo),&n)||!sfo_value(sfo,n,"TITLE_ID",title,sizeof(title))||strcmp(title,"PLVTB0001")||!sfo_value(sfo,n,"APP_VER",appver,16))return false;
+    if(!sfo_value(sfo,n,"CONTENT_ID",content,sizeof(content))||!content[0])
+        snprintf(content,sizeof(content),"EP9000-%s_00-0000000000000000",title);
+    /* Only our own homebrew identity is accepted. */
+    if(!strstr(content,"-PLVTB0001_")||strlen(content)>=sizeof(content))return false;
+    unsigned char *h=malloc(65537);if(!h)return false;
+    bool ok=read_small("app0:sce_sys/package/head.bin",h,65537,&n)&&pv_head_rebuild(h,n,content,sha1);
+    snprintf(folder,sizeof(folder),"%s/sce_sys/package",root);
+    if(ok)ok=ensure_dir(folder);
+    snprintf(path,sizeof(path),"%s/head.bin",folder);
+    if(ok){
+        int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
+        if(fd<0)ok=false;
+        else {FILE *out=fdopen(fd,"wb");if(!out){close(fd);ok=false;}else {ok=fwrite(h,1,n,out)==n;if(fclose(out)!=0)ok=false;}}
+    }
+    free(h);return ok;
+}
+static PvUpdateState install_fail(PvUpdater *u,unsigned stage,int code){u->install_stage=stage;u->install_error=code;return PV_UP_ERROR;}
 static PvUpdateState install(PvUpdater *u){
-    Candidate *c=&u->candidate;char actual[65];
-    if(!c->path[0]||!hash_file(c->path,actual,c->size)||strcmp(actual,c->hash))return PV_UP_ERROR;
+    Candidate *c=&u->candidate;char actual[65],appver[16]={0};
+    if(!c->path[0]||!hash_file(c->path,actual,c->size)||strcmp(actual,c->hash))return install_fail(u,1,-1);
     char root[128];snprintf(root,sizeof(root),STAGE_ROOT "/UpdateStage-%llu",(unsigned long long)sceKernelGetProcessTimeWide());
-    if(mkdir(root,0700)!=0)return PV_UP_ERROR;
-    if(!pv_update_unpack(c->path,root)||!stage_header(root)){pv_update_clean_stage(root);return PV_UP_ERROR;}
+    if(mkdir(root,0700)!=0)return install_fail(u,2,-errno);
+    if(!pv_update_unpack(c->path,root)){pv_update_clean_stage(root);return install_fail(u,3,-1);}
+    if(!stage_header(root,appver)){pv_update_clean_stage(root);return install_fail(u,4,-1);}
     uint32_t args[]={0x180000u,UINT32_MAX,UINT32_MAX,1,UINT32_MAX,UINT32_MAX};int paf_result=-1;
     SceSysmoduleOpt opt={.flags=sizeof(SceSysmoduleOpt),.result=&paf_result,.unused={-1,-1}};
-    if(sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF,sizeof(args),args,&opt)<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PAF)<0){pv_update_clean_stage(root);return PV_UP_ERROR;}
-    if(sceSysmoduleLoadModuleInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL)<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL)<0){pv_update_clean_stage(root);return PV_UP_ERROR;}
-    int rc=scePromoterUtilityInit();if(rc<0){pv_update_clean_stage(root);return PV_UP_ERROR;}
-    rc=scePromoterUtilityPromotePkgWithRif(root,0);
+    int rc=sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF,sizeof(args),args,&opt);
+    if(rc<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PAF)<0){pv_update_clean_stage(root);return install_fail(u,5,rc);}
+    rc=sceSysmoduleLoadModuleInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL);
+    if(rc<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL)<0){pv_update_clean_stage(root);return install_fail(u,6,rc);}
+    rc=scePromoterUtilityInit();if(rc<0){pv_update_clean_stage(root);return install_fail(u,7,rc);}
+    /* VitaShell's homebrew promotion mode uses 1. No uninstall, app deletion
+     * or direct overwrite of the live application files is attempted. */
+    rc=scePromoterUtilityPromotePkgWithRif(root,1);
+    unsigned stage=8;
     if(rc>=0){
         int state=1;uint64_t start=sceKernelGetProcessTimeWide();
         while(state){
             rc=scePromoterUtilityGetState(&state);if(rc<0)break;
-            if(state&&sceKernelGetProcessTimeWide()-start>180000000ull)return PV_UP_ERROR;
+            if(state&&sceKernelGetProcessTimeWide()-start>180000000ull){u->install_unsafe=true;return install_fail(u,9,-1);}
             if(state)sceKernelDelayThread(100000);
         }
-        if(rc>=0){int result=-1;rc=scePromoterUtilityGetResult(&result);if(rc>=0)rc=result;}
-        if(state&&rc<0)return PV_UP_ERROR;
+        if(rc<0&&state){u->install_unsafe=true;return install_fail(u,9,rc);}
+        if(rc>=0){int result=-1;rc=scePromoterUtilityGetResult(&result);if(rc>=0)rc=result;stage=10;}
     }
     scePromoterUtilityExit();
     pv_update_clean_stage(root);
-    if(rc<0)return PV_UP_ERROR;
+    if(rc<0)return install_fail(u,stage,rc);
+    /* Keep the verified VPK if the running process cannot observe the new
+     * installed version; report ambiguity rather than claiming success. */
+    unsigned char sfo[8192];size_t n=0;char installed[16]={0};
+    if(!read_small("ux0:app/PLVTB0001/sce_sys/param.sfo",sfo,sizeof(sfo),&n)||!sfo_value(sfo,n,"APP_VER",installed,sizeof(installed))||strcmp(installed,appver))return install_fail(u,11,-1);
     if(hash_file(c->path,actual,c->size)&&!strcmp(actual,c->hash))unlink(c->path);
     return PV_UP_INSTALLED;
 }
@@ -284,6 +329,8 @@ bool pv_updater_command(PvUpdater *u,PvUpdateCommand cmd,unsigned lang){
         u->dirty=true;return true;
     }
     if((cmd==PV_UP_CMD_DOWNLOAD&&u->report.state!=PV_UP_AVAILABLE)||(cmd==PV_UP_CMD_INSTALL&&u->report.state!=PV_UP_READY)){u->dirty=true;return false;}
+    if(cmd==PV_UP_CMD_INSTALL&&u->install_unsafe)return false;
+    u->install_stage=0;u->install_error=0;u->report.install_stage=0;u->report.install_error=0;
     u->command=cmd;u->lang=lang;atomic_store(&u->cancel,false);atomic_store(&u->done,false);atomic_store(&u->progress,0);u->last_progress=0;
     u->report.progress=0;u->report.state=cmd==PV_UP_CMD_CHECK?PV_UP_CHECKING:cmd==PV_UP_CMD_DOWNLOAD?PV_UP_DOWNLOADING:PV_UP_INSTALLING;
     pthread_attr_t attr;int rc=pthread_attr_init(&attr);
@@ -301,6 +348,7 @@ bool pv_updater_poll(PvUpdater *u,PvUpdateReport *out){
             PvVersion v;if(u->result==PV_UP_AVAILABLE&&pv_version_parse(u->candidate.tag,&v)){pv_version_display(v,u->report.version);strcpy(u->report.notes,u->candidate.notes);}
         }
         if(u->result==PV_UP_READY)strcpy(u->report.file,u->candidate.path);
+        u->report.install_stage=u->install_stage;u->report.install_error=u->install_error;
         u->dirty=true;
     }
     unsigned p=atomic_load(&u->progress);if(p!=u->last_progress){u->last_progress=p;u->report.progress=p;u->dirty=true;}

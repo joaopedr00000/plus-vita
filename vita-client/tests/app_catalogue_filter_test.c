@@ -17,15 +17,15 @@ int main(void){
  const char json[]="{\"npsso\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
  PlusVitaAppEffect auth=plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_ACCOUNT_LOADED,.operation=load.operation,.data=json,.data_size=sizeof(json)-1});
  PlusVitaCatalogEntry entries[]={
- {.name="Alpha",.id="SYNTHETIC3",.platform="PS3",.launch_id_valid=true},
+ {.name="Alpha",.id="SYNTHETIC3",.platform="PS3",.launch_id_valid=true,.in_library=true},
  {.name="Beta",.id="SYNTHETIC4",.platform="ps4",.launch_id_valid=true},
- {.name="Gamma",.id="SYNTHETIC5",.platform="PS5",.launch_id_valid=true,.ps5_stream_id="synthetic-stream"},
+ {.name="Gamma",.id="SYNTHETIC5",.platform="PS5",.launch_id_valid=true,.ps5_stream_id="synthetic-stream",.in_library=true},
  {.name="Unknown",.id="SYNTHETIC0"}};
- plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_AUTHORIZED,.operation=auth.operation,.entries=entries,.entry_count=4});
+ plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_AUTHORIZED,.operation=auth.operation,.entries=entries,.entry_count=4,.library_complete=true});
  PlusVitaAppView v=plus_vita_app_view(app);
  assert(v.screen==PLUS_VITA_APP_CATALOGUE && v.list_total==4 && v.platform_filter==0);
  assert(v.actions[v.list_count].id==PLUS_VITA_ACTION_SEARCH);
- assert(v.action_count==v.list_count+7);
+ assert(v.action_count==v.list_count+8);
  tap(app,PLUS_VITA_ACTION_FILTER_PS3);v=plus_vita_app_view(app);
  assert(v.list_total==1 && v.platform_filter==1 && !strcmp(v.detail->name,"Alpha"));
  send(app,PLUS_VITA_EVENT_PLATFORM_FILTER);v=plus_vita_app_view(app);
@@ -36,6 +36,9 @@ int main(void){
  assert(play.kind==PLUS_VITA_EFFECT_PLAY && !strcmp(play.game.id,"SYNTHETIC5") && !strcmp(play.game.ps5_stream_id,"synthetic-stream"));
  plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,.operation=play.operation,.status=PLUS_VITA_RESULT_OK});
  v=plus_vita_app_view(app);assert(v.platform_filter==3 && v.list_total==1);
+ send(app,PLUS_VITA_EVENT_PLATFORM_FILTER);v=plus_vita_app_view(app);
+ assert(v.platform_filter==4&&v.list_total==2&&v.detail->in_library);
+ assert(!strcmp(v.detail->name,"Alpha"));
  tap(app,PLUS_VITA_ACTION_FILTER_ALL);v=plus_vita_app_view(app);
  assert(v.platform_filter==0 && v.list_total==4);
  plus_vita_app_destroy(app);

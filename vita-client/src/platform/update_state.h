@@ -8,6 +8,8 @@ typedef struct {
     PvUpdateState state;
     bool beta,automatic;
     unsigned progress;
+    unsigned install_stage;
+    int install_error;
     char version[40],notes[4096],file[200];
 } PvUpdateReport;
 #endif

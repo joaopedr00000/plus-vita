@@ -72,7 +72,7 @@ struct plus_vita_app_t {
 #endif
 	unsigned region_mode,ui_language;
 	unsigned stream_options;
-	bool regional_catalogue;
+	bool regional_catalogue,library_complete;
 	char locale_label[128];
 	uint32_t theme_primary,theme_secondary;
 	bool theme_custom;
@@ -192,7 +192,11 @@ static void update_view(PlusVitaApp *app){
     }
     snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s%s%s",PV_TR("Installed:"),PLUS_VITA_DISPLAY_VERSION,PV_TR(status[st]),q->version[0]?" ":"",q->version);
     size_t used=strlen(app->update_body);
-    if(!update_busy(q->state)&&notes[0])snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
+    if(q->state==PV_UP_ERROR&&q->install_stage){
+        snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s %u / 0x%08X\n%s",PV_TR("Installer stage:"),q->install_stage,(unsigned)q->install_error,PV_TR("Update installation failed; verified VPK retained."));
+        used=strlen(app->update_body);
+    }
+    if(!update_busy(q->state)&&notes[0]&&!q->install_stage)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
     if(update_busy(q->state)){
         app->view.hint=q->state==PV_UP_INSTALLING?"Please wait":"O  Cancel";
@@ -812,7 +816,7 @@ static void clear_runtime(PlusVitaApp *app)
 	free(app->catalogue);
 	app->catalogue = NULL;
 	app->catalogue_count = app->catalogue_selection = 0; app->catalogue_first=0;
-	app->regional_catalogue=false;
+	app->regional_catalogue=false;app->library_complete=false;
 	memset(app->label, 0, sizeof(app->label));
 	memset(app->online_id, 0, sizeof(app->online_id));
 	memset(app->store_country, 0, sizeof(app->store_country));
@@ -868,7 +872,7 @@ static void filter_catalogue(PlusVitaApp *app)
 	app->matches_count = 0;
 	for(size_t i=0;i<app->catalogue_count;i++){
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(pv_catalog_matches(app->platform_filter,app->catalogue[i].platform) && title_matches(app->catalogue[i].name,app->search))
+		if(pv_catalog_entry_matches(app->platform_filter,app->catalogue[i].platform,app->catalogue[i].in_library) && title_matches(app->catalogue[i].name,app->search))
 #else
 		if(title_matches(app->catalogue[i].name,app->search))
 #endif
@@ -902,12 +906,13 @@ static void catalogue_view(PlusVitaApp *app)
 		v.selected=app->catalogue_selection-v.list_first;
 		v.detail=&app->catalogue[app->matches[app->catalogue_selection]];
 	}
-	if(!v.detail)v.title=app->search[0]?"No search results.":"No cloud games found.";
+	if(!v.detail)v.title=app->platform_filter==4?(app->search[0]?"No search results.":app->library_complete?"No library games found.":"Library unavailable or incomplete. Sign in again."):(app->search[0]?"No search results.":"No cloud games found.");
+    if(app->platform_filter==4)v.subtitle=app->library_complete?"MY LIBRARY - CLOUD TITLES":"MY LIBRARY - RESULTS MAY BE INCOMPLETE";
 	if(app->search_focus||!v.list_count)v.selected=v.action_count;
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_SEARCH,app->search_button,21,62,app->search[0]?238:288,32};
 	if(app->search[0])v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_CLEAR_SEARCH,"Clear search",263,62,46,32};
-	for(unsigned filter=0;filter<4;filter++)
-		v.actions[v.action_count++]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+filter),PV_TR(filter?pv_catalog_filter_name(filter):"All"),343+(int)filter*80,64,70,28};
+	for(unsigned filter=0;filter<5;filter++)
+		v.actions[v.action_count++]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+filter),PV_TR(filter?pv_catalog_filter_name(filter):"All"),343+(int)filter*80,64,filter==4?174:70,28};
 	if(v.detail)v.actions[v.action_count++]=(PlusVitaAppButton){v.detail->launch_id_valid?PLUS_VITA_ACTION_PLAY:PLUS_VITA_ACTION_DISABLED,
 		v.detail->launch_id_valid?(pv_catalog_platform(v.detail->platform)==3?"Experimental test":"Play"):"Play unavailable",672,386,264,46};
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",866,500,80,36};
@@ -983,7 +988,7 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 #endif
 	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
 		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
-		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?"Portal":"PC");
+		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?"PC (PS5)":"PC");
 }
 
 static void attach_stream_diagnostic(PlusVitaApp *app)
@@ -1410,7 +1415,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 				account_error(app, "The catalogue could not be loaded. Please try again later.");
 			else
 			{
-				app->regional_catalogue=event.regional_catalogue;
+				app->regional_catalogue=event.regional_catalogue;app->library_complete=event.library_complete;
 				memcpy(app->store_country,event.store_country,sizeof(app->store_country));
 				memcpy(app->store_language,event.store_language,sizeof(app->store_language));
 				memcpy(app->language,event.language,sizeof(app->language));
@@ -1701,7 +1706,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(action==PLUS_VITA_ACTION_SEARCH) return plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_SEARCH});
 		else if(action==PLUS_VITA_ACTION_PLATFORM_FILTER) return plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLATFORM_FILTER});
 #if PLUS_VITA_ADAPTIVE_STREAM
-		else if(action>=PLUS_VITA_ACTION_FILTER_ALL && action<=PLUS_VITA_ACTION_FILTER_PS5 && view->screen==PLUS_VITA_APP_CATALOGUE){
+		else if(action>=PLUS_VITA_ACTION_FILTER_ALL && action<=PLUS_VITA_ACTION_FILTER_OWNED && view->screen==PLUS_VITA_APP_CATALOGUE){
 			app->platform_filter=(unsigned)(action-PLUS_VITA_ACTION_FILTER_ALL);app->search_focus=false;
 			filter_catalogue(app);catalogue_view(app);return effect;
 		}

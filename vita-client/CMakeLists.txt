@@ -21,7 +21,7 @@ option(PLUS_VITA_FINAL_004 "Package VitaPlus search and latency update as v0.0.4
 option(PLUS_VITA_FINAL_005 "Package VitaPlus library update as v0.0.5" OFF)
 option(PLUS_VITA_FINAL_005_2 "Package VitaPlus reference layout as v0.0.5-2" OFF)
 option(PLUS_VITA_FINAL_010 "Package VitaPlus v0.1.0" OFF)
-option(PLUS_VITA_FINAL_006 "Package VitaPlus v0.0.6 stable" OFF)
+option(PLUS_VITA_TEST_006_B1 "Package VitaPlus v0.0.6 B1 public beta" OFF)
 set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
@@ -147,13 +147,13 @@ if(PLUS_VITA_FINAL_010)
   set(VITA_VERSION "01.00")
   set(PLUS_VITA_PUBLIC_VERSION "v0.1.0")
 endif()
-if(PLUS_VITA_FINAL_006)
+if(PLUS_VITA_TEST_006_B1)
   if(NOT PLUS_VITA_FINAL_005_2 OR PLUS_VITA_FINAL_010)
-    message(FATAL_ERROR "v0.0.6 requires the v0.0.5-2 profile and excludes v0.1.0")
+    message(FATAL_ERROR "v0.0.6 B1 requires the v0.0.5-2 profile and excludes v0.1.0")
   endif()
-  set(VITA_VERSION "00.27")
-  set(PLUS_VITA_PUBLIC_VERSION "v0.0.6")
-  set(PLUS_VITA_DISPLAY_VERSION "0.0.6")
+  set(VITA_VERSION "00.28")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.0.6-b1")
+  set(PLUS_VITA_DISPLAY_VERSION "0.0.6 B1")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -723,6 +723,16 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     message(FATAL_ERROR "Pylux PS5 HTTP identity patch point not found")
   endif()
   string(REPLACE "${PV_PS5_UA_OLD}" "${PV_PS5_UA_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Con v0.5.2 prefers session-issued PS5 OAuth client IDs when valid.
+  # Retain the initial IDs if absent/invalid; never accept arbitrary URL text.
+  set(PV_CLIENT_OLD [=[if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } json_object_put(j); }]=])
+  set(PV_CLIENT_NEW [=[if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } if(c->pscloud){pv_session_use_client(c->gk_client_id,sizeof(c->gk_client_id),cc_json_str(j,"gkClientId"));pv_session_use_client(c->stream_server_client_id,sizeof(c->stream_server_client_id),cc_json_str(j,"streamServerClientId"));} json_object_put(j); }]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_CLIENT_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "PS5 session-issued client ID patch point not found")
+  endif()
+  string(REPLACE "${PV_CLIENT_OLD}" "${PV_CLIENT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  set(PLUS_VITA_GAIKAI_TEXT "#include \"${CMAKE_CURRENT_SOURCE_DIR}/src/platform/session_client.h\"\n${PLUS_VITA_GAIKAI_TEXT}")
   # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
   # this is an experimental capability request, NOT a proven PS5 service profile.
   foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
@@ -1283,7 +1293,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   PLUS_VITA_FINAL_001=$<BOOL:${PLUS_VITA_FINAL_001}>
   PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
-  $<$<BOOL:${PLUS_VITA_FINAL_006}>:PLUS_VITA_DISPLAY_VERSION=\"${PLUS_VITA_DISPLAY_VERSION}\">
+  $<$<BOOL:${PLUS_VITA_TEST_006_B1}>:PLUS_VITA_DISPLAY_VERSION=\"${PLUS_VITA_DISPLAY_VERSION}\">
   PLUS_VITA_PS3_STARTUP_SAMPLE=$<BOOL:${PLUS_VITA_PS3_STARTUP_SAMPLE}>
   PLUS_VITA_PS3_REPLAY=$<BOOL:${PLUS_VITA_PS3_REPLAY}>
   PLUS_VITA_PS3_LIVE=$<BOOL:${PLUS_VITA_PS3_LIVE}>

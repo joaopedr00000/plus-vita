@@ -42,3 +42,7 @@ B4 automatic push builds are paused at the maintainer's request. The workflow re
 ## v0.0.6 stable-channel release
 
 Explicit maintainer approval to compile and publish v0.0.6 for B3 internal-updater testing. Source includes B4 options, contextual help, solid indicators and conservative defaults. APP_VER 00.27, title ID PLVTB0001, canonical tag v0.0.6, asset VitaPlus-v0.0.6.vpk and SHA256SUMS.txt. Only the new release branch has a publication job; the original B4 remains paused. Native self-install and PS5 video still require hardware validation. v0.1.0 remains blocked.
+
+## v0.0.6 B1 public beta
+
+My games filters active account-library entitlements intersecting the existing cloud catalogue; no claim of permanent purchase or eligibility. PS5 uses validated session-issued OAuth client IDs where present, based on Con 0.5.2, with original IDs as fallback. No later upstream streaming release found; HEVC remains unsupported. Internal installer regenerates the native package header using the installed same-title template and target SFO, uses VitaShell-style promotion mode 1, records stage/error and verifies installed APP_VER before success. Native self-update is still unverified; old clients need a manual B1 installation to test later updates. Maintainer cannot test on hardware at present; community feedback requested. Publish only as prerelease; stable 0.0.6 stays latest and 0.1.0 remains blocked.

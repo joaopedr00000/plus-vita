@@ -80,6 +80,7 @@ static void authorize(PlusVitaAccount *account)
 	account->result.auth_transport_error=result->transport_error;
 	account->result.auth_curl_error=result->curl_error;
 	account->result.regional_catalogue=result->regional_catalog_complete;
+	account->result.library_complete=result->owned_authorized&&result->owned_complete;
 	account->result.entries = result->native_titles;
 	account->result.entry_count = result->native_titles_count;
 	if(account->result.status == PLUS_VITA_RESULT_OK) {

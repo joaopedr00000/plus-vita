@@ -256,7 +256,7 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 		return;
 	}
 	if(b->id==PLUS_VITA_ACTION_BACK)return; /* painted with footer icon; hitbox remains live */
-	bool filter=b->id>=PLUS_VITA_ACTION_FILTER_ALL&&b->id<=PLUS_VITA_ACTION_FILTER_PS5;
+	bool filter=b->id>=PLUS_VITA_ACTION_FILTER_ALL&&b->id<=PLUS_VITA_ACTION_FILTER_OWNED;
 	bool active=filter&&(unsigned)(b->id-PLUS_VITA_ACTION_FILTER_ALL)==v->platform_filter;
 	bool play=b->id==PLUS_VITA_ACTION_PLAY;
 	bool filled=active||play||pressed;
@@ -332,7 +332,7 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),789,303,TEXT_HINT,147,23,false,MENU_WHITE);
 		text(d,localized(d,"Game ID:"),678,326,TEXT_HINT,105,23,false,MENU_MUTED);
 		text(d,g->launch_id_valid?g->id:localized(d,"Unavailable"),789,326,TEXT_MICRO,147,23,false,MENU_WHITE);
-		text(d,localized(d,"Playtime: unavailable | Trophies: unavailable"),678,350,TEXT_MICRO,258,34,true,MENU_MUTED);
+		text(d,localized(d,g->in_library?"In your library - access checked at launch":"Playtime: unavailable | Trophies: unavailable"),678,350,TEXT_MICRO,258,34,true,g->in_library?readable(d,MENU_ACCENT):MENU_MUTED);
 	}else{
 		text(d,localized(d,v->title?v->title:"No cloud games found."),24,145,TEXT_BODY,350,100,true,MENU_BODY);
 		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),418,150,TEXT_BODY,510,100,true,readable(d,MENU_ACCENT));
