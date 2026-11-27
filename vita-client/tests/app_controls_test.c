@@ -14,6 +14,7 @@ int __wrap_rename(const char *source,const char *destination)
 { if(fail_rename) { errno=EIO;return -1; }return __real_rename(source,destination); }
 
 static SceCtrlData pad;
+static SceTouchData front_touch,rear_touch;
 int sceKernelGetModel(void) { return SCE_KERNEL_MODEL_VITA; }
 int sceCtrlGetControllerPortInfo(SceCtrlPortInfo *info) { *info=(SceCtrlPortInfo){.port={SCE_CTRL_TYPE_PHY}};return 0; }
 int sceCtrlPeekBufferPositiveExt2(int port,SceCtrlData *out,int count)
@@ -21,7 +22,7 @@ int sceCtrlPeekBufferPositiveExt2(int port,SceCtrlData *out,int count)
 int sceCtrlPeekBufferPositive(int port,SceCtrlData *out,int count)
 { assert(port==0 && count==1);*out=pad;return 1; }
 int sceTouchPeek(uint32_t port,SceTouchData *out,uint32_t count)
-{ (void)port;(void)count;memset(out,0,sizeof(*out));return 1; }
+{ (void)count;*out=port==SCE_TOUCH_PORT_FRONT ? front_touch : rear_touch;return 1; }
 
 static PlusVitaAppEffect choose(PlusVitaApp *app,PlusVitaAppAction action,const char *label)
 {
@@ -107,6 +108,45 @@ static void cancel_restore_and_failed_save(void)
 	plus_vita_app_destroy(app);
 }
 
+static void front_stick_location(void)
+{
+	PlusVitaApp *app=plus_vita_app_create();assert(app);
+	choose(app,PLUS_VITA_ACTION_SETTINGS,NULL);
+	choose(app,PLUS_VITA_ACTION_CONTROL_LAYOUT,NULL);
+	choose(app,PLUS_VITA_ACTION_FRONT_STICKS,"L3 / R3: Rear touchpad");
+	save_controls(app,true);
+	PlusVitaControlLayout loaded;
+	assert(plus_vita_control_layout_load("layout.dat",&loaded)==PLUS_VITA_CONTROLS_OK && loaded.front_stick_clicks);
+	plus_vita_app_destroy(app);
+	PlusVitaInputVita input={.layout=loaded,.layout_ready=true,.front_ready=true,.rear_ready=true,
+		.rear_mid_x=500,.rear_mid_y=500,.front_info={.minAaX=0,.minAaY=0,.maxAaX=1000,.maxAaY=1000}};
+	pad=(SceCtrlData){.lx=128,.ly=128,.rx=128,.ry=128};
+	rear_touch=(SceTouchData){.reportNum=2,.report={{.id=1,.x=100,.y=100},{.id=2,.x=100,.y=800}}};
+	front_touch=(SceTouchData){.reportNum=2,.report={{.id=3,.x=100,.y=800},{.id=4,.x=800,.y=800}}};
+	ChiakiControllerState prev;chiaki_controller_state_set_idle(&prev);
+	PlusVitaInputSample sample={0};
+	assert(plus_vita_input_vita_read(&input,&prev,&sample)==1);
+	assert(sample.state.buttons==(CHIAKI_CONTROLLER_BUTTON_L3|CHIAKI_CONTROLLER_BUTTON_R3));
+	assert(sample.state.l2_state==255 && plus_vita_input_touch_count(&sample.state)==0);
+	/* Sliding a held finger across zones must not change its assigned button. */
+	front_touch.reportNum=1;front_touch.report[0].x=900;front_touch.report[0].y=100;
+	prev=sample.state;
+	assert(plus_vita_input_vita_read(&input,&prev,&sample)==1);
+	assert(sample.state.buttons==CHIAKI_CONTROLLER_BUTTON_L3);
+	front_touch.reportNum=0;prev=sample.state;
+	assert(plus_vita_input_vita_read(&input,&prev,&sample)==1);
+	assert(sample.state.buttons==0);
+	front_touch=(SceTouchData){.reportNum=2,.report={{.id=3,.x=100,.y=100},{.id=4,.x=800,.y=100}}};
+	prev=sample.state;
+	assert(plus_vita_input_vita_read(&input,&prev,&sample)==1);
+	assert(sample.state.buttons==CHIAKI_CONTROLLER_BUTTON_TOUCHPAD && plus_vita_input_touch_count(&sample.state)==2);
+	input.layout.front_stick_clicks=false;prev=sample.state;
+	assert(plus_vita_input_vita_read(&input,&prev,&sample)==1);
+	assert(sample.state.buttons==(CHIAKI_CONTROLLER_BUTTON_L3|CHIAKI_CONTROLLER_BUTTON_TOUCHPAD));
+	assert(remove("layout.dat")==0);
+	front_touch=(SceTouchData){0};rear_touch=(SceTouchData){0};
+}
+
 int main(void)
 {
 	PlusVitaApp *app=plus_vita_app_create();assert(app);
@@ -135,5 +175,6 @@ int main(void)
 	assert(remove("layout.dat")==0);
 	plus_vita_app_destroy(app);
 	cancel_restore_and_failed_save();
+	front_stick_location();
 	puts("controls journey: Settings edit, save, next-session mapping and restart persistence passed");
 }

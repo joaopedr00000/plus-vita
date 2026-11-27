@@ -51,6 +51,12 @@ every binding remains editable for the same global layout.
 - **Front-touch movement** independently controls touch contacts/coordinates.
   The two-finger input has its own binding, including Disabled. Turning movement
   off does not automatically disable that binding.
+- **L3 / R3** switches between the rear touchpad (default) and the lower
+  half of the front screen (left L3, right R3). Front stick contacts stay
+  assigned until release and never generate PS touchpad motion or a two-finger
+  click. Upper front contacts retain normal touchpad behavior. Rear L2/R2 and
+  custom non-stick mappings remain unchanged; rear L3/R3 actions are suppressed
+  only in front mode. Physical PS TV stick buttons are unaffected.
 - **Save for next session** persists the complete layout. **Cancel** or Circle
   discards changes. **Restore defaults** changes the draft; Save is still required.
   A failed save leaves the previous saved layout intact and reports the failure.

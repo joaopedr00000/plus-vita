@@ -14,6 +14,8 @@ typedef struct {
 	SceTouchPanelInfo front_info;
 	PlusVitaControlLayout layout;
 	bool layout_ready;
+	/* Contact ownership is latched until release, independently of motion. */
+	uint8_t front_zone_by_id[128];
 	PlusVitaController controller;
 } PlusVitaInputVita;
 

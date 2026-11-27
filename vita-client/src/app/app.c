@@ -118,11 +118,12 @@ static void layout_view(PlusVitaApp *app)
 {
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_CONTROL_LAYOUT,.title="Control mapping.",
 		.subtitle="GAMEPLAY LAYOUT",.body=app->controls_status,.hint="D-pad / left stick  Move     X  Select     O  Cancel",
-		.actions={{PLUS_VITA_ACTION_BINDINGS,"Edit input bindings",64,260,832,40},
-			{PLUS_VITA_ACTION_FRONT_MOTION,app->controls_draft.front_motion ? "Front-touch movement: On" : "Front-touch movement: Off",64,304,832,40},
-			{PLUS_VITA_ACTION_CONTROL_DEFAULTS,"Restore defaults",64,348,832,40},
-			{PLUS_VITA_ACTION_SAVE_CONTROLS,"Save for next session",64,392,832,40},
-			{PLUS_VITA_ACTION_CANCEL_CONTROLS,"Cancel",64,436,832,40}},.action_count=5};
+		.actions={{PLUS_VITA_ACTION_BINDINGS,"Edit input bindings",64,240,832,36},
+			{PLUS_VITA_ACTION_FRONT_MOTION,app->controls_draft.front_motion ? "Front-touch movement: On" : "Front-touch movement: Off",64,280,832,36},
+			{PLUS_VITA_ACTION_FRONT_STICKS,app->controls_draft.front_stick_clicks ? "L3 / R3: Front screen (lower half)" : "L3 / R3: Rear touchpad",64,320,832,36},
+			{PLUS_VITA_ACTION_CONTROL_DEFAULTS,"Restore defaults",64,360,832,36},
+			{PLUS_VITA_ACTION_SAVE_CONTROLS,"Save for next session",64,400,832,36},
+			{PLUS_VITA_ACTION_CANCEL_CONTROLS,"Cancel",64,440,832,36}},.action_count=6};
 }
 
 /* Lists prepare only visible rows. The same viewport rule serves mappings and games. */
@@ -200,8 +201,10 @@ static PlusVitaAppEffect edit_controls(PlusVitaApp *app,PlusVitaAppAction action
 		bindings_view(app,false);
 	} else if(action==PLUS_VITA_ACTION_FRONT_MOTION) {
 		app->controls_draft.front_motion=!app->controls_draft.front_motion;layout_view(app);app->view.selected=1;
+	} else if(action==PLUS_VITA_ACTION_FRONT_STICKS) {
+		app->controls_draft.front_stick_clicks=!app->controls_draft.front_stick_clicks;layout_view(app);app->view.selected=2;
 	} else if(action==PLUS_VITA_ACTION_CONTROL_DEFAULTS) {
-		plus_vita_control_layout_defaults(&app->controls_draft);layout_view(app);app->view.selected=2;
+		plus_vita_control_layout_defaults(&app->controls_draft);layout_view(app);app->view.selected=3;
 	} else if(action==PLUS_VITA_ACTION_SAVE_CONTROLS) {
 		app->pending_operation=++app->next_operation;app->waiting_for=PLUS_VITA_EFFECT_SAVE_CONTROLS;
 		app->view.operation=app->pending_operation;

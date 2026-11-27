@@ -57,9 +57,9 @@ PlusVitaControlsResult plus_vita_control_layout_load(const char *path,PlusVitaCo
 	bool failed=ferror(file)!=0;
 	if(fclose(file)) failed=true;
 	if(failed) return PLUS_VITA_CONTROLS_STORAGE_ERROR;
-	if(size!=sizeof(record) || extra!=EOF || memcmp(record,"PVCTRL1",8) || record[8]>1)
+	if(size!=sizeof(record) || extra!=EOF || memcmp(record,"PVCTRL1",8) || record[8]>3)
 		return PLUS_VITA_CONTROLS_INVALID;
-	PlusVitaControlLayout loaded={.front_motion=record[8]!=0};
+	PlusVitaControlLayout loaded={.front_motion=(record[8]&1)!=0,.front_stick_clicks=(record[8]&2)!=0};
 	memcpy(loaded.bindings,record+9,PLUS_VITA_INPUT_COUNT);
 	if(!plus_vita_control_layout_valid(&loaded)) return PLUS_VITA_CONTROLS_INVALID;
 	*layout=loaded;return PLUS_VITA_CONTROLS_OK;
@@ -71,7 +71,8 @@ bool plus_vita_control_layout_save(const char *path,const PlusVitaControlLayout 
 	int length=snprintf(temporary,sizeof(temporary),"%s.tmp",path);
 	if(length<0 || (size_t)length>=sizeof(temporary)) return false;
 	unsigned char record[9+PLUS_VITA_INPUT_COUNT]="PVCTRL1";
-	record[8]=layout->front_motion ? 1 : 0;
+	/* Bit zero retains the original PVCTRL1 encoding; legacy records load with rear sticks. */
+	record[8]=(layout->front_motion ? 1 : 0) | (layout->front_stick_clicks ? 2 : 0);
 	memcpy(record+9,layout->bindings,PLUS_VITA_INPUT_COUNT);
 	FILE *file=fopen(temporary,"wb");if(!file) return false;
 	bool success=fwrite(record,1,sizeof(record),file)==sizeof(record);

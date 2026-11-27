@@ -26,6 +26,7 @@ typedef enum { PLUS_VITA_DEVICE_VITA, PLUS_VITA_DEVICE_DS3, PLUS_VITA_DEVICE_DS4
 typedef struct {
 	uint8_t bindings[PLUS_VITA_INPUT_COUNT];
 	bool front_motion;
+	bool front_stick_clicks;
 } PlusVitaControlLayout;
 typedef enum { PLUS_VITA_CONTROLS_OK, PLUS_VITA_CONTROLS_MISSING,
 	PLUS_VITA_CONTROLS_INVALID, PLUS_VITA_CONTROLS_STORAGE_ERROR } PlusVitaControlsResult;

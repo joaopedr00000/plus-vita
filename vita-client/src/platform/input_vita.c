@@ -141,6 +141,30 @@ static void apply_layout(const PlusVitaControlLayout *layout,const uint8_t *leve
 	}
 }
 
+/* Front lower contacts become stick clicks; upper contacts remain PS touchpad
+ * contacts. Keep their initial zone until release, just like GreenVita. */
+static uint32_t split_front_sticks(PlusVitaInputVita *input,const SceTouchData *touch,SceTouchData *pointer)
+{
+	uint8_t active[128]={0};
+	uint32_t buttons=0;
+	const SceTouchPanelInfo *panel=&input->front_info;
+	int mid_x=panel->minAaX+(panel->maxAaX-panel->minAaX)/2;
+	int mid_y=panel->minAaY+(panel->maxAaY-panel->minAaY)/2;
+	unsigned count=touch->reportNum>SCE_TOUCH_MAX_REPORT ? SCE_TOUCH_MAX_REPORT : touch->reportNum;
+	*pointer=*touch;pointer->reportNum=0;
+	for(unsigned i=0;i<count;i++) {
+		unsigned id=touch->report[i].id&0x7f;
+		uint8_t zone=input->front_zone_by_id[id];
+		if(!zone) zone=touch->report[i].y<mid_y ? 1 : touch->report[i].x<mid_x ? 2 : 3;
+		active[id]=zone;
+		if(zone==2) buttons|=CHIAKI_CONTROLLER_BUTTON_L3;
+		else if(zone==3) buttons|=CHIAKI_CONTROLLER_BUTTON_R3;
+		else pointer->report[pointer->reportNum++]=touch->report[i];
+	}
+	for(unsigned i=0;i<128;i++) input->front_zone_by_id[i]=active[i];
+	return buttons;
+}
+
 int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 	PlusVitaInputSample *sample)
 {
@@ -159,6 +183,7 @@ int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 	plus_vita_control_layout_defaults(&defaults);
 	const PlusVitaControlLayout *layout=input->layout_ready && plus_vita_control_layout_valid(&input->layout) ? &input->layout : &defaults;
 	uint8_t levels[PLUS_VITA_INPUT_COUNT]={0};
+	uint32_t front_sticks=0;
 	static const uint32_t pad_buttons[]={SCE_CTRL_CROSS,SCE_CTRL_CIRCLE,SCE_CTRL_SQUARE,SCE_CTRL_TRIANGLE,
 		SCE_CTRL_UP,SCE_CTRL_DOWN,SCE_CTRL_LEFT,SCE_CTRL_RIGHT,SCE_CTRL_LTRIGGER,SCE_CTRL_RTRIGGER,SCE_CTRL_START,SCE_CTRL_SELECT};
 	for(unsigned i=0;i<sizeof(pad_buttons)/sizeof(*pad_buttons);i++) if(pad.buttons&pad_buttons[i]) levels[i]=255;
@@ -177,7 +202,11 @@ int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 			unsigned count=touch.reportNum>SCE_TOUCH_MAX_REPORT ? SCE_TOUCH_MAX_REPORT : touch.reportNum;
 			for(unsigned i=0;i<count;i++) {
 				unsigned quadrant=(touch.report[i].y<input->rear_mid_y ? 0 : 2)+(touch.report[i].x<input->rear_mid_x ? 0 : 1);
-				levels[PLUS_VITA_INPUT_REAR_TL+quadrant]=255;
+				unsigned binding=PLUS_VITA_INPUT_REAR_TL+quadrant;
+				/* Only relocate rear stick-click actions, not custom non-stick bindings. */
+				if(!layout->front_stick_clicks ||
+					(layout->bindings[binding]!=PLUS_VITA_CONTROL_L3 && layout->bindings[binding]!=PLUS_VITA_CONTROL_R3))
+					levels[binding]=255;
 			}
 		}
 	}
@@ -185,11 +214,14 @@ int plus_vita_input_vita_read(void *user, const ChiakiControllerState *previous,
 	{
 		SceTouchData touch = { 0 };
 		if(sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1) > 0) {
-			if(layout->front_motion) map_front_contacts(&touch,&input->front_info,previous,&sample->state);
-			if(touch.reportNum>=2) levels[PLUS_VITA_INPUT_FRONT_CLICK]=255;
+			SceTouchData pointer=touch;
+			if(layout->front_stick_clicks) front_sticks=split_front_sticks(input,&touch,&pointer);
+			if(layout->front_motion) map_front_contacts(&pointer,&input->front_info,previous,&sample->state);
+			if(pointer.reportNum>=2) levels[PLUS_VITA_INPUT_FRONT_CLICK]=255;
 		}
 	}
 	apply_layout(layout,levels,&sample->state);
+	sample->state.buttons|=front_sticks;
 	return 1;
 }
 
