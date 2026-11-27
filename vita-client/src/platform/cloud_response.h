@@ -40,16 +40,16 @@ static inline bool vp_cloud_session_ids(struct json_object *root,char cloud[128]
 {
     const char *keys[]={"gkClientId","streamServerClientId"};
     char *dst[]={cloud,stream};
-    const char *next[2]={NULL,NULL};
     if(!root || !json_object_is_type(root,json_type_object)) return false;
+    /* Con 0.5.2 validates each returned ID independently. Invalid or absent
+     * values must not replace the original ID or invalidate the session. */
     for(unsigned n=0;n<2;n++){
         struct json_object *v=NULL;
         if(!json_object_object_get_ex(root,keys[n],&v))continue;
-        if(!v || !json_object_is_type(v,json_type_string) || json_object_get_string_len(v)!=36) return false;
-        next[n]=json_object_get_string(v);
-        if(!vp_cloud_uuid(next[n]))return false;
+        if(!v || !json_object_is_type(v,json_type_string) || json_object_get_string_len(v)!=36) continue;
+        const char *next=json_object_get_string(v);
+        if(vp_cloud_uuid(next))memcpy(dst[n],next,37);
     }
-    for(unsigned n=0;n<2;n++)if(next[n])memcpy(dst[n],next[n],37);
     return true;
 }
 

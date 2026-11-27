@@ -723,16 +723,6 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
     message(FATAL_ERROR "Pylux PS5 HTTP identity patch point not found")
   endif()
   string(REPLACE "${PV_PS5_UA_OLD}" "${PV_PS5_UA_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
-  # Con v0.5.2 prefers session-issued PS5 OAuth client IDs when valid.
-  # Retain the initial IDs if absent/invalid; never accept arbitrary URL text.
-  set(PV_CLIENT_OLD [=[if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } json_object_put(j); }]=])
-  set(PV_CLIENT_NEW [=[if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } if(c->pscloud){pv_session_use_client(c->gk_client_id,sizeof(c->gk_client_id),cc_json_str(j,"gkClientId"));pv_session_use_client(c->stream_server_client_id,sizeof(c->stream_server_client_id),cc_json_str(j,"streamServerClientId"));} json_object_put(j); }]=])
-  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_CLIENT_OLD}" PV_POS)
-  if(PV_POS EQUAL -1)
-    message(FATAL_ERROR "PS5 session-issued client ID patch point not found")
-  endif()
-  string(REPLACE "${PV_CLIENT_OLD}" "${PV_CLIENT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
-  set(PLUS_VITA_GAIKAI_TEXT "#include \"${CMAKE_CURRENT_SOURCE_DIR}/src/platform/session_client.h\"\n${PLUS_VITA_GAIKAI_TEXT}")
   # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
   # this is an experimental capability request, NOT a proven PS5 service profile.
   foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
@@ -805,8 +795,8 @@ string(REPLACE "${PV_COMPAT_OLD}" "${PV_COMPAT_NEW}" PLUS_VITA_GAIKAI_TEXT "${PL
 set(PV_COMPAT_OLD [=[	if(j) { const char *sid = cc_json_str(j, "sessionId"); if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); } json_object_put(j); }]=])
 set(PV_COMPAT_NEW [=[	if(j) {
         const char *sid = cc_json_str(j, "sessionId");
-        bool valid = !c->pscloud || vp_cloud_session_ids(j,c->gk_client_id,c->stream_server_client_id);
-        if(valid && *sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); }
+        if(c->pscloud)vp_cloud_session_ids(j,c->gk_client_id,c->stream_server_client_id);
+        if(*sid) { free(c->gaikai_session_id); c->gaikai_session_id = strdup(sid); }
         json_object_put(j);
     }]=])
 string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_COMPAT_OLD}" PV_POS)

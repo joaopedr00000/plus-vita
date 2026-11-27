@@ -11,7 +11,7 @@ int main(void){
     j=json_tokener_parse("{\"dataCenterList\":42}");assert(!vp_cloud_dc_array(j));json_object_put(j);
     char cloud[128]="original",stream[128]="original2";
     j=json_tokener_parse("{\"gkClientId\":\"12345678-1234-1234-1234-123456789abc\",\"streamServerClientId\":\"invalid\"}");
-    assert(!vp_cloud_session_ids(j,cloud,stream)&&!strcmp(cloud,"original"));json_object_put(j);
+    assert(vp_cloud_session_ids(j,cloud,stream)&&!strcmp(cloud,"12345678-1234-1234-1234-123456789abc")&&!strcmp(stream,"original2"));json_object_put(j);
     j=json_tokener_parse("{\"gkClientId\":\"12345678-1234-1234-1234-123456789abc\"}");
     assert(vp_cloud_session_ids(j,cloud,stream)&&!strcmp(cloud,"12345678-1234-1234-1234-123456789abc")&&!strcmp(stream,"original2"));json_object_put(j);
     assert(vp_cloud_event("{\"errors\":[{\"eventCode\":\"002.0011\",\"secret\":\"private\"}]}")==1);
