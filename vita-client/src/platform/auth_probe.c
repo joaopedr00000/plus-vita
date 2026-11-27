@@ -205,7 +205,7 @@ static const char *infer_catalog_platform(const char *id)
 static bool catalog_owned(struct json_object *row){
     struct json_object *owned=NULL,*feature=NULL;
     return json_object_object_get_ex(row,"isOwned",&owned)&&json_object_is_type(owned,json_type_boolean)&&json_object_get_boolean(owned)
-        &&(!json_object_object_get_ex(row,"feature_type",&feature)||json_object_get_int(feature)!=1);
+        &&(!json_object_object_get_ex(row,"feature_type",&feature)||(json_object_is_type(feature,json_type_int)&&json_object_get_int(feature)>1));
 }
 
 static bool append_catalog_entry(PlusVitaAuthProbeResult *result,

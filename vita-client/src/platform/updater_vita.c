@@ -238,7 +238,7 @@ static bool stage_header(const char *root,char appver[16]){
     if(!sfo_value(sfo,n,"CONTENT_ID",content,sizeof(content))||!content[0])
         snprintf(content,sizeof(content),"EP9000-%s_00-0000000000000000",title);
     /* Only our own homebrew identity is accepted. */
-    if(!strstr(content,"-PLVTB0001_")||strlen(content)>=sizeof(content))return false;
+    if(!memchr(content,0,sizeof(content))||!strstr(content,"-PLVTB0001_"))return false;
     unsigned char *h=malloc(65537);if(!h)return false;
     bool ok=read_small("app0:sce_sys/package/head.bin",h,65537,&n)&&pv_head_rebuild(h,n,content,sha1);
     snprintf(folder,sizeof(folder),"%s/sce_sys/package",root);

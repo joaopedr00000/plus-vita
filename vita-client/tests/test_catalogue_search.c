@@ -51,7 +51,7 @@ int main(void){
     assert(v.screen==PLUS_VITA_APP_CATALOGUE&&v.list_total==10&&v.list_count==7);
     search(a,"rAcInG");
     v=plus_vita_app_view(a);
-    assert(v.list_total==9&&v.list_count==7&&v.action_count==15);
+    assert(v.list_total==9&&v.list_count==7&&v.action_count==16);
     assert(strstr(v.actions[v.list_count].label,"rAcInG"));
     assert(v.actions[v.list_count+1].id==PLUS_VITA_ACTION_CLEAR_SEARCH);
     click(a,PLUS_VITA_ACTION_FILTER_PS3);
