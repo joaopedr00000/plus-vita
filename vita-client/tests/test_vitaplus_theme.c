@@ -74,6 +74,23 @@ int main(void){
     v.preview_eligible=false;
     plus_vita_app_paint_with_covers(NULL,pixels,960,&v,(const PlusVitaCovers *)&artwork);
     assert(pixels[292*960+525]!=0xff123456);
+    /* All indicator interior pixels are solid, independently of row focus. */
+    v=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_OPTIONS,.title="Streaming",.body="Test description",.action_count=2,
+        .actions={{PLUS_VITA_ACTION_OPT_REORDER,"First",24,86,542,34},{PLUS_VITA_ACTION_OPT_HUD,"Second",24,126,542,34}}};
+    for(unsigned focus=0;focus<2;focus++){
+        v.selected=focus;
+        for(unsigned mask=0;mask<4;mask++){
+            v.stream_options=(mask&1)?PV_OPT_REORDER:0;
+            v.stream_hud=(mask&2)!=0;
+            plus_vita_app_paint(NULL,pixels,960,&v);
+            for(unsigned j=0;j<2;j++){
+                uint32_t expected=(mask&(1u<<j))?VP_RGB(240,211,111):VP_RGB(27,27,30);
+                int x=522,y=92+40*(int)j;
+                for(int dy=5;dy<17;dy++)for(int dx=5;dx<17;dx++)
+                    assert(pixels[(y+dy)*960+x+dx]==expected);
+            }
+        }
+    }
     /* Compare controller icon pixels (not only colors) with catalogue originals.
      * Two standard 172px slots start at x=600, glyph centers 612 and 784. */
     uint32_t glyphs[2][25][25];
