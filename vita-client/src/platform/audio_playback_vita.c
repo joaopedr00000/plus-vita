@@ -26,7 +26,7 @@ struct plus_vita_audio_playback_t {
 	bool stop, failed;
 	AudioUnit queue[AUDIO_QUEUE];
 	unsigned head, count, peak, dropped, decoded, outputs, concealed, stale;
-	unsigned prebuffer_base, prebuffer_target, clean_audio_units;
+	unsigned prebuffer_base, prebuffer_target, clean_audio_units, prebuffer_floor;
 	bool audio_buffering, audio_fade;
 	bool sequence_valid;
 	uint16_t sequence;
@@ -161,7 +161,7 @@ static void *audio_worker(void *user)
 		pthread_mutex_lock(&a->mutex);
 		#if PLUS_VITA_ADAPTIVE_STREAM
 		if(a->prebuffer_base && !a->count && a->decoded && !a->audio_buffering) {
-			if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,true);
+			if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,true);
 			a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;a->fill=0;
 		}
 		while(!a->stop && a->audio_buffering && a->count<a->prebuffer_target)
@@ -187,7 +187,7 @@ static void *audio_worker(void *user)
 #endif
 #if PLUS_VITA_ADAPTIVE_STREAM
 		if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT)&&a->prebuffer_base && ++a->clean_audio_units>=2000) {
-			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_base,a->prebuffer_target,false);
+			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,false);
 		}
 #endif
 		pthread_mutex_unlock(&a->mutex);
@@ -269,7 +269,7 @@ PlusVitaAudioPlayback *plus_vita_audio_start_options(const ChiakiAudioHeader *h,
 a->block_frames=AUDIO_BLOCK;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	a->block_frames=cap_kbps&&pv_opt(a->options,PV_OPT_AUDIO_SMALL)?pv_audio_block(cap_kbps):AUDIO_BLOCK;
-	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
+	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_floor=cap_kbps==15000?5:a->prebuffer_base;a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
 #else
 	(void)cap_kbps;
 #endif

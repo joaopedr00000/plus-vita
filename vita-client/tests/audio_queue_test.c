@@ -2,6 +2,7 @@
 /* Exercise unchanged production arrival/sequence/queue/output code. Only the
  * external codec, device, clock and log writer are deterministic boundaries. */
 #include "audio_playback_vita.h"
+#include "stream_options.h"
 #include <opus.h>
 #include <assert.h>
 #include <pthread.h>
@@ -20,6 +21,7 @@ static unsigned sequence, output_count, log_delay, slow_output, initial_units;
 static unsigned first_pcm_delay;
 static unsigned native_block, expected_block, open_attempts, period_remainder;
 static bool reject_small_block;
+static unsigned options=PV_OPT_DEFAULT;
 static char final_timing[2048], final_summary[1024];
 
 uint64_t sceKernelGetProcessTimeWide(void) { return atomic_load(&now_us); }
@@ -93,7 +95,7 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 {
 	ready = finished = false; audio = NULL; sequence = output_count = 0;
 	native_block = open_attempts = period_remainder = 0;
-	expected_block = profile == 6000 ? 512 : 960;
+	expected_block = profile == 6000 && pv_opt(options,PV_OPT_AUDIO_SMALL) ? 512 : 960;
 	log_delay = writer_delay; slow_output = pacing_error; relative_pacing = relative;
 	first_pcm_delay = after_first ? startup : 0;
 	if(after_first) startup = 0;
@@ -101,7 +103,7 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 	atomic_store(&now_us, 1); final_timing[0] = final_summary[0] = 0;
 	ChiakiLog log; chiaki_log_init(&log, CHIAKI_LOG_ALL, log_message, NULL);
 	ChiakiAudioHeader header = { .channels = 2, .bits = 16, .rate = 48000, .frame_size = 480 };
-	audio = plus_vita_audio_start_profile(&header, &log,profile); assert(audio);
+	audio = plus_vita_audio_start_options(&header, &log,profile,options); assert(audio);
 	/* Simulate arrivals during native initialization before its consumer runs. */
 	for(unsigned i = 0; i < initial_units; i++) {
 		atomic_store(&now_us, 1 + (startup ? i * 10000u : 0)); uint8_t packet = 0;
@@ -147,5 +149,11 @@ int main(void)
 	reject_small_block=false;
 	uint64_t quality=run("adaptive 15 Mbps / 200ms startup",200000,0,0,false,false,15000);
 	assert(quality<140000 && field(final_summary,"queue_peak=")<=12 && field(final_summary,"dropped=")>0);
-	puts("audio queue: legacy timing and adaptive bounded backlog passed; no hardware latency inferred");
+	options=PV_OPT_DEFAULT&~PV_OPT_AUDIO_SMALL;
+    uint64_t large=run("6 Mbps / small audio blocks disabled",200000,0,0,false,false,6000);
+    assert(large<110000 && native_block==960);
+    options=0;
+    uint64_t fixed=run("6 Mbps / all optional audio optimizations disabled",200000,0,0,false,false,6000);
+    assert(fixed<120000 && native_block==960 && field(final_summary,"queue_peak=")<=8);
+    puts("audio queue: legacy timing, adaptive backlog and opt-out paths passed; no hardware latency inferred");
 }
