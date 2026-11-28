@@ -15,11 +15,15 @@
 #define PV_OPT_AUDIO_BOUND (1u<<9)
 #define PV_OPT_COUNT 10u
 #define PV_OPT_ALL ((1u<<PV_OPT_COUNT)-1u)
-#define PV_OPT_DEFAULT (PV_OPT_VIDEO_CATCHUP|PV_OPT_AUDIO_ADAPT|PV_OPT_PCM_TRIM|PV_OPT_FAST_INPUT)
+#define PV_OPT_DEFAULT (PV_OPT_VIDEO_CATCHUP|PV_OPT_AUDIO_ADAPT|PV_OPT_FAST_INPUT)
 /* Keep new B4 experiments and diagnostic overhead opt-in. */
 static inline bool pv_opt(unsigned flags,unsigned bit){return (flags&bit)!=0;}
 static inline bool pv_options_valid(unsigned flags){return !(flags&~PV_OPT_ALL);}
 static inline unsigned pv_options_sanitize(unsigned flags){return pv_options_valid(flags)?flags:PV_OPT_DEFAULT;}
+/* Only migrate audio flags. Preserve every unrelated preference. */
+static inline unsigned pv_audio_migrate_options(unsigned flags){
+    return pv_options_sanitize(flags)&~(PV_OPT_PCM_TRIM|PV_OPT_AUDIO_SMALL|PV_OPT_AUDIO_BOUND);
+}
 static inline bool pv_options_parse(const char *text,unsigned *out){
     unsigned v=0,mask=0;char extra;
     if(!text||!out||sscanf(text,"%u %u %c",&v,&mask,&extra)!=2||v!=1||!pv_options_valid(mask))return false;

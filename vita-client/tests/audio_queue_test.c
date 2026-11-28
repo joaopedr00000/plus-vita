@@ -147,18 +147,18 @@ int main(void)
 	assert(relative > logging + 30000);
 	assert(mismatch > startup + 25000);
 	uint64_t low=run("adaptive 6 Mbps / 200ms startup",200000,0,0,false,false,6000);
-	assert(low<110000 && field(final_summary,"queue_peak=")<=9 && field(final_summary,"dropped=")>0);
+	assert(low<160000 && field(final_summary,"queue_peak=")<=14 && field(final_summary,"dropped=")>0);
 	reject_small_block=true;
 	uint64_t fallback=run("adaptive 6 Mbps / rejected 512-frame port fallback",200000,0,0,false,false,6000);
-	assert(fallback<110000 && field(final_summary,"queue_peak=")<=9 && field(final_summary,"dropped=")>0);
+	assert(fallback<160000 && field(final_summary,"queue_peak=")<=14 && field(final_summary,"dropped=")>0);
 	reject_small_block=false;
 	uint64_t quality=run("adaptive 15 Mbps / 200ms startup",200000,0,0,false,false,15000);
-	assert(quality<140000 && field(final_summary,"queue_peak=")<=12 && field(final_summary,"dropped=")>0);
+	assert(quality<180000 && field(final_summary,"queue_peak=")<=16 && field(final_summary,"dropped=")>0);
 	options=PV_OPT_DEFAULT;
     uint64_t large=run("6 Mbps / small audio blocks disabled",200000,0,0,false,false,6000);
-    assert(large<110000 && native_block==960);
+    assert(large<170000 && native_block==960 && final_audio.trimmed_pcm_samples==0 && final_audio.queue_peak<=15);
     options=0;
     uint64_t fixed=run("6 Mbps / all optional audio optimizations disabled",200000,0,0,false,false,6000);
-    assert(fixed<120000 && native_block==960 && field(final_summary,"queue_peak=")<=8);
+    assert(fixed<170000 && native_block==960 && final_audio.trimmed_pcm_samples==0 && field(final_summary,"queue_peak=")<=15);
     puts("audio queue: legacy timing, adaptive backlog and opt-out paths passed; no hardware latency inferred");
 }

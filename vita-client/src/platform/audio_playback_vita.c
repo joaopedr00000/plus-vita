@@ -224,9 +224,17 @@ static void *audio_worker(void *user)
 		unsigned target_snapshot=a->prebuffer_target;
 #endif
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT)&&a->prebuffer_base && ++a->clean_audio_units>=2000) {
-			a->clean_audio_units=0;a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,false);
-		}
+		/* Count genuinely continuous arrivals, not duplicate or missing units.
+         * Do not lower the target while the buffer is close to empty. */
+        uint16_t step=(uint16_t)(unit.sequence-a->sequence);
+        if(a->prebuffer_base){
+            if(unit.local_drops_before||(a->sequence_valid&&step!=1)||queue_after_pop<2)
+                a->clean_audio_units=0;
+            else if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT)&&++a->clean_audio_units>=PV_AUDIO_CLEAN_UNITS){
+                a->clean_audio_units=0;
+                a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,false);
+            }
+        }
 #endif
 		pthread_mutex_unlock(&a->mutex);
 		uint64_t queue_age_us = sceKernelGetProcessTimeWide() - unit.arrived_us;
@@ -309,7 +317,7 @@ PlusVitaAudioPlayback *plus_vita_audio_start_options(const ChiakiAudioHeader *h,
 a->block_frames=AUDIO_BLOCK;
 #if PLUS_VITA_ADAPTIVE_STREAM
 	a->block_frames=cap_kbps&&pv_opt(a->options,PV_OPT_AUDIO_SMALL)?pv_audio_block(cap_kbps):AUDIO_BLOCK;
-	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_floor=cap_kbps==15000?5:a->prebuffer_base;a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
+	if(cap_kbps){a->prebuffer_base=pv_profile_audio(cap_kbps);a->prebuffer_floor=a->prebuffer_base;a->prebuffer_target=a->prebuffer_base;a->audio_buffering=true;}
 #else
 	(void)cap_kbps;
 #endif

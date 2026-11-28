@@ -11,7 +11,7 @@ static inline unsigned pv_profile_next(unsigned v){return v==6000?10000:v==10000
 static inline unsigned pv_profile_reorder(unsigned v){return v==6000?4000:v==10000?8000:12000;}
 static inline unsigned pv_profile_reorder_initial(unsigned v){return v==6000?12000:v==10000?16000:20000;}
 static inline unsigned pv_audio_block(unsigned v){return v==6000?512:960;}
-static inline unsigned pv_profile_audio(unsigned v){return v==6000?4:v==10000?4:6;}
+static inline unsigned pv_profile_audio(unsigned v){return v==6000||v==10000?8:10;}
 static inline unsigned pv_profile_queue(unsigned v){return v==6000?4:v==10000?6:8;}
 static inline unsigned pv_reorder_adjust(unsigned base,unsigned current,unsigned saved,unsigned expired){
     unsigned max=base==4000?20000:base==8000?26000:30000;
@@ -29,15 +29,16 @@ static inline unsigned pv_reorder_adjust(unsigned base,unsigned current,unsigned
 }
 static inline unsigned pv_audio_adjust(unsigned base,unsigned current,bool starved){
     if(current<base)current=base;
-    if(current>11)current=11;
-    return starved?(current<11?current+1:11):(current>base?current-1:base);
+    if(current>16)current=16;
+    return starved?(current<16?current+2>16?16:current+2:16):(current>base?current-1:base);
 }
-/* Each compressed Opus unit is 10 ms. Retain a three-unit jitter margin,
- * but never allow the adaptive backlog to grow to the old fixed 160 ms. */
+/* 10 ms per unit. A wider bounded margin absorbs burst arrivals without
+ * immediately throwing away valid compressed frames. */
+#define PV_AUDIO_CLEAN_UNITS 6000u
 static inline unsigned pv_audio_queue_limit(unsigned target){
-    if(target<4)target=4;
-    if(target>11)target=11;
-    return target+3;
+    if(target<8)target=8;
+    if(target>16)target=16;
+    return target+6;
 }
 /* Only skip presentation of a fully decoded picture. Compressed references
  * must always be submitted in order; show recovery/first output immediately. */

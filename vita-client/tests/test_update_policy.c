@@ -17,5 +17,7 @@ int main(void){
     assert(!pv_update_checksum("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  other.vpk\n","VitaPlus-v0.0.6-b2.vpk",hash));
     assert(pv_update_safe_path("sce_sys/livearea/contents/template.xml")&&pv_update_safe_path("eboot.bin"));
     assert(!pv_update_safe_path("sce_sys/../eboot.bin")&&!pv_update_safe_path("sce_sys//x")&&!pv_update_safe_path("ux0:app/x")&&!pv_update_safe_path("sce_sys/..\\x"));
+    assert(pv_version_parse("v0.0.7-b1",&b));
+    assert(pv_update_eligible(s,b,true,true,false)&&!pv_update_eligible(s,b,false,true,false));
     puts("Update policy tests passed");return 0;
 }
