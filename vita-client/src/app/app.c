@@ -198,6 +198,10 @@ static void update_view(PlusVitaApp *app){
         snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s %u / 0x%08X\n%s",PV_TR("Installer stage:"),q->install_stage,(unsigned)q->install_error,PV_TR("Update installation failed; verified VPK retained."));
         used=strlen(app->update_body);
     }
+    if(q->state==PV_UP_READY||q->state==PV_UP_INSTALLING){
+        snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",PV_TR("A temporary installer opens. A black screen may appear briefly. Wait for it to finish; do not turn off the Vita."));
+        used=strlen(app->update_body);
+    }
     if(!update_busy(q->state)&&notes[0]&&!q->install_stage)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
     if(update_busy(q->state)){

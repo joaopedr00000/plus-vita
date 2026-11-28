@@ -5,6 +5,9 @@
 #include "update_head.h"
 #include "update_handoff.h"
 #include <psp2/appmgr.h>
+#include <psp2/display.h>
+#include <psp2/kernel/sysmem.h>
+#include "../app/font_vita.h"
 #include "curl_resolve.h"
 #include <curl/curl.h>
 #include <json_object.h>
@@ -402,29 +405,89 @@ static void helper_result(unsigned stage,int rc){
 /* This entrypoint runs under the distinct helper title, before any account,
  * networking, migration or UI initialization. Only a locally approved,
  * verified package in the fixed Downloads slot can be installed. */
+/* Standalone display for the short-lived installer. No account, network,
+ * settings migration, input handling or full library UI is started here.
+ * Keep both buffers owned by this process until it exits; never free a
+ * framebuffer that might still be scanned out during an app switch. */
+#define HELPER_PITCH 1024
+#define HELPER_WIDTH 960
+#define HELPER_HEIGHT 544
+#define HELPER_FRAME_BYTES ((HELPER_PITCH * HELPER_HEIGHT * 4u + 0x3ffffu) & ~0x3ffffu)
+#define HC(r,g,b) (0xff000000u | ((uint32_t)(b)<<16) | ((uint32_t)(g)<<8) | (r))
+typedef struct {
+    SceUID blocks[2];
+    uint32_t *pixels[2];
+    PlusVitaFont *font;
+    unsigned back;
+    bool ready;
+} HelperDisplay;
+static void helper_screen_open(HelperDisplay *d){
+    memset(d,0,sizeof(*d));d->blocks[0]=d->blocks[1]=-1;
+    for(unsigned n=0;n<2;n++){
+        d->blocks[n]=sceKernelAllocMemBlock("VitaPlusUpdaterUI",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,HELPER_FRAME_BYTES,NULL);
+        if(d->blocks[n]<0||sceKernelGetMemBlockBase(d->blocks[n],(void **)&d->pixels[n])<0)goto fail;
+    }
+    d->font=plus_vita_font_create();
+    if(!d->font)goto fail;
+    d->ready=true;return;
+fail:
+    for(unsigned n=0;n<2;n++)if(d->blocks[n]>=0)sceKernelFreeMemBlock(d->blocks[n]);
+    plus_vita_font_free(d->font);d->font=NULL;
+}
+static void helper_rect(uint32_t *p,unsigned x,unsigned y,unsigned w,unsigned h,uint32_t color){
+    for(unsigned row=y;row<y+h;row++)for(unsigned col=x;col<x+w;col++)p[row*HELPER_PITCH+col]=color;
+}
+static void helper_text(HelperDisplay *d,uint32_t *p,const char *s,int y,int size,int height,uint32_t color){
+    plus_vita_font_draw(d->font,p,HELPER_PITCH,s,(PlusVitaTextBox){48,y,864,height},size,true,color);
+}
+static void helper_screen(HelperDisplay *d,unsigned step,const char *en,const char *pt,bool failed){
+    if(!d->ready)return;
+    uint32_t *p=d->pixels[d->back];
+    helper_rect(p,0,0,HELPER_PITCH,HELPER_HEIGHT,HC(24,24,27));
+    helper_rect(p,0,0,HELPER_WIDTH,5,HC(240,211,111));
+    helper_text(d,p,"VitaPlus",34,36,54,HC(240,211,111));
+    helper_text(d,p,"INSTALLER / INSTALADOR",96,22,40,HC(224,224,228));
+    helper_text(d,p,en,155,26,78,failed?HC(255,153,135):HC(244,244,248));
+    helper_text(d,p,pt,239,24,82,HC(216,216,223));
+    helper_rect(p,48,340,864,12,HC(55,55,60));
+    if(step<=6&&step>0)helper_rect(p,48,340,864u*step/6u,12,failed?HC(255,153,135):HC(240,211,111));
+    helper_text(d,p,failed?"Do not delete VitaPlus. / Nao exclua o VitaPlus.":"Please wait. Do not turn off the console.",384,21,45,HC(216,216,223));
+    helper_text(d,p,failed?"Open the main app in LiveArea. / Abra o app principal.":"Aguarde. Nao desligue o console.",436,20,60,HC(216,216,223));
+    SceDisplayFrameBuf frame={.size=sizeof(frame),.base=p,.pitch=HELPER_PITCH,
+        .pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8,.width=HELPER_WIDTH,.height=HELPER_HEIGHT};
+    if(sceDisplaySetFrameBuf(&frame,SCE_DISPLAY_SETBUF_NEXTFRAME)<0||sceDisplayWaitSetFrameBuf()<0){d->ready=false;return;}
+    d->back^=1u;
+}
+
 int pv_update_run_helper(void){
     PvHandoffJob job;struct stat st;char current[16]={0},ver[16]={0},root[128],path[256];
     unsigned stage=15;int rc=-1;
     if(!pv_update_is_helper())return 1;
+    HelperDisplay display;helper_screen_open(&display);
+    helper_screen(&display,1,"Checking the downloaded update...","Verificando a atualizacao baixada...",false);
     if(stat(HANDOFF_RESULT,&st)==0)goto launch;
     if(!read_job(&job)||!helper_owned(&job)||!match_hash(VPK,job.size,job.hash))goto finish;
     if(!read_version(MAIN_PATH "/sce_sys/param.sfo",PV_MAIN_TITLE,current))goto finish;
     if(!strcmp(current,job.appver)){stage=0;rc=0;goto finish;}
     if(strcmp(current,job.appver)>0)goto finish;
     stage=16;
+    helper_screen(&display,2,"Closing VitaPlus for installation...","Encerrando o VitaPlus para instalar...",false);
     /* User explicitly chose Install. Close the previous foreground title
      * before promotion, following VitaShell's separate-updater pattern. */
     sceKernelDelayThread(500000);
     rc=sceAppMgrDestroyOtherApp();if(rc<0)goto finish;
     sceKernelDelayThread(300000);
     stage=2;
+    helper_screen(&display,3,"Preparing the verified package...","Preparando o pacote verificado...",false);
     if(!new_stage(root)){rc=-errno;goto finish;}
     stage=3;rc=-1;
     if(!pv_update_unpack(VPK,root))goto cleanup;
     snprintf(path,sizeof(path),"%s/sce_sys/param.sfo",root);
     stage=4;
     if(!read_version(path,PV_MAIN_TITLE,ver)||strcmp(ver,job.appver)||!stage_header(root,PV_MAIN_TITLE,ver))goto cleanup;
+    helper_screen(&display,4,"Installing the update...","Instalando a atualizacao...",false);
     rc=promote(root,false,&stage);if(rc<0)goto cleanup;
+    helper_screen(&display,5,"Checking the installed version...","Conferindo a versao instalada...",false);
     stage=11;rc=-1;
     if(!read_version(MAIN_PATH "/sce_sys/param.sfo",PV_MAIN_TITLE,current)||strcmp(current,job.appver))goto cleanup;
     stage=0;rc=0;
@@ -432,11 +495,28 @@ cleanup:
     pv_update_clean_stage(root);
 finish:
     helper_result(stage,rc);
+    if(stage||rc){
+        char error[128];snprintf(error,sizeof(error),"Installation failed: stage %u / 0x%08X",stage,(unsigned)rc);
+        helper_screen(&display,0,error,"Falha na instalacao. VPK mantido em Downloads.",true);
+        sceKernelDelayThread(4000000);
+    }else{
+        helper_screen(&display,6,"Update installed and verified.","Atualizacao instalada e verificada.",false);
+        sceKernelDelayThread(1000000);
+    }
     /* Keep the verified VPK even on success until the new main app confirms
      * the installed version and consumes the receipt. */
 launch:
+    helper_screen(&display,6,"Opening VitaPlus...","Reabrindo o VitaPlus...",false);
     sceKernelDelayThread(500000);
-    sceAppMgrLaunchAppByUri(0xFFFFF,"psgm:play?titleid=" PV_MAIN_TITLE);
+    rc=sceAppMgrLaunchAppByUri(0xFFFFF,"psgm:play?titleid=" PV_MAIN_TITLE);
+    if(rc<0){
+        char error[128];snprintf(error,sizeof(error),"Automatic restart failed: 0x%08X",(unsigned)rc);
+        helper_screen(&display,0,error,"Reabra o VitaPlus principal pela LiveArea.",true);
+        sceKernelDelayThread(8000000);
+    }
+    /* Exit once, whether launch succeeds or fails. The main app owns receipt
+     * recovery; never install twice or loop on a failed launch request. */
+    plus_vita_font_free(display.font);
     return 0;
 }
 static void recover_handoff(PvUpdater *u){
