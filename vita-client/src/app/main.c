@@ -12,7 +12,15 @@ int main(void)
 	if(pv_update_is_helper())result=pv_update_run_helper();
 	else
 #endif
-		result=plus_vita_app_run();
+	{
+#if PLUS_VITA_DIRECT_EXPERIMENT
+        if(!pv_direct_recover_startup()) {sceKernelExitProcess(1);return 1;}
+#endif
+        result=plus_vita_app_run();
+#if PLUS_VITA_DIRECT_EXPERIMENT
+        if(pv_direct_commit_pending())result=0;
+#endif
+    }
 	sceKernelExitProcess(result);
 	return result;
 }

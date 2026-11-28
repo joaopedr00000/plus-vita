@@ -395,6 +395,9 @@ int plus_vita_app_run(void)
 	{ free(display); plus_vita_app_destroy(app); plus_vita_account_close(account); plus_vita_account_close(storage); plus_vita_play_close(play); plus_vita_covers_close(covers); plus_vita_diagnostic_ui_end(); return 1; }
 	if(!display_open(display))
 	{ free(display); plus_vita_app_destroy(app); plus_vita_account_close(account); plus_vita_account_close(storage); plus_vita_play_close(play); plus_vita_covers_close(covers); plus_vita_diagnostic_ui_end(); return 1; }
+#if PLUS_VITA_DIRECT_EXPERIMENT
+    pv_direct_confirm();
+#endif
 	/* Keep a process-lifetime reference while account HTTP and artwork overlap.
 	 * Individual account requests balance their own curl reference as before. */
 	bool network_owned = !plus_vita_network_is_initialized();
@@ -807,7 +810,11 @@ int plus_vita_app_run(void)
 	} /* A live cancelled worker retains its resources until process exit. */
 	plus_vita_app_destroy(app);
 	if(recovery_ready) plus_vita_recovery_fini();
-	if(display_close(display)) free(display);
+	bool display_closed=display_close(display);
+    if(display_closed) free(display);
+#if PLUS_VITA_DIRECT_EXPERIMENT
+    if(!account_closed||!storage_closed||!play_closed||!covers_closed||!display_closed)pv_direct_cancel_pending();
+#endif
 	plus_vita_diagnostic_ui_end();
 	/* On failed scanout restoration leave its buffers alive until process exit. */
 	return result;

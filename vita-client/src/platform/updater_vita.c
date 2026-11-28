@@ -18,6 +18,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <dirent.h>
+#include <psp2/io/fcntl.h>
 #include <psp2/net/net.h>
 #include <arpa/inet.h>
 #include <psp2/kernel/processmgr.h>
@@ -355,6 +357,166 @@ static bool new_stage(char root[128]){
     snprintf(root,128,STAGE_ROOT "/UpdateStage-%llu",(unsigned long long)sceKernelGetProcessTimeWide());
     return mkdir(root,0700)==0;
 }
+
+#if PLUS_VITA_DIRECT_EXPERIMENT
+#define DIRECT_ROOT STAGE_ROOT "/DirectUpdate"
+#define DIRECT_JOB DIRECT_ROOT "/pending"
+#define DIRECT_OK DIRECT_ROOT "/confirmed"
+#define DIRECT_SLOT DOWNLOADS "/VitaPlus-B6-SHA256SUMS.txt"
+static bool direct_pending;
+typedef struct {unsigned size[4];char hash[4][65];} DirectJob;
+static const char *const direct_files[]={DIRECT_ROOT "/old-sfo",DIRECT_ROOT "/old-eboot",DIRECT_ROOT "/new-sfo",DIRECT_ROOT "/new-eboot"};
+static const char *const direct_live[]={MAIN_PATH "/sce_sys/param.sfo",MAIN_PATH "/eboot.bin"};
+static bool direct_matches(const char *path,const DirectJob *j,unsigned i){
+    return j->size[i]&&match_hash(path,j->size[i],j->hash[i]);
+}
+static bool direct_read(DirectJob *j){
+    char raw[400];size_t n=0;
+    if(!read_small(DIRECT_JOB,(unsigned char *)raw,sizeof(raw),&n))return false;
+    raw[n]=0;char extra;
+    if(sscanf(raw,"PVD1 %u %64[0-9a-f] %u %64[0-9a-f] %u %64[0-9a-f] %u %64[0-9a-f] %c",
+       &j->size[0],j->hash[0],&j->size[1],j->hash[1],&j->size[2],j->hash[2],&j->size[3],j->hash[3],&extra)!=8)return false;
+    for(unsigned i=0;i<4;i++)if(!j->size[i]||j->size[i]>MAX_VPK||!pv_handoff_hash(j->hash[i]))return false;
+    return true;
+}
+static bool direct_copy(const char *from,const char *to,DirectJob *j,unsigned i){
+    if(!file_size(from,&j->size[i])||!hash_file(from,j->hash[i],j->size[i]))return false;
+    FILE *in=fopen(from,"rb");if(!in)return false;
+    int fd=open(to,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if(fd<0){fclose(in);return false;}
+    FILE *out=fdopen(fd,"wb");if(!out){close(fd);fclose(in);unlink(to);return false;}
+    unsigned char buf[8192];size_t total=0;bool ok=true;
+    while(ok){size_t n=fread(buf,1,sizeof(buf),in);if(!n)break;total+=n;ok=total<=j->size[i]&&fwrite(buf,1,n,out)==n;}
+    ok=ok&&!ferror(in)&&total==j->size[i];
+    fclose(in);if(fflush(out)!=0)ok=false;
+    if(fclose(out)!=0)ok=false;
+    ok=ok&&direct_matches(to,j,i);if(!ok)unlink(to);return ok;
+}
+/* Never recursively remove the persistent backup directory. */
+static void direct_clean(void){
+    for(unsigned i=0;i<4;i++)unlink(direct_files[i]);
+    unlink(DIRECT_ROOT "/restore-sfo");unlink(DIRECT_ROOT "/restore-eboot");
+    unlink(DIRECT_OK);unlink(DIRECT_JOB);rmdir(DIRECT_ROOT);
+}
+static bool direct_resources(const char *root,const char *relative,unsigned depth){
+    if(depth>8)return false;
+    char dir[400];int n=snprintf(dir,sizeof(dir),"%s%s%s",root,*relative?"/":"",relative);
+    if(n<0||(size_t)n>=sizeof(dir))return false;
+    DIR *d=opendir(dir);if(!d)return false;
+    bool ok=true;struct dirent *e;
+    while(ok&&(e=readdir(d))){
+        if(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."))continue;
+        char rel[181],src[400],dst[400];struct stat st;
+        n=snprintf(rel,sizeof(rel),"%s%s%s",relative,*relative?"/":"",e->d_name);
+        if(n<0||(size_t)n>=sizeof(rel)){ok=false;break;}
+        n=snprintf(src,sizeof(src),"%s/%s",root,rel);if(n<0||(size_t)n>=sizeof(src)||stat(src,&st)){ok=false;break;}
+        if(S_ISDIR(st.st_mode)){ok=direct_resources(root,rel,depth+1);continue;}
+        if(!S_ISREG(st.st_mode)||!pv_update_safe_path(rel)){ok=false;break;}
+        if(!strcmp(rel,"eboot.bin")||!strcmp(rel,"sce_sys/param.sfo"))continue;
+        n=snprintf(dst,sizeof(dst),MAIN_PATH "/%s",rel);
+        unsigned size;char hash[65];
+        ok=n>=0&&(size_t)n<sizeof(dst)&&file_size(src,&size)&&hash_file(src,hash,size)&&match_hash(dst,size,hash);
+    }
+    closedir(d);return ok;
+}
+static bool direct_prepare(const Candidate *c,const char *root){
+    /* Only the paired, private B5 -> B6 test is allowed to exercise this
+     * path; all other releases still use the normal B4 helper. */
+    if(strcmp(PLUS_VITA_APP_VERSION,"v0.0.6-b5")||strcmp(c->tag,"v0.0.6-b6"))return false;
+    char title[32]={0},sfo[400],eboot[400],old[16]={0},next[16]={0};
+    if(sceAppMgrAppParamGetString(0,12,title,sizeof(title))<0||strcmp(title,PV_MAIN_TITLE))return false;
+    snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",root);
+    snprintf(eboot,sizeof(eboot),"%s/eboot.bin",root);
+    if(!read_version(direct_live[0],PV_MAIN_TITLE,old)||strcmp(old,"00.32")||
+       !read_version(sfo,PV_MAIN_TITLE,next)||strcmp(next,"00.33")||
+       !direct_resources(root,"",0))return false;
+    if(mkdir(DIRECT_ROOT,0700)!=0)return false; /* never overwrite an earlier recovery */
+    DirectJob j={0};
+    if(!direct_copy(direct_live[0],direct_files[0],&j,0)||
+       !direct_copy(direct_live[1],direct_files[1],&j,1)||
+       !direct_copy(sfo,direct_files[2],&j,2)||
+       !direct_copy(eboot,direct_files[3],&j,3)){direct_clean();return false;}
+    char raw[400];int n=snprintf(raw,sizeof(raw),"PVD1 %u %s %u %s %u %s %u %s\n",
+        j.size[0],j.hash[0],j.size[1],j.hash[1],j.size[2],j.hash[2],j.size[3],j.hash[3]);
+    if(n<0||(size_t)n>=sizeof(raw)||!write_new(DIRECT_JOB,raw,(size_t)n)){direct_clean();return false;}
+    sceIoSync("ux0:",0);
+    direct_pending=true;return true;
+}
+static bool direct_restore(const DirectJob *j){
+    bool ok=true;
+    const char *const tmp[]={DIRECT_ROOT "/restore-sfo",DIRECT_ROOT "/restore-eboot"};
+    /* Roll back only known old/new files; never replace an unknown file. */
+    for(unsigned i=0;i<2;i++){
+        if(direct_matches(direct_live[i],j,i))continue;
+        if(!direct_matches(direct_live[i],j,i+2)||!direct_matches(direct_files[i],j,i)){ok=false;continue;}
+        DirectJob copy={0};
+        if(!direct_copy(direct_files[i],tmp[i],&copy,i)){ok=false;continue;}
+        if(!direct_matches(tmp[i],j,i)||rename(tmp[i],direct_live[i])!=0||
+           !direct_matches(direct_live[i],j,i))ok=false;
+        unlink(tmp[i]);
+    }
+    sceIoSync("ux0:",0);return ok;
+}
+void pv_direct_cancel_pending(void){
+    if(direct_pending){direct_pending=false;direct_clean();}
+}
+bool pv_direct_commit_pending(void){
+    if(!direct_pending)return false;
+    direct_pending=false;DirectJob j={0};
+    if(!direct_read(&j)||!direct_matches(direct_live[0],&j,0)||!direct_matches(direct_live[1],&j,1)||
+       !direct_matches(direct_files[0],&j,0)||!direct_matches(direct_files[1],&j,1)||
+       !direct_matches(direct_files[2],&j,2)||!direct_matches(direct_files[3],&j,3))return true;
+    /* Unlike VitaDB, only attempt this after UI and network shutdown.
+     * Never unlink a live file to work around FAT rename limitations. */
+    if(sceAppMgrUmount("app0:")<0)return true;
+    if(rename(direct_files[2],direct_live[0])!=0||
+       !direct_matches(direct_live[0],&j,2)||
+       rename(direct_files[3],direct_live[1])!=0||
+       !direct_matches(direct_live[1],&j,3)){
+        (void)direct_restore(&j);return true;
+    }
+    sceIoSync("ux0:",0);
+    /* Successful LoadExec does not return. On failure restore both files. */
+    sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);
+    (void)direct_restore(&j);return true;
+}
+bool pv_direct_recover_startup(void){
+    struct stat st;DirectJob j={0};
+    if(stat(DIRECT_JOB,&st)!=0||stat(DIRECT_OK,&st)==0)return true;
+    if(!direct_read(&j))return true; /* preserve for manual repair */
+    if(!strcmp(PLUS_VITA_APP_VERSION,"v0.0.6-b6")&&
+       direct_matches(direct_live[0],&j,2)&&direct_matches(direct_live[1],&j,3))return true;
+    if(strcmp(PLUS_VITA_APP_VERSION,"v0.0.6-b5"))return true;
+    if(direct_matches(direct_live[0],&j,0)&&direct_matches(direct_live[1],&j,1)){
+        /* The B5 executable is intact. Keep backups and permit helper retry. */
+        return true;
+    }
+    if(sceAppMgrUmount("app0:")<0)return true;
+    if(direct_restore(&j))sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);
+    return false;
+}
+void pv_direct_confirm(void){
+    DirectJob j={0};
+    if(!strcmp(PLUS_VITA_APP_VERSION,"v0.0.6-b6")&&direct_read(&j)&&
+       direct_matches(direct_live[0],&j,2)&&direct_matches(direct_live[1],&j,3)){
+        (void)write_new(DIRECT_OK,"B6\n",3);sceIoSync("ux0:",0);
+    }
+}
+static bool direct_local_candidate(PvUpdater *u){
+    if(!u->report.beta||strcmp(PLUS_VITA_APP_VERSION,"v0.0.6-b5"))return false;
+    char sums[16385],hash[65];size_t n=0;unsigned size;
+    if(!read_small(DIRECT_SLOT,(unsigned char *)sums,sizeof(sums),&n))return false;
+    sums[n]=0;
+    if(!pv_update_checksum(sums,"VitaPlus-v0.0.6-b6.vpk",hash)||!file_size(VPK,&size)||
+       !match_hash(VPK,size,hash)||!pv_update_identity(VPK))return false;
+    Candidate *c=&u->candidate;memset(c,0,sizeof(*c));c->size=size;
+    strcpy(c->tag,"v0.0.6-b6");strcpy(c->asset,"VitaPlus-v0.0.6-b6.vpk");
+    strcpy(c->hash,hash);strcpy(c->path,VPK);
+    strcpy(c->notes,"Local B6 test. Verify the checksum against the GitHub Actions artifact before installing.");
+    return true;
+}
+#endif
+
 static PvUpdateState install_fail(PvUpdater *u,unsigned stage,int code){u->install_stage=stage;u->install_error=code;return PV_UP_ERROR;}
 static PvUpdateState install(PvUpdater *u){
     Candidate *c=&u->candidate;char root[128],path[256],ver[16]={0},current[16]={0};
@@ -371,6 +533,11 @@ static PvUpdateState install(PvUpdater *u){
     if(!read_version(path,PV_MAIN_TITLE,ver)||!read_version("app0:sce_sys/param.sfo",PV_MAIN_TITLE,current)||strcmp(ver,current)<=0){
         pv_update_clean_stage(root);return install_fail(u,4,-1);
     }
+#if PLUS_VITA_DIRECT_EXPERIMENT
+    if(u->command==PV_UP_CMD_INSTALL&&direct_prepare(c,root)){
+        pv_update_clean_stage(root);return PV_UP_HANDOFF;
+    }
+#endif
     memcpy(job.appver,ver,6);
     if(!helper_sfo(path)){pv_update_clean_stage(root);return install_fail(u,12,-3);}
     snprintf(path,sizeof(path),"%s/eboot.bin",root);
@@ -467,8 +634,13 @@ static void recover_handoff(PvUpdater *u){
 }
 static void *worker(void *opaque){
     PvUpdater *u=opaque;
-    PvUpdateState state=u->command==PV_UP_CMD_CHECK?check(u):u->command==PV_UP_CMD_DOWNLOAD?download(u):install(u);
-    if(atomic_load(&u->cancel)&&u->command!=PV_UP_CMD_INSTALL&&state!=PV_UP_READY)state=PV_UP_CANCELLED;
+    PvUpdateState state;
+#if PLUS_VITA_DIRECT_EXPERIMENT
+    if(u->command==PV_UP_CMD_CHECK&&direct_local_candidate(u))state=PV_UP_READY;
+    else
+#endif
+    state=u->command==PV_UP_CMD_CHECK?check(u):u->command==PV_UP_CMD_DOWNLOAD?download(u):install(u);
+    if(atomic_load(&u->cancel)&&u->command!=PV_UP_CMD_INSTALL&&u->command!=PV_UP_CMD_INSTALL_HELPER&&state!=PV_UP_READY)state=PV_UP_CANCELLED;
     u->result=state;atomic_store(&u->done,true);return NULL;
 }
 static bool save_prefs(PvUpdater *u){
@@ -490,12 +662,12 @@ bool pv_updater_busy(const PvUpdater *u){return u&&u->running;}
 bool pv_updater_automatic(const PvUpdater *u){return u&&u->report.automatic&&!u->report.install_stage;}
 void pv_updater_destroy(PvUpdater *u){
     if(!u)return;
-    if(u->running){if(u->command!=PV_UP_CMD_INSTALL)atomic_store(&u->cancel,true);pthread_join(u->thread,NULL);}
+    if(u->running){if(u->command!=PV_UP_CMD_INSTALL&&u->command!=PV_UP_CMD_INSTALL_HELPER)atomic_store(&u->cancel,true);pthread_join(u->thread,NULL);}
     free(u);
 }
 bool pv_updater_command(PvUpdater *u,PvUpdateCommand cmd,unsigned lang){
     if(!u)return false;
-    if(cmd==PV_UP_CMD_CANCEL){if(u->running&&u->command!=PV_UP_CMD_INSTALL)atomic_store(&u->cancel,true);u->dirty=true;return true;}
+    if(cmd==PV_UP_CMD_CANCEL){if(u->running&&u->command!=PV_UP_CMD_INSTALL&&u->command!=PV_UP_CMD_INSTALL_HELPER)atomic_store(&u->cancel,true);u->dirty=true;return true;}
     if(u->running){u->dirty=true;return false;}
     if(cmd==PV_UP_CMD_CHANNEL||cmd==PV_UP_CMD_AUTO){
         bool b=u->report.beta,a=u->report.automatic;
@@ -504,8 +676,8 @@ bool pv_updater_command(PvUpdater *u,PvUpdateCommand cmd,unsigned lang){
         else if(cmd==PV_UP_CMD_CHANNEL){memset(&u->candidate,0,sizeof(u->candidate));u->report.state=PV_UP_IDLE;u->report.version[0]=u->report.notes[0]=u->report.file[0]=0;}
         u->dirty=true;return true;
     }
-    if((cmd==PV_UP_CMD_DOWNLOAD&&u->report.state!=PV_UP_AVAILABLE)||(cmd==PV_UP_CMD_INSTALL&&u->report.state!=PV_UP_READY)){u->dirty=true;return false;}
-    if(cmd==PV_UP_CMD_INSTALL&&u->install_unsafe)return false;
+    if((cmd==PV_UP_CMD_DOWNLOAD&&u->report.state!=PV_UP_AVAILABLE)||((cmd==PV_UP_CMD_INSTALL||cmd==PV_UP_CMD_INSTALL_HELPER)&&u->report.state!=PV_UP_READY)){u->dirty=true;return false;}
+    if((cmd==PV_UP_CMD_INSTALL||cmd==PV_UP_CMD_INSTALL_HELPER)&&u->install_unsafe)return false;
     u->install_stage=0;u->install_error=0;u->report.install_stage=0;u->report.install_error=0;
     u->command=cmd;u->lang=lang;atomic_store(&u->cancel,false);atomic_store(&u->done,false);atomic_store(&u->progress,0);u->last_progress=0;
     u->report.progress=0;u->report.state=cmd==PV_UP_CMD_CHECK?PV_UP_CHECKING:cmd==PV_UP_CMD_DOWNLOAD?PV_UP_DOWNLOADING:PV_UP_INSTALLING;
@@ -521,7 +693,7 @@ bool pv_updater_poll(PvUpdater *u,PvUpdateReport *out){
         pthread_join(u->thread,NULL);u->running=false;u->report.state=u->result;
         if(u->command==PV_UP_CMD_CHECK){
             u->report.version[0]=u->report.notes[0]=u->report.file[0]=0;
-            PvVersion v;if(u->result==PV_UP_AVAILABLE&&pv_version_parse(u->candidate.tag,&v)){pv_version_display(v,u->report.version);strcpy(u->report.notes,u->candidate.notes);}
+            PvVersion v;if((u->result==PV_UP_AVAILABLE||u->result==PV_UP_READY)&&pv_version_parse(u->candidate.tag,&v)){pv_version_display(v,u->report.version);strcpy(u->report.notes,u->candidate.notes);}
         }
         if(u->result==PV_UP_READY)strcpy(u->report.file,u->candidate.path);
         u->report.install_stage=u->install_stage;u->report.install_error=u->install_error;

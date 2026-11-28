@@ -210,7 +210,14 @@ static void update_view(PlusVitaApp *app){
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_AUTO,q->automatic?"Automatic checks: On":"Automatic checks: Off",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHECK,"Check for updates",64,0,832,34};
     if(q->state==PV_UP_AVAILABLE)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_DOWNLOAD,"Download update",64,0,832,34};
-    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and reopen manually",64,0,832,34};
+    if(q->state==PV_UP_READY){
+#if PLUS_VITA_DIRECT_EXPERIMENT
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install verified update",64,0,832,34};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL_HELPER,"Install and reopen manually",64,0,832,34};
+#else
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and reopen manually",64,0,832,34};
+#endif
+    }
     if(len>220&&q->state!=PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
     int first=490-(int)app->view.action_count*40;
@@ -1836,6 +1843,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
             if(action==PLUS_VITA_ACTION_UPDATE_CHECK)return update_effect(app,PV_UP_CMD_CHECK);
             if(action==PLUS_VITA_ACTION_UPDATE_DOWNLOAD)return update_effect(app,PV_UP_CMD_DOWNLOAD);
             if(action==PLUS_VITA_ACTION_UPDATE_INSTALL)return update_effect(app,PV_UP_CMD_INSTALL);
+            if(action==PLUS_VITA_ACTION_UPDATE_INSTALL_HELPER)return update_effect(app,PV_UP_CMD_INSTALL_HELPER);
             return effect;
         }
         else if(action==PLUS_VITA_ACTION_THEME && view->screen==PLUS_VITA_APP_SETTINGS)theme_view(app,NULL);

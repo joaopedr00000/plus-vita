@@ -5,6 +5,12 @@
 typedef struct PvUpdater PvUpdater;
 bool pv_update_is_helper(void);
 int pv_update_run_helper(void);
+#if PLUS_VITA_DIRECT_EXPERIMENT
+bool pv_direct_commit_pending(void);
+bool pv_direct_recover_startup(void);
+void pv_direct_cancel_pending(void);
+void pv_direct_confirm(void);
+#endif
 PvUpdater *pv_updater_create(void);
 void pv_updater_destroy(PvUpdater *u);
 bool pv_updater_command(PvUpdater *u,PvUpdateCommand cmd,unsigned language);
