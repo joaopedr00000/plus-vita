@@ -179,6 +179,7 @@ typedef struct plus_vita_stream_probe_t
 	unsigned int feedback_reports;
 	unsigned int heartbeats_sent;
 	unsigned int quality_reports;
+    unsigned server_target_raw,server_upstream_raw;
 	PlusVitaVideoDecoder video_decoder;
 	bool video_decoder_ready;
 	unsigned int video_decode_attempts;
@@ -1265,6 +1266,8 @@ static void probe_handle_streaminfo(PlusVitaStreamProbe *probe, uint8_t *buf,
 	probe->video_header_size = context.video_header_size;
 	probe->video_width = context.video_width;
 	probe->video_height = context.video_height;
+    plus_vita_diagnostic_event("video.width",(int)probe->video_width);
+    plus_vita_diagnostic_event("video.height",(int)probe->video_height);
 	probe->selected_profile_index = context.selected_profile_index;
 	if(probe->capture_only)
 	{
@@ -1433,6 +1436,8 @@ static void probe_takion_cb(ChiakiTakionEvent *event, void *user)
 				&& msg.has_connection_quality_payload)
 			{
 				probe->quality_reports++;
+                probe->server_target_raw=(unsigned)msg.connection_quality_payload.target_bitrate;
+                probe->server_upstream_raw=(unsigned)msg.connection_quality_payload.upstream_bitrate;
 				CHIAKI_LOGI(probe->log,
 					"Stream probe server quality: target_bitrate=%u upstream_bitrate=%u loss=%lld",
 					(unsigned int)msg.connection_quality_payload.target_bitrate,
@@ -1737,7 +1742,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #endif
 	CHIAKI_LOGI(probe->log,"Stream probe scanout slots=%u (3=overlapped decode, 2=fallback)",present.slots.count);
 #if PLUS_VITA_ADAPTIVE_STREAM
-	uint64_t hud_at=started,hud_rx=0;unsigned hud_frames=0,hud_saved=0,hud_expired=0;char hud_line[180]={0};
+	uint64_t hud_at=started,hud_rx=0,quality_at=started,quality_rx=0;unsigned hud_frames=0,hud_saved=0,hud_expired=0;char hud_line[180]={0};
 #endif
 	unsigned int decoded = 0, presentation_skips = 0;
 	unsigned int recovery_generation_fed = 0;
@@ -1917,6 +1922,17 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			if(err != CHIAKI_ERR_SUCCESS) break;
 		}
 		#if PLUS_VITA_ADAPTIVE_STREAM
+        if(shown.first_display&&now-quality_at>=5000u){
+            uint64_t rate=(probe->video_rx_bytes-quality_rx)*8u/(now-quality_at);
+            plus_vita_diagnostic_event("video.rx_kbps",(int)(rate>100000000u?100000000u:rate));
+            plus_vita_diagnostic_event("video.picture_width",(int)probe->video_decoder.picture_width);
+            plus_vita_diagnostic_event("video.picture_height",(int)probe->video_decoder.picture_height);
+            if(probe->quality_reports){
+                plus_vita_diagnostic_event("video.server_target_raw",(int)probe->server_target_raw);
+                plus_vita_diagnostic_event("video.server_upstream_raw",(int)probe->server_upstream_raw);
+            }
+            quality_at=now;quality_rx=probe->video_rx_bytes;
+        }
 		if(now-hud_at>=1000) {
 			unsigned saved=probe->reorder_saved_frames-hud_saved,expired=probe->reorder_expired_frames+probe->reorder_missing_frames-hud_expired;
 			if(pv_opt(probe->options,PV_OPT_REORDER))probe->video_reorder.grace_us=pv_reorder_adjust(pv_profile_reorder(probe->profile_kbps),probe->video_reorder.grace_us,saved,expired);

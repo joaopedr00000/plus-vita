@@ -12,6 +12,7 @@
 #include "stream_affinity.h"
 #include "stream_options.h"
 #include "audio_diagnostic.h"
+#include "pcm_transition.h"
 #include <time.h>
 #define AUDIO_QUEUE 32
 #define AUDIO_UNIT_MAX 255
@@ -29,7 +30,10 @@ struct plus_vita_audio_playback_t {
 	AudioUnit queue[AUDIO_QUEUE];
 	unsigned head, count, peak, dropped, decoded, outputs, concealed, stale;
 	unsigned prebuffer_base, prebuffer_target, clean_audio_units, prebuffer_floor;
-	bool audio_buffering, audio_fade;
+	bool audio_buffering, audio_fade, tail_valid;
+    int16_t pcm_tail[2];
+    unsigned transition_count, local_decoder_realign;
+    uint64_t pcm_full_scale;
 	bool sequence_valid;
 	uint16_t sequence;
 	int16_t block[AUDIO_BLOCK * 2];
@@ -66,7 +70,7 @@ static void audio_log_timing(PlusVitaAudioPlayback *a, const char *phase)
         .refill_count=a->refill_count,.brief_waits=a->brief_waits,.target_ms=10u*target,.block_frames=a->block_frames,.failed=a->failed,
         .queue_age_avg_us=a->queue_age_samples?a->queue_age_total_us/a->queue_age_samples:0,.queue_age_max_us=a->queue_age_max_us,.arrival_gap_max_us=arrival_gap_max_us,
         .output_gap_max_us=a->output_gap_max_us,.output_call_max_us=a->output_call_max_us,.refill_wait_total_us=a->refill_wait_total_us,.refill_wait_max_us=a->refill_wait_max_us,
-        .discarded_pcm_samples=a->discarded_pcm_samples,.trimmed_pcm_samples=a->trimmed_pcm_samples,.arrival_discontinuities=discontinuities,.discontinuity_resets=a->discontinuity_resets,.decode_errors=a->decode_errors};
+        .discarded_pcm_samples=a->discarded_pcm_samples,.trimmed_pcm_samples=a->trimmed_pcm_samples,.arrival_discontinuities=discontinuities,.discontinuity_resets=a->discontinuity_resets,.decode_errors=a->decode_errors,.transition_count=a->transition_count,.local_decoder_realign=a->local_decoder_realign,.pcm_peak_l=a->pcm_peak[0],.pcm_peak_r=a->pcm_peak[1],.pcm_full_scale=a->pcm_full_scale};
     plus_vita_diagnostic_audio(&snapshot,!strcmp(phase,"final"));
 	CHIAKI_LOGI(a->log,
 		"Stream probe audio timing %s decoded=%u arrived=%u arrival_gap_max_us=%llu arrival_gt20ms=%u arrival_gt40ms=%u empty_waits=%u empty_wait_max_us=%llu empty_gt20ms=%u output_gap_max_us=%llu output_gap_stalls=%u output_call_max_us=%llu output_call_stalls=%u stall_budget_us=%llu queue_age_avg_us=%llu queue_age_max_us=%llu queue_now=%u seq_gaps=%u seq_resets=%u max_missing=%u skipped_local=%u",
@@ -98,6 +102,7 @@ static void audio_measure(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned
 		int value = pcm[i * a->channels + ch];
 		unsigned magnitude = (unsigned)(value < 0 ? -value : value);
 		if(magnitude > a->pcm_peak[ch]) a->pcm_peak[ch] = magnitude;
+        if(magnitude>=32767u)a->pcm_full_scale++;
 		a->pcm_samples[ch]++; if(value) a->pcm_nonzero[ch]++;
 		a->pcm_square_sum[ch] += (uint64_t)magnitude * magnitude;
 	}
@@ -127,6 +132,20 @@ static bool audio_output(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned 
 		}
 	}
 	return true;
+}
+
+/* Only the worker owns this transition state. The tail is the previous
+ * PCM sample accepted by the output path, not an arbitrary decoded sample. */
+static bool audio_emit(PlusVitaAudioPlayback *a,int16_t *pcm,unsigned samples){
+    if(a->audio_fade){
+        pv_pcm_transition(pcm,samples,(unsigned)a->channels,a->pcm_tail,a->tail_valid);
+        a->audio_fade=false;a->transition_count++;
+    }
+    if(samples){
+        for(int c=0;c<a->channels;c++)a->pcm_tail[c]=pcm[(samples-1u)*(unsigned)a->channels+(unsigned)c];
+        a->tail_valid=true;
+    }
+    return audio_output(a,pcm,samples);
 }
 
 /* Absorb one brief packet interval without flushing residual PCM or raising
@@ -171,9 +190,10 @@ static void *audio_worker(void *user)
         a->port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,a->block_frames,48000,a->channels==2?SCE_AUDIO_OUT_MODE_STEREO:SCE_AUDIO_OUT_MODE_MONO);
     }
 	if(a->port < 0) goto failed;
-	int volume[2] = { SCE_AUDIO_OUT_MAX_VOL, SCE_AUDIO_OUT_MAX_VOL };
+	/* Modest output headroom (~1.16 dB); decoded PCM remains unchanged. */
+    int volume[2] = { SCE_AUDIO_OUT_MAX_VOL*7/8, SCE_AUDIO_OUT_MAX_VOL*7/8 };
 	if(sceAudioOutSetVolume(a->port, SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH, volume) < 0) goto failed;
-	CHIAKI_LOGI(a->log, "Stream probe audio playback started queue=%u block=%u volume=unity port_len=%d port_freq=%d port_mode=%d",
+	CHIAKI_LOGI(a->log, "Stream probe audio playback started queue=%u block=%u volume=7/8 port_len=%d port_freq=%d port_mode=%d",
 		AUDIO_QUEUE, a->block_frames,
 		sceAudioOutGetConfig(a->port, SCE_AUDIO_OUT_CONFIG_TYPE_LEN),
 		sceAudioOutGetConfig(a->port, SCE_AUDIO_OUT_CONFIG_TYPE_FREQ),
@@ -191,7 +211,7 @@ static void *audio_worker(void *user)
             if(!a->count&&!a->stop){
                 if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,true);
                 a->refill_count++;a->refill_started_us=sceKernelGetProcessTimeWide();
-                a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;
+                a->audio_buffering=true;a->audio_fade=true;a->tail_valid=false;a->clean_audio_units=0;
                 a->discarded_pcm_samples+=a->fill;a->fill=0;
             }
         }
@@ -250,7 +270,7 @@ static void *audio_worker(void *user)
                 if(opus_decoder_ctl(a->decoder, OPUS_RESET_STATE)!=OPUS_OK)goto failed;
                 a->discontinuity_resets++;
                 a->discarded_pcm_samples+=a->fill;a->fill=0;
-                a->sequence_valid=false;a->audio_fade=true;
+                a->sequence_valid=false;a->audio_fade=true;a->tail_valid=false;
             }
             pending_local_drops=0;
         }
@@ -271,14 +291,32 @@ static void *audio_worker(void *user)
 			/* Fade in after deliberately skipping stale audio to reduce clicks. */
 			if(local && a->prebuffer_base)a->audio_fade=true;
 #endif
-			if(wire_missing <= 3) {
-				for(unsigned i = 0; i < wire_missing; i++) {
-					int n = opus_decode(a->decoder, NULL, 0, pcm, 480, 0);
-					if(n != 480){memset(pcm,0,sizeof(pcm));n=480;a->decode_errors++;a->audio_fade=true;}
-                    if(!audio_output(a, pcm, (unsigned)n)) goto failed;
-					a->concealed++;
-				}
-			} else { a->sequence_resets++; if(opus_decoder_ctl(a->decoder, OPUS_RESET_STATE)!=OPUS_OK)goto failed; a->discarded_pcm_samples+=a->fill;a->fill = 0; a->audio_fade=true; }
+            /* The old path skipped locally evicted compressed units without
+             * advancing Opus state. Advance up to three missing units using
+             * PLC, but never play PLC for local evictions. Reset on larger
+             * discontinuities rather than decoding against stale state. */
+            if(missing<=3){
+                for(unsigned i=0;i<local;i++){
+                    int n=opus_decode(a->decoder,NULL,0,pcm,480,0);
+                    if(n!=480){
+                        a->decode_errors++;
+                        if(opus_decoder_ctl(a->decoder,OPUS_RESET_STATE)!=OPUS_OK)goto failed;
+                        break;
+                    }
+                }
+                if(local)a->local_decoder_realign++;
+                for(unsigned i=0;i<wire_missing;i++){
+                    int n=opus_decode(a->decoder,NULL,0,pcm,480,0);
+                    if(n!=480){memset(pcm,0,sizeof(pcm));n=480;a->decode_errors++;a->audio_fade=true;}
+                    if(!audio_emit(a,pcm,(unsigned)n))goto failed;
+                    a->concealed++;
+                }
+            }else{
+                a->sequence_resets++;if(local)a->local_decoder_realign++;
+                if(opus_decoder_ctl(a->decoder,OPUS_RESET_STATE)!=OPUS_OK)goto failed;
+                a->discarded_pcm_samples+=a->fill;a->fill=0;
+                a->audio_fade=true;a->tail_valid=false;
+            }
 		}
 		pending_local_drops = 0;
 		int n = opus_decode(a->decoder, unit.data, (opus_int32)unit.size, pcm, 480, 0);
@@ -292,21 +330,13 @@ static void *audio_worker(void *user)
             memset(pcm,0,sizeof(pcm));
             a->sequence=unit.sequence;a->sequence_valid=true;
             a->audio_fade=true;
-            if(!audio_output(a,pcm,480))goto failed;
+            if(!audio_emit(a,pcm,480))goto failed;
+            a->audio_fade=true;
             continue;
         }
         a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
 #if PLUS_VITA_ADAPTIVE_STREAM
 		bool stable_pcm=a->decoded>2&&!a->audio_fade;
-		if(a->audio_fade) {
-			for(unsigned i=0;i<240;i++) {
-				for(int ch=0;ch<a->channels;ch++) {
-					size_t index=(size_t)i*(size_t)a->channels+(size_t)ch;
-					pcm[index]=(int16_t)((int32_t)pcm[index]*(int)i/240);
-				}
-			}
-			a->audio_fade=false;
-		}
 #endif
 		audio_measure(a, pcm, (unsigned)n);
 		if(a->decoded == 1 || a->decoded % 1000 == 0) {
@@ -323,7 +353,7 @@ static void *audio_worker(void *user)
 		n=(int)pv_pcm_shorten(pcm,(unsigned)n,(unsigned)a->channels,trim);
         a->trimmed_pcm_samples+=original-(unsigned)n;
 		#endif
-		if(!audio_output(a, pcm, (unsigned)n)) goto failed;
+		if(!audio_emit(a, pcm, (unsigned)n)) goto failed;
 		if(a->decoded == 1) CHIAKI_LOGI(a->log, "Stream probe audio first PCM decoded samples=%d", n);
 	}
 	return NULL;

@@ -10,6 +10,8 @@ typedef struct {
     unsigned seq_gaps,seq_resets,max_missing,skipped_local,empty_waits;
     unsigned refill_count,brief_waits,target_ms,block_frames,failed;
     unsigned arrival_discontinuities,discontinuity_resets,decode_errors;
+    unsigned transition_count,local_decoder_realign,pcm_peak_l,pcm_peak_r;
+    uint64_t pcm_full_scale;
     uint64_t queue_age_avg_us,queue_age_max_us,arrival_gap_max_us,output_gap_max_us,output_call_max_us;
     uint64_t refill_wait_total_us,refill_wait_max_us,discarded_pcm_samples,trimmed_pcm_samples;
 } PvAudioDiagnostic;

@@ -21,5 +21,7 @@ int main(void){
     assert(pv_update_eligible(s,b,true,true,false)&&!pv_update_eligible(s,b,false,true,false));
     assert(pv_version_parse("v0.0.7-b2",&c));
     assert(pv_update_eligible(b,c,true,true,false)&&!pv_update_eligible(b,c,false,true,false));
+    assert(pv_version_parse("v0.0.7-b3",&d));
+    assert(pv_update_eligible(c,d,true,true,false)&&!pv_update_eligible(c,d,false,true,false));
     puts("Update policy tests passed");return 0;
 }

@@ -25,6 +25,18 @@ static inline bool plus_vita_cloud_identifier_valid(const char *value)
 {
 	return plus_vita_cloud_ascii_id(value,128) && strlen(value)>=8;
 }
+static inline bool pv_cloud_enum_equal(const char *s,const char *literal){
+    if(!s||!literal)return false;
+    while(*s&&*literal){unsigned char c=(unsigned char)*s++;if(c>='A'&&c<='Z')c=(unsigned char)(c-'A'+'a');if(c!=(unsigned char)*literal++)return false;}
+    return !*s&&!*literal;
+}
+static inline bool pv_ps5_catalog_candidate(const char *service,const char *platform,const char *category){
+    return pv_cloud_enum_equal(service,"pscloud")&&pv_cloud_enum_equal(platform,"ps5")&&
+        (pv_cloud_enum_equal(category,"owned")||pv_cloud_enum_equal(category,"streamable"));
+}
+static inline bool pv_ps5_catalog_launchable(const char *service,const char *platform,const char *category,const char *stream){
+    return pv_ps5_catalog_candidate(service,platform,category)&&plus_vita_cloud_identifier_valid(stream);
+}
 static inline bool plus_vita_bitrate_valid(unsigned value)
 {
 	#if PLUS_VITA_ADAPTIVE_STREAM

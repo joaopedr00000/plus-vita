@@ -11,6 +11,12 @@ int main(void)
 	assert(plus_vita_manual_dc_valid("example-dc_1"));
 	assert(!plus_vita_cloud_identifier_valid("short"));
 	assert(plus_vita_cloud_identifier_valid("EXAMPLE-ENTITLEMENT"));
+    assert(pv_ps5_catalog_launchable("pscloud","ps5","streamable","EXAMPLE-ENTITLEMENT"));
+    assert(pv_ps5_catalog_launchable("PSCLOUD","PS5","OWNED","EXAMPLE-ENTITLEMENT"));
+    assert(!pv_ps5_catalog_launchable("psnow","ps5","owned","EXAMPLE-ENTITLEMENT"));
+    assert(!pv_ps5_catalog_launchable("pscloud","ps5","purchase","EXAMPLE-ENTITLEMENT"));
+    assert(!pv_ps5_catalog_launchable("pscloud","ps5","owned","bad/id"));
+    assert(!pv_ps5_catalog_launchable("pscloud","ps4","owned","EXAMPLE-ENTITLEMENT"));
 	assert(!plus_vita_bitrate_valid(0));
 	assert(!plus_vita_bitrate_valid(16000));
 	assert(plus_vita_next_bitrate(4000)==8000);

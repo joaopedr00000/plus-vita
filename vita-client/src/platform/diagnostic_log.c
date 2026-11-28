@@ -479,7 +479,7 @@ void plus_vita_diagnostic_event(const char *event, int code)
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
-		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase"};
+		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase","video.request_kbps","video.width","video.height","video.picture_width","video.picture_height","video.rx_kbps","video.server_target_raw","video.server_upstream_raw","catalog.ps5_candidates","catalog.ps5_accepted","catalog.ps5_invalid_id","catalog.ps5_result"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {
@@ -489,6 +489,8 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			else if(!strcmp(names[i],"allocation.http")) code=code>=100 && code<=599 ? code : 0;
 			else if(!strcmp(names[i],"allocation.reason")) code=code>=0 && code<=21 ? code : 0;
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
+            else if(!strncmp(names[i],"video.",6))code=code>=0&&code<=100000000?code:-1;
+            else if(!strncmp(names[i],"catalog.ps5_",12))code=code>=0&&code<=100000?code:-1;
 			else if(!strcmp(names[i],"auth.phase")||!strcmp(names[i],"https.phase")||!strcmp(names[i],"catalog.phase")) code=code>=0&&code<=20?code:-1;
 			else code=code>=-1 && code<=21 ? code : -1;
 			pthread_mutex_lock(&diagnostic_write_mutex);
@@ -611,6 +613,8 @@ void plus_vita_diagnostic_audio(const PvAudioDiagnostic *v,bool final){
         "%s audio arrived=%u decoded=%u outputs=%u concealed=%u stale=%u dropped=%u queue_peak=%u queue_now=%u arrival_gt20ms=%u arrival_gt40ms=%u output_gap_stalls=%u output_call_stalls=%u seq_gaps=%u seq_resets=%u max_missing=%u skipped_local=%u empty_waits=%u refill_count=%u brief_waits=%u target_ms=%u block_frames=%u failed=%u queue_age_avg_us=%llu queue_age_max_us=%llu arrival_gap_max_us=%llu output_gap_max_us=%llu output_call_max_us=%llu refill_wait_total_us=%llu refill_wait_max_us=%llu discarded_pcm_samples=%llu trimmed_pcm_samples=%llu arrival_discontinuities=%u discontinuity_resets=%u decode_errors=%u",
         final?"final":"periodic",v->arrived,v->decoded,v->outputs,v->concealed,v->stale,v->dropped,v->queue_peak,v->queue_now,v->arrival_gt20ms,v->arrival_gt40ms,v->output_gap_stalls,v->output_call_stalls,v->seq_gaps,v->seq_resets,v->max_missing,v->skipped_local,v->empty_waits,v->refill_count,v->brief_waits,v->target_ms,v->block_frames,v->failed,
         (unsigned long long)v->queue_age_avg_us,(unsigned long long)v->queue_age_max_us,(unsigned long long)v->arrival_gap_max_us,(unsigned long long)v->output_gap_max_us,(unsigned long long)v->output_call_max_us,(unsigned long long)v->refill_wait_total_us,(unsigned long long)v->refill_wait_max_us,(unsigned long long)v->discarded_pcm_samples,(unsigned long long)v->trimmed_pcm_samples,v->arrival_discontinuities,v->discontinuity_resets,v->decode_errors);
+    if(n>0&&(size_t)n<sizeof(record))write_line("AUDIO",record,0);
+    n=snprintf(record,sizeof(record),"%s pcm peak_l=%u peak_r=%u full_scale=%llu transitions=%u local_decoder_realign=%u",final?"final":"periodic",v->pcm_peak_l,v->pcm_peak_r,(unsigned long long)v->pcm_full_scale,v->transition_count,v->local_decoder_realign);
     if(n>0&&(size_t)n<sizeof(record))write_line("AUDIO",record,0);
 }
 

@@ -30,7 +30,7 @@ on:
       - "release/v0.0.5.md"
       - "release/v0.0.5-2.md"
       - "release/v0.1.0.md"
-      - "release/v0.0.7-b2.md"
+      - "release/v0.0.7-b3.md"
       - "tools/test-app-freetype.sh"
   pull_request:
     paths:
@@ -57,7 +57,7 @@ on:
       - "release/v0.0.5.md"
       - "release/v0.0.5-2.md"
       - "release/v0.1.0.md"
-      - "release/v0.0.7-b2.md"
+      - "release/v0.0.7-b3.md"
       - "tools/test-app-freetype.sh"
   workflow_dispatch:
 
@@ -69,12 +69,12 @@ jobs:
         with:
           submodules: recursive
       - name: Test experimental datacenter and bitrate helpers
-        if: github.ref == 'refs/heads/beta1' || (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: github.ref == 'refs/heads/beta1' || (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_cloud_experimental.c -o /tmp/plus-vita-cloud-test
           /tmp/plus-vita-cloud-test
       - name: Test offline browser to native encrypted QR interoperability
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           sudo apt-get update
           sudo apt-get install -y libmbedtls-dev
@@ -92,12 +92,16 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_stream_options.c -o /tmp/pv-stream-options
           /tmp/pv-stream-options
       - name: Test adaptive streaming policy
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_adaptive_stream.c -o /tmp/pv-adaptive
           /tmp/pv-adaptive
           cc -std=c11 -Wall -Wextra -Werror -Ivita-client/src/platform vita-client/tests/video_reorder_test.c vita-client/src/platform/video_reorder.c -o /tmp/pv-reorder
           /tmp/pv-reorder
+      - name: Test signed PCM continuity transition
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_pcm_transition.c -o /tmp/pv-pcm-transition
+          /tmp/pv-pcm-transition
       - name: Test strict helper handoff metadata
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_update_handoff.c -o /tmp/pv-handoff
@@ -107,21 +111,21 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_audio_repair.c -o /tmp/pv-audio-repair
           /tmp/pv-audio-repair
       - name: Test bounded audio queue and playback pacing
-        if: ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library')
+        if: ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library')
         run: sh tools/test-audio-queue.sh
       - name: Test regional discovery policy
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_region_policy.c -o /tmp/pv-region
           /tmp/pv-region
       - name: Test embedded public CA bundle parsing
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cmake -DPV_CA_INPUT="$PWD/vita-client/cacert.pem" -DPV_CA_OUTPUT=/tmp/pv-ca/pv_embedded_ca.h -P vita-client/cmake/embedded_ca.cmake
           cc -std=c11 -Wall -Wextra -Werror -I/tmp/pv-ca vita-client/tests/test_embedded_ca.c -lmbedx509 -lmbedcrypto -o /tmp/pv-ca-test
           /tmp/pv-ca-test
       - name: Test 19 locale tables
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -O3 -Wall -Wextra -Werror -Wstring-compare vita-client/tests/test_i18n.c -o /tmp/pv-i18n
           /tmp/pv-i18n
@@ -169,12 +173,12 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror -DPLUS_VITA_ADAPTIVE_STREAM=1 vita-client/tests/test_vitaplus_theme.c vita-client/src/app/render.c -o /tmp/pv-theme
           /tmp/pv-theme
       - name: Test local QR login HTTP validation
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_lan_login_http.c -o /tmp/pv-lan-login
           /tmp/pv-lan-login
       - name: Test reverse QR strict token validation
-        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+        if: (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_qr_reverse.c -o /tmp/pv-reverse
           /tmp/pv-reverse
@@ -191,7 +195,7 @@ jobs:
       - name: Test catalogue search and details
         run: sh tools/test-app-catalogue.sh
       - name: Test focused artwork preview in legacy and adaptive catalogues
-        if: github.ref == 'refs/heads/update/vitaplus-library' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))
+        if: github.ref == 'refs/heads/update/vitaplus-library' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))
         run: sh tools/test-app-preview.sh
       - name: Test allocation cancellation and recovery
         run: sh tools/test-app-recovery.sh
@@ -207,7 +211,7 @@ jobs:
         run: sh tools/test-app-freetype.sh
 
   build:
-    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta3' && github.ref != 'refs/heads/release/v0.0.1' && github.ref != 'refs/heads/update/vitaplus-i18n' && github.ref != 'refs/heads/release/v0.0.2' && github.ref != 'refs/heads/update/vitaplus-about-controls' && github.ref != 'refs/heads/release/v0.0.3' && github.ref != 'refs/heads/update/vitaplus-game-search' && github.ref != 'refs/heads/release/v0.0.4' && github.ref != 'refs/heads/release/v0.0.5' && github.ref != 'refs/heads/release/v0.0.5-2' && github.ref != 'refs/heads/update/vitaplus-clean' && github.ref != 'refs/heads/release/v0.0.7-b2' && github.ref != 'refs/heads/update/vitaplus-library'
+    if: github.ref != 'refs/heads/beta1' && github.ref != 'refs/heads/beta3' && github.ref != 'refs/heads/release/v0.0.1' && github.ref != 'refs/heads/update/vitaplus-i18n' && github.ref != 'refs/heads/release/v0.0.2' && github.ref != 'refs/heads/update/vitaplus-about-controls' && github.ref != 'refs/heads/release/v0.0.3' && github.ref != 'refs/heads/update/vitaplus-game-search' && github.ref != 'refs/heads/release/v0.0.4' && github.ref != 'refs/heads/release/v0.0.5' && github.ref != 'refs/heads/release/v0.0.5-2' && github.ref != 'refs/heads/update/vitaplus-clean' && github.ref != 'refs/heads/release/v0.0.7-b3' && github.ref != 'refs/heads/update/vitaplus-library'
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     strategy:
@@ -259,9 +263,9 @@ jobs:
 
   beta3-build:
     env:
-      PV_VERSION: v0.0.7-b2
-      PV_FILENAME: VitaPlus-v0.0.7-b2.vpk
-    if: github.repository == 'joaopedr00000/plus-vita' && (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
+      PV_VERSION: v0.0.7-b3
+      PV_FILENAME: VitaPlus-v0.0.7-b3.vpk
+    if: github.repository == 'joaopedr00000/plus-vita' && (github.ref == 'refs/heads/beta3' || (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))))
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
     permissions:
@@ -284,14 +288,14 @@ jobs:
           -DPLUS_VITA_RELEASE_CANDIDATE=ON -DPLUS_VITA_RELEASE_VERSION=v002
           -DPLUS_VITA_PS5_EXPERIMENTAL=ON -DPLUS_VITA_BETA1=ON -DPLUS_VITA_BETA2=ON -DPLUS_VITA_BETA3=ON
           -DPLUS_VITA_CURL_ROOT="$PWD/build/curl-mbedtls"
-          -DPLUS_VITA_FINAL_001=${{ (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))) && 'ON' || 'OFF' }}
-          -DPLUS_VITA_FINAL_002=${{ (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))))) && 'ON' || 'OFF' }}
-          -DPLUS_VITA_FINAL_003=${{ (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library'))) && 'ON' || 'OFF' }}
-          -DPLUS_VITA_FINAL_004=${{ ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')))) || github.ref == 'refs/heads/update/vitaplus-library') && 'ON' || 'OFF' }}
-          -DPLUS_VITA_FINAL_005=${{ (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2'))) && 'ON' || 'OFF' }}
-          -DPLUS_VITA_FINAL_005_2=${{ (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b2')) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_001=${{ (github.ref == 'refs/heads/release/v0.0.1' || (github.ref == 'refs/heads/update/vitaplus-i18n' || (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))))) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_002=${{ (github.ref == 'refs/heads/release/v0.0.2' || (github.ref == 'refs/heads/update/vitaplus-about-controls' || (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))))) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_003=${{ (github.ref == 'refs/heads/release/v0.0.3' || (github.ref == 'refs/heads/update/vitaplus-game-search' || ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library'))) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_004=${{ ((github.ref == 'refs/heads/release/v0.0.4' || (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')))) || github.ref == 'refs/heads/update/vitaplus-library') && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_005=${{ (github.ref == 'refs/heads/release/v0.0.5' || (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3'))) && 'ON' || 'OFF' }}
+          -DPLUS_VITA_FINAL_005_2=${{ (github.ref == 'refs/heads/release/v0.0.5-2' || (github.ref == 'refs/heads/update/vitaplus-clean' || github.ref == 'refs/heads/release/v0.0.7-b3')) && 'ON' || 'OFF' }}
           -DPLUS_VITA_FINAL_010=OFF
-          -DPLUS_VITA_FINAL_007=ON -DPLUS_VITA_TEST_007_B2=ON
+          -DPLUS_VITA_FINAL_007=ON -DPLUS_VITA_TEST_007_B3=ON
           -DPLUS_VITA_TEST_006_B4=OFF
       - name: Build and normalize VPK
         run: |
@@ -315,21 +319,21 @@ jobs:
           sha256sum "$PV_FILENAME" > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: vitaplus-v0.0.7-b2
+          name: vitaplus-v0.0.7-b3
           path: dist/
           if-no-files-found: error
 
 
   # Publish only after the source and VPK checks have succeeded.
 
-  publish-v007-b2:
-    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.7-b2' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+  publish-v007-b3:
+    if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.7-b3' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [app-workflow, beta3-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     concurrency:
-      group: vitaplus-publish-v007-b2
+      group: vitaplus-publish-v007-b3
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
@@ -339,28 +343,28 @@ jobs:
           submodules: recursive
       - uses: actions/download-artifact@v4
         with:
-          name: vitaplus-v0.0.7-b2
+          name: vitaplus-v0.0.7-b3
           path: dist
       - name: Verify release package and checksum
         run: |
-          test -s dist/VitaPlus-v0.0.7-b2.vpk
+          test -s dist/VitaPlus-v0.0.7-b3.vpk
           (cd dist && sha256sum -c SHA256SUMS.txt)
-          python3 tools/publication_gate.py --version v0.0.7-b2 --vpk dist/VitaPlus-v0.0.7-b2.vpk
-      - name: Publish beta v0.0.7-b2
+          python3 tools/publication_gate.py --version v0.0.7-b3 --vpk dist/VitaPlus-v0.0.7-b3.vpk
+      - name: Publish beta v0.0.7-b3
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          tag=v0.0.7-b2
-          branch_ref="repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.7-b2"
+          tag=v0.0.7-b3
+          branch_ref="repos/$GITHUB_REPOSITORY/git/ref/heads/release/v0.0.7-b3"
           test "$(gh api "$branch_ref" --jq '.object.sha')" = "$GITHUB_SHA"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             test "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
             test "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" = "$GITHUB_SHA"
           else
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus 0.0.7 B2 — Streaming Recovery" --notes-file release/v0.0.7-b2.md --draft --prerelease --latest=false
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "VitaPlus 0.0.7 B3 — Audio Continuity & PS5 Discovery" --notes-file release/v0.0.7-b3.md --draft --prerelease --latest=false
           fi
-          gh release upload "$tag" dist/VitaPlus-v0.0.7-b2.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$tag" dist/VitaPlus-v0.0.7-b3.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
           test "$(gh api "$branch_ref" --jq '.object.sha')" = "$GITHUB_SHA"
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=true --latest=false
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,isDraft,assets

@@ -8,8 +8,10 @@
 #ifdef __vita__
 #include "diagnostic_log.h"
 #define PV_AUTH_PHASE(n) plus_vita_diagnostic_event("auth.phase",(n))
+#define PV_PS5_DIAG(name,n) plus_vita_diagnostic_event((name),(int)(n))
 #else
 #define PV_AUTH_PHASE(n) ((void)(n))
+#define PV_PS5_DIAG(name,n) ((void)(n))
 #endif
 
 #include <chiaki/random.h>
@@ -281,6 +283,14 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 #if PLUS_VITA_PS5_EXPERIMENTAL
 /* Keep the audited legacy catalogue intact; add only authorized PS5 stream rows.
  * No upstream catalogue logs or account-specific cache survive this request. */
+/* Strict JSON strings for the service contract. Reject embedded NUL and
+ * non-string values rather than accepting JSON coercion. */
+static const char *ps5_field(struct json_object *row,const char *key){
+    struct json_object *v=NULL;
+    if(!json_object_object_get_ex(row,key,&v)||!json_object_is_type(v,json_type_string))return NULL;
+    const char *s=json_object_get_string(v);
+    return s&&(size_t)json_object_get_string_len(v)==strlen(s)?s:NULL;
+}
 static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAuthProbeResult *result,unsigned mode)
 {
 	const char *cache=PV_PS5_CATALOG;
@@ -291,6 +301,7 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
 	if(!pv_region_account_locale_valid(result->country,result->language))return false;
 	snprintf(locale,sizeof(locale),"%.2s-%s",result->language,result->country);
 	bool complete=false;
+    unsigned candidates=0,accepted=0,invalid=0;
 	ChiakiCloudCatalogConfig config={.npsso=credential->value,.locale=locale,.cache_dir=cache,.force_refresh=true};
 	ChiakiCloudCatalogResult catalog={0};
 	ChiakiLog log;
@@ -330,22 +341,33 @@ static bool append_ps5_catalog(const PlusVitaCredential *credential, PlusVitaAut
                         if(!strcasecmp(existing->platform,platform)&&((pid&&!strcmp(existing->id,pid))||(cat&&!strcmp(existing->id,cat))||(stream&&!strcmp(existing->id,stream))))existing->in_library=true;
                     }
                 }
-				if(!service || strcmp(service,"pscloud") || !platform || strcmp(platform,"ps5")
-					|| !category || (strcmp(category,"owned") && strcmp(category,"streamable"))
-					|| !plus_vita_cloud_identifier_valid(stream)) continue;
+                service=ps5_field(row,"streamServiceType");platform=ps5_field(row,"platform");
+                category=ps5_field(row,"category");stream=ps5_field(row,"streamIdentifier");
+                if(!pv_ps5_catalog_candidate(service,platform,category))continue;
+                candidates++;
+                if(!pv_ps5_catalog_launchable(service,platform,category,stream)){invalid++;continue;}
 				bool duplicate=false;
 				for(unsigned n=0;n<result->native_titles_count;n++)
 					if(!strcmp(result->native_titles[n].ps5_stream_id,stream)){duplicate=true;if(catalog_owned(row))result->native_titles[n].in_library=true;}
 				if(duplicate) continue;
 				if(!append_catalog_entry(result,row)) {complete=false;break;}
 				PlusVitaCatalogEntry *entry=&result->native_titles[result->native_titles_count-1];
-				if(!entry->launch_id_valid) { result->native_titles_count--; continue; }
-				snprintf(entry->platform,sizeof(entry->platform),"PS5");
-				snprintf(entry->ps5_stream_id,sizeof(entry->ps5_stream_id),"%s",stream);
+                /* PS5 launch uses the exact streamIdentifier, not productId.
+                 * Generic IDs are metadata only; retain them if valid, and
+                 * never truncate a long PS5 entitlement into a launch ID. */
+                if(!entry->launch_id_valid&&strlen(stream)<sizeof(entry->id))
+                    snprintf(entry->id,sizeof(entry->id),"%s",stream);
+                snprintf(entry->platform,sizeof(entry->platform),"PS5");
+                snprintf(entry->ps5_stream_id,sizeof(entry->ps5_stream_id),"%s",stream);
+                entry->launch_id_valid=true;accepted++;
 			}
 		}
 	}
 	PV_AUTH_PHASE(17);
+    PV_PS5_DIAG("catalog.ps5_candidates",candidates);
+    PV_PS5_DIAG("catalog.ps5_accepted",accepted);
+    PV_PS5_DIAG("catalog.ps5_invalid_id",invalid);
+    PV_PS5_DIAG("catalog.ps5_result",complete?1:0);
 	if(root)json_object_put(root);
 	chiaki_cloudcatalog_result_fini(&catalog);
 	chiaki_cloudcatalog_invalidate_cache(cache);

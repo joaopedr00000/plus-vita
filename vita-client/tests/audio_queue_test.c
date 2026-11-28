@@ -62,7 +62,7 @@ int opus_decoder_ctl(OpusDecoder *d, int request, ...) { (void)d; assert(request
 int sceAudioOutOpenPort(int type, int block, int rate, int mode)
 { assert(type == 0 && rate == 48000 && mode == 1); assert(block == (open_attempts++ ? 960 : (int)expected_block)); if(block == 512 && reject_small_block) return -1; native_block = (unsigned)block; return 1; }
 int sceAudioOutSetVolume(int port, int flags, const int *v)
-{ assert(port == 1 && flags == 3 && v[0] == 32768 && v[1] == 32768); return 0; }
+{ assert(port == 1 && flags == 3 && v[0] == 28672 && v[1] == 28672); return 0; }
 int sceAudioOutGetConfig(int port, int key) { assert(port == 1); return key == 0 ? (int)native_block : key == 1 ? 48000 : 1; }
 int sceAudioOutReleasePort(int port) { assert(port == 1); return 0; }
 int sceAudioOutOutput(int port, const void *pcm)
@@ -170,5 +170,6 @@ int main(void)
     assert(injected_gap&&injected_bad&&final_audio.decode_errors==1);
     assert(final_audio.arrival_discontinuities==1&&final_audio.discontinuity_resets==1);
     assert(final_audio.arrival_gap_max_us>=1340000u&&!final_audio.failed);
+    assert(final_audio.transition_count>=2);
     puts("audio queue: legacy timing, adaptive backlog, interruption and malformed-unit recovery passed; no hardware latency inferred");
 }

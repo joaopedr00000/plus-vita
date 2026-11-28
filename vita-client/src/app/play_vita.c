@@ -120,6 +120,7 @@ static void *allocate(void *context)
 	chiaki_log_init(&log,CHIAKI_LOG_INFO | CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR,
 		plus_vita_diagnostic_chiaki_log,NULL);
 	plus_vita_diagnostic_event("allocation.begin",0);
+    plus_vita_diagnostic_event("video.request_kbps",config.bitrate_kbps);
 	plus_vita_diagnostic_event("allocation.phase",0);
 	ChiakiErrorCode error=chiaki_cloud_provision_session(&config,&play->provision,&log);
 	#if PLUS_VITA_PS5_EXPERIMENTAL
@@ -154,6 +155,7 @@ bool plus_vita_play_start(PlusVitaPlay *play,const PlusVitaAppEffect *effect)
 		|| !effect->store_language[0] || !effect->language[0]
 		|| !effect->credential.length) return false;
 	#if PLUS_VITA_PS5_EXPERIMENTAL
+    if(effect->game.ps5_stream_id[0]&&!plus_vita_cloud_identifier_valid(effect->game.ps5_stream_id))return false;
 	if((strcmp(effect->datacenter,PLUS_VITA_DC_DISCOVER) && !plus_vita_manual_dc_valid(effect->datacenter))
 		|| !plus_vita_bitrate_valid(effect->bitrate_kbps)) return false;
 	#endif
