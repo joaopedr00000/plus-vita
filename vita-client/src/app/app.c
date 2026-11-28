@@ -206,18 +206,19 @@ static void update_view(PlusVitaApp *app){
         if(q->state!=PV_UP_INSTALLING)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CANCEL,"Cancel",64,440,832,42};
         return;
     }
+#if PLUS_VITA_DIRECT_EXPERIMENT
+    if(q->state==PV_UP_READY){
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and restart (experimental)",64,350,832,34};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL_HELPER,"Install and reopen manually",64,390,832,34};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,430,832,34};
+        return;
+    }
+#endif
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHANNEL,q->beta?"Channel: Beta":"Channel: Stable",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_AUTO,q->automatic?"Automatic checks: On":"Automatic checks: Off",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHECK,"Check for updates",64,0,832,34};
     if(q->state==PV_UP_AVAILABLE)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_DOWNLOAD,"Download update",64,0,832,34};
-    if(q->state==PV_UP_READY){
-#if PLUS_VITA_DIRECT_EXPERIMENT
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install verified update",64,0,832,34};
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL_HELPER,"Install and reopen manually",64,0,832,34};
-#else
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and reopen manually",64,0,832,34};
-#endif
-    }
+    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and reopen manually",64,0,832,34};
     if(len>220&&q->state!=PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
     int first=490-(int)app->view.action_count*40;

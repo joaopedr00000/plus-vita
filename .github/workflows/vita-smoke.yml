@@ -150,6 +150,10 @@ jobs:
         run: |
           cc -std=c11 -O2 -Wall -Wextra -Werror -Iexternal/json-c -I/tmp/pv-stream-test vita-client/tests/test_cloud_response.c -l:libjson-c.so.5 -o /tmp/pv-stream-test/response
           /tmp/pv-stream-test/response
+      - name: Test direct updater order and rollback paths
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_update_direct_transaction.c -o /tmp/pv-direct-test
+          /tmp/pv-direct-test
       - name: Test update channel ordering and archive policy
         run: |
           cc -std=c11 -Wall -Wextra -Werror vita-client/tests/test_update_policy.c -o /tmp/pv-update-policy

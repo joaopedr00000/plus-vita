@@ -7,6 +7,7 @@ int main(void){
     assert(pv_language(19)==0);
     for(unsigned l=0;l<PV_LANG_COUNT;l++){
         assert(pv_locale_names[l]&&*pv_locale_names[l]);
+        assert(!strcmp(pv_translate(l,pv_direct_label[0]),pv_direct_label[l]));
         for(unsigned k=0;k<2;k++){
             assert(pv_manual_restart[l][k]&&*pv_manual_restart[l][k]);
             assert(!strcmp(pv_translate(l,pv_manual_restart[0][k]),pv_manual_restart[l][k]));

@@ -4,6 +4,7 @@
 #include "update_package.h"
 #include "update_head.h"
 #include "update_handoff.h"
+#include "update_direct_transaction.h"
 #include <psp2/appmgr.h>
 #include "curl_resolve.h"
 #include <curl/curl.h>
@@ -439,46 +440,69 @@ static bool direct_prepare(const Candidate *c,const char *root){
     char raw[400];int n=snprintf(raw,sizeof(raw),"PVD1 %u %s %u %s %u %s %u %s\n",
         j.size[0],j.hash[0],j.size[1],j.hash[1],j.size[2],j.hash[2],j.size[3],j.hash[3]);
     if(n<0||(size_t)n>=sizeof(raw)||!write_new(DIRECT_JOB,raw,(size_t)n)){direct_clean();return false;}
-    sceIoSync("ux0:",0);
+    if(sceIoSync("ux0:",0)<0){direct_clean();return false;}
     direct_pending=true;return true;
+}
+static bool direct_missing(const char *path){
+    struct stat st;return stat(path,&st)!=0&&errno==ENOENT;
+}
+/* Try native rename replacement first. If this filesystem disallows it,
+ * move the known original to a reserved recovery slot before installing.
+ * The verified independent backup and journal already exist. */
+static bool direct_swap(const char *from,const char *live,const char *park,const DirectJob *j,unsigned incoming,unsigned outgoing){
+    if(!direct_matches(from,j,incoming)||!direct_matches(live,j,outgoing))return false;
+    if(sceIoRename(from,live)>=0)return direct_matches(live,j,incoming);
+    if(!direct_matches(from,j,incoming)||!direct_matches(live,j,outgoing)||!direct_missing(park))return false;
+    if(sceIoRename(live,park)<0)return false;
+    if(!direct_matches(park,j,outgoing)||sceIoRename(from,live)<0){
+        if(direct_missing(live)&&direct_matches(park,j,outgoing))(void)sceIoRename(park,live);
+        return false;
+    }
+    return direct_matches(live,j,incoming);
 }
 static bool direct_restore(const DirectJob *j){
     bool ok=true;
     const char *const tmp[]={DIRECT_ROOT "/restore-sfo",DIRECT_ROOT "/restore-eboot"};
-    /* Roll back only known old/new files; never replace an unknown file. */
+    const char *const discard[]={DIRECT_ROOT "/discard-sfo",DIRECT_ROOT "/discard-eboot"};
+    /* Restore only a missing file or a known new file, never unknown content. */
     for(unsigned i=0;i<2;i++){
         if(direct_matches(direct_live[i],j,i))continue;
-        if(!direct_matches(direct_live[i],j,i+2)||!direct_matches(direct_files[i],j,i)){ok=false;continue;}
+        bool missing=direct_missing(direct_live[i]);
+        if((!missing&&!direct_matches(direct_live[i],j,i+2))||!direct_matches(direct_files[i],j,i)){ok=false;continue;}
         DirectJob copy={0};
-        if(!direct_copy(direct_files[i],tmp[i],&copy,i)){ok=false;continue;}
-        if(!direct_matches(tmp[i],j,i)||rename(tmp[i],direct_live[i])!=0||
-           !direct_matches(direct_live[i],j,i))ok=false;
-        unlink(tmp[i]);
+        if(!direct_matches(tmp[i],j,i)&&!direct_copy(direct_files[i],tmp[i],&copy,i)){ok=false;continue;}
+        if(!direct_matches(tmp[i],j,i)){ok=false;continue;}
+        bool restored=missing?sceIoRename(tmp[i],direct_live[i])>=0:
+            direct_swap(tmp[i],direct_live[i],discard[i],j,i,i+2);
+        if(!restored||!direct_matches(direct_live[i],j,i))ok=false;
     }
-    sceIoSync("ux0:",0);return ok;
+    return sceIoSync("ux0:",0)>=0&&ok;
 }
 void pv_direct_cancel_pending(void){
     if(direct_pending){direct_pending=false;direct_clean();}
+}
+static bool direct_unmount(void *context){(void)context;return sceAppMgrUmount("app0:")>=0;}
+static bool direct_replace(void *context,unsigned i){
+    const char *const park[]={DIRECT_ROOT "/park-sfo",DIRECT_ROOT "/park-eboot"};
+    return direct_swap(direct_files[i+2],direct_live[i],park[i],context,i+2,i);
+}
+static bool direct_sync(void *context){(void)context;return sceIoSync("ux0:",0)>=0;}
+static void direct_restart(void *context){(void)context;(void)sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);}
+static bool direct_rollback(void *context){return direct_restore(context);}
+static void direct_outcome(unsigned result){
+    char s[64];int n=snprintf(s,sizeof(s),"direct update outcome %u\n",result);
+    if(n>0&&(size_t)n<sizeof(s))(void)write_new(DIRECT_ROOT "/outcome",s,(size_t)n);
+    (void)sceIoSync("ux0:",0);
 }
 bool pv_direct_commit_pending(void){
     if(!direct_pending)return false;
     direct_pending=false;DirectJob j={0};
     if(!direct_read(&j)||!direct_matches(direct_live[0],&j,0)||!direct_matches(direct_live[1],&j,1)||
        !direct_matches(direct_files[0],&j,0)||!direct_matches(direct_files[1],&j,1)||
-       !direct_matches(direct_files[2],&j,2)||!direct_matches(direct_files[3],&j,3))return true;
-    /* Unlike VitaDB, only attempt this after UI and network shutdown.
-     * Never unlink a live file to work around FAT rename limitations. */
-    if(sceAppMgrUmount("app0:")<0)return true;
-    if(rename(direct_files[2],direct_live[0])!=0||
-       !direct_matches(direct_live[0],&j,2)||
-       rename(direct_files[3],direct_live[1])!=0||
-       !direct_matches(direct_live[1],&j,3)){
-        (void)direct_restore(&j);return true;
-    }
-    sceIoSync("ux0:",0);
-    /* Successful LoadExec does not return. On failure restore both files. */
-    sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);
-    (void)direct_restore(&j);return true;
+       !direct_matches(direct_files[2],&j,2)||!direct_matches(direct_files[3],&j,3)){direct_outcome(7);return true;}
+    /* UI and networking have already shut down. Successful LoadExec never returns. */
+    PvDirectOps ops={&j,direct_unmount,direct_replace,direct_sync,direct_restart,direct_rollback};
+    direct_outcome((unsigned)pv_direct_execute(ops));return true;
 }
 bool pv_direct_recover_startup(void){
     struct stat st;DirectJob j={0};
