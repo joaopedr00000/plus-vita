@@ -594,6 +594,7 @@ void plus_vita_diagnostic_counter(const char *name, uint64_t count)
 		"feedback_published","feedback_consumed","feedback_coalesced","feedback_send_failures",
 		"feedback_logs_suppressed","input_neutral_consumed","input_neutral_failed","recovery_episodes",
 		"decrypted_video_packets","decrypted_audio_packets","capture_frames","heartbeats_sent",
+        "audio_fec_recovered","audio_duplicate_source",
 		"replay_submitted","replay_displayed","replay_drained","replay_drain_empty",
 		"feedback_state_sends","benchmark.min_us"};
 	const char *fixed=known_name(name,names,sizeof(names)/sizeof(names[0]));
@@ -601,6 +602,16 @@ void plus_vita_diagnostic_counter(const char *name, uint64_t count)
 	char record[128];
 	snprintf(record,sizeof(record),"final counter=%s count=%llu",fixed,(unsigned long long)count);
 	write_line("COUNTER",record,0);
+}
+
+void plus_vita_diagnostic_audio(const PvAudioDiagnostic *v,bool final){
+    if(!v)return;
+    char record[920];
+    int n=snprintf(record,sizeof(record),
+        "%s audio arrived=%u decoded=%u outputs=%u concealed=%u stale=%u dropped=%u queue_peak=%u queue_now=%u arrival_gt20ms=%u arrival_gt40ms=%u output_gap_stalls=%u output_call_stalls=%u seq_gaps=%u seq_resets=%u max_missing=%u skipped_local=%u empty_waits=%u refill_count=%u brief_waits=%u target_ms=%u block_frames=%u failed=%u queue_age_avg_us=%llu queue_age_max_us=%llu arrival_gap_max_us=%llu output_gap_max_us=%llu output_call_max_us=%llu refill_wait_total_us=%llu refill_wait_max_us=%llu discarded_pcm_samples=%llu trimmed_pcm_samples=%llu",
+        final?"final":"periodic",v->arrived,v->decoded,v->outputs,v->concealed,v->stale,v->dropped,v->queue_peak,v->queue_now,v->arrival_gt20ms,v->arrival_gt40ms,v->output_gap_stalls,v->output_call_stalls,v->seq_gaps,v->seq_resets,v->max_missing,v->skipped_local,v->empty_waits,v->refill_count,v->brief_waits,v->target_ms,v->block_frames,v->failed,
+        (unsigned long long)v->queue_age_avg_us,(unsigned long long)v->queue_age_max_us,(unsigned long long)v->arrival_gap_max_us,(unsigned long long)v->output_gap_max_us,(unsigned long long)v->output_call_max_us,(unsigned long long)v->refill_wait_total_us,(unsigned long long)v->refill_wait_max_us,(unsigned long long)v->discarded_pcm_samples,(unsigned long long)v->trimmed_pcm_samples);
+    if(n>0&&(size_t)n<sizeof(record))write_line("AUDIO",record,0);
 }
 
 void plus_vita_diagnostic_chiaki_log(ChiakiLogLevel level,

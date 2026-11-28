@@ -6,6 +6,7 @@
 #include "video_decoder_vita.h"
 #include "video_present_vita.h"
 #include "audio_playback_vita.h"
+#include "audio_repair.h"
 #include "video_fec.h"
 #include "video_reorder.h"
 #include "adaptive_stream.h"
@@ -140,7 +141,8 @@ typedef struct plus_vita_stream_probe_t
 	unsigned int fec_packets_seen;
 	unsigned int fec_attempts, fec_repaired_frames, fec_repaired_units, fec_failed;
 	uint64_t fec_total_us, fec_max_us;
-	unsigned int audio_frames;
+	unsigned int audio_frames,audio_fec_recovered,audio_duplicate_source;
+    PvAudioRepair audio_repair;
 	PlusVitaAudioPlayback *audio_playback;
 	bool video_keyframe;
 	PlusVitaH264Guard reference_guard;
@@ -895,9 +897,24 @@ static ChiakiErrorCode probe_audio_packet(PlusVitaStreamProbe *probe,
 		return CHIAKI_ERR_INVALID_DATA;
 	}
 	bool first_audio_frame = probe->audio_frames == 0;
-	for(unsigned int i = 0; i < source_units; i++)
-		if(!plus_vita_audio_push(probe->audio_playback, (uint16_t)(packet->frame_index + i),
-			packet->data + i * unit_size, unit_size)) return CHIAKI_ERR_INVALID_DATA;
+    PvAudioRepairPlan plan={0};
+    /* Pylux's packed PSNOW layout carries prior source frames after current
+     * source units. Recover the suffix of a real gap before enqueueing new
+     * sources; never enqueue redundant startup or already queued units.
+     * PSCLOUD (PS5) is a different format and remains untouched. */
+    if(probe->provision&&(!strcmp(probe->provision->platform,"ps3")||!strcmp(probe->provision->platform,"ps4"))){
+        plan=pv_audio_repair_plan(&probe->audio_repair,packet->frame_index,source_units,fec_units);
+        for(unsigned i=0;i<plan.repair;i++){
+            unsigned index=(unsigned)source_units+fec_units-plan.repair+i;
+            uint16_t seq=(uint16_t)(packet->frame_index-plan.repair+i);
+            if(!plus_vita_audio_push(probe->audio_playback,seq,packet->data+index*unit_size,unit_size))return CHIAKI_ERR_INVALID_DATA;
+            probe->audio_fec_recovered++;
+        }
+        probe->audio_duplicate_source+=plan.skip;
+    }
+    for(unsigned i=plan.skip;i<source_units;i++)
+        if(!plus_vita_audio_push(probe->audio_playback,(uint16_t)(packet->frame_index+i),
+            packet->data+i*unit_size,unit_size))return CHIAKI_ERR_INVALID_DATA;
 	probe->audio_frames += source_units;
 	if(first_audio_frame)
 		CHIAKI_LOGI(probe->log,
@@ -2105,6 +2122,8 @@ chiaki_mutex_unlock(&probe->mutex);
 	plus_vita_diagnostic_counter("displayed",shown.displayed);
 	plus_vita_diagnostic_counter("submitted",probe->video_decode_attempts);
 	plus_vita_diagnostic_counter("audio_frames",probe->audio_frames);
+    plus_vita_diagnostic_counter("audio_fec_recovered",probe->audio_fec_recovered);
+    plus_vita_diagnostic_counter("audio_duplicate_source",probe->audio_duplicate_source);
 	plus_vita_diagnostic_counter("fec_repaired",probe->fec_repaired_frames);
 	plus_vita_diagnostic_counter("fec_failed",probe->fec_failed);
 	plus_vita_diagnostic_counter("reorder_late",probe->reorder_late_packets);

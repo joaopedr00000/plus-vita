@@ -3,6 +3,7 @@
  * external codec, device, clock and log writer are deterministic boundaries. */
 #include "audio_playback_vita.h"
 #include "stream_options.h"
+#include "audio_diagnostic.h"
 #include <opus.h>
 #include <assert.h>
 #include <pthread.h>
@@ -23,6 +24,8 @@ static unsigned native_block, expected_block, open_attempts, period_remainder;
 static bool reject_small_block;
 static unsigned options=PV_OPT_ALL; /* Exercise all experimental paths explicitly. */
 static char final_timing[2048], final_summary[1024];
+static PvAudioDiagnostic final_audio;
+void plus_vita_diagnostic_audio(const PvAudioDiagnostic *s,bool final){if(final)final_audio=*s;}
 
 uint64_t sceKernelGetProcessTimeWide(void) { return atomic_load(&now_us); }
 static void deliver_until(uint64_t target)
@@ -122,6 +125,8 @@ static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, u
 		(unsigned long long)average, field(final_timing, "queue_age_max_us="), field(final_timing, "output_gap_stalls="),
 		field(final_summary, "dropped="), field(final_summary, "outputs="));
 	assert(field(final_summary, "failed=") == 0);
+    assert(final_audio.outputs==output_count&&final_audio.arrived>0&&!final_audio.failed&&final_audio.block_frames==native_block);
+    assert(final_audio.queue_age_avg_us==average&&final_audio.dropped==field(final_summary,"dropped="));
 	return average;
 }
 int main(void)

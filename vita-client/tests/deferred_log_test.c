@@ -206,6 +206,17 @@ static void session_reset(void)
 	}
 	fclose(f);assert(stop);
 }
+static void audio_privacy(void){
+    assert(plus_vita_diagnostic_begin());
+    PvAudioDiagnostic v={.arrived=100,.decoded=96,.dropped=3,.concealed=1,.refill_count=2,.target_ms=50,.queue_age_avg_us=12345,.trimmed_pcm_samples=24};
+    plus_vita_diagnostic_audio(&v,false);
+    plus_vita_diagnostic_chiaki_log(CHIAKI_LOG_INFO,"final audio token=synthetic-secret",NULL);
+    plus_vita_diagnostic_audio(&v,true);
+    plus_vita_diagnostic_end();
+    FILE *f=fopen(plus_vita_diagnostic_path(),"rb");assert(f);char line[2048];bool ok=false;
+    while(fgets(line,sizeof(line),f)){assert(!strstr(line,"synthetic-secret"));if(strstr(line,"final audio arrived=100 decoded=96")&&strstr(line,"refill_count=2")&&strstr(line,"queue_age_avg_us=12345"))ok=true;}
+    fclose(f);assert(ok);
+}
 static void bounded_file(void)
 {
 	assert(plus_vita_diagnostic_begin());
@@ -237,6 +248,7 @@ static void bounded_file(void)
 int main(void)
 {
 	privacy_entrypoints();
+    audio_privacy();
 	stream_snapshot();
 	legacy_cleanup();
 	session_reset();

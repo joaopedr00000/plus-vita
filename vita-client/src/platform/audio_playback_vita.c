@@ -11,6 +11,8 @@
 #include "adaptive_stream.h"
 #include "stream_affinity.h"
 #include "stream_options.h"
+#include "audio_diagnostic.h"
+#include <time.h>
 #define AUDIO_QUEUE 32
 #define AUDIO_UNIT_MAX 255
 #define AUDIO_BLOCK 960
@@ -41,6 +43,8 @@ struct plus_vita_audio_playback_t {
 	unsigned empty_waits, empty_wait_gt20ms, output_gap_stalls;
 	unsigned output_call_stalls, sequence_gaps, sequence_resets, skipped_local;
 	unsigned max_missing_units;
+    unsigned refill_count,brief_waits;
+    uint64_t refill_started_us,refill_wait_total_us,refill_wait_max_us,discarded_pcm_samples,trimmed_pcm_samples;
 	uint64_t empty_wait_max_us, output_gap_max_us, output_call_max_us;
 	uint64_t last_output_start_us, queue_age_total_us, queue_age_max_us;
 	unsigned queue_age_samples;
@@ -54,7 +58,16 @@ static void audio_log_timing(PlusVitaAudioPlayback *a, const char *phase)
 	unsigned arrival_gap_gt40ms = a->arrival_gap_gt40ms;
 	uint64_t arrival_gap_max_us = a->arrival_gap_max_us;
 	unsigned queue_count = a->count;
+    unsigned peak=a->peak,drops=a->dropped,target=a->prebuffer_target;
 	pthread_mutex_unlock(&a->mutex);
+    PvAudioDiagnostic snapshot={.arrived=arrived,.decoded=a->decoded,.outputs=a->outputs,.concealed=a->concealed,.stale=a->stale,.dropped=drops,.queue_peak=peak,.queue_now=queue_count,
+        .arrival_gt20ms=arrival_gap_gt20ms,.arrival_gt40ms=arrival_gap_gt40ms,.output_gap_stalls=a->output_gap_stalls,.output_call_stalls=a->output_call_stalls,
+        .seq_gaps=a->sequence_gaps,.seq_resets=a->sequence_resets,.max_missing=a->max_missing_units,.skipped_local=a->skipped_local,.empty_waits=a->empty_waits,
+        .refill_count=a->refill_count,.brief_waits=a->brief_waits,.target_ms=10u*target,.block_frames=a->block_frames,.failed=a->failed,
+        .queue_age_avg_us=a->queue_age_samples?a->queue_age_total_us/a->queue_age_samples:0,.queue_age_max_us=a->queue_age_max_us,.arrival_gap_max_us=arrival_gap_max_us,
+        .output_gap_max_us=a->output_gap_max_us,.output_call_max_us=a->output_call_max_us,.refill_wait_total_us=a->refill_wait_total_us,.refill_wait_max_us=a->refill_wait_max_us,
+        .discarded_pcm_samples=a->discarded_pcm_samples,.trimmed_pcm_samples=a->trimmed_pcm_samples};
+    plus_vita_diagnostic_audio(&snapshot,!strcmp(phase,"final"));
 	CHIAKI_LOGI(a->log,
 		"Stream probe audio timing %s decoded=%u arrived=%u arrival_gap_max_us=%llu arrival_gt20ms=%u arrival_gt40ms=%u empty_waits=%u empty_wait_max_us=%llu empty_gt20ms=%u output_gap_max_us=%llu output_gap_stalls=%u output_call_max_us=%llu output_call_stalls=%u stall_budget_us=%llu queue_age_avg_us=%llu queue_age_max_us=%llu queue_now=%u seq_gaps=%u seq_resets=%u max_missing=%u skipped_local=%u",
 		phase, a->decoded, arrived, (unsigned long long)arrival_gap_max_us,
@@ -116,6 +129,19 @@ static bool audio_output(PlusVitaAudioPlayback *a, const int16_t *pcm, unsigned 
 	return true;
 }
 
+/* Absorb one brief packet interval without flushing residual PCM or raising
+ * the target. Absolute deadline prevents repeated spurious wakeups from
+ * extending the wait. The receiver still owns packet arrival. */
+#if PLUS_VITA_ADAPTIVE_STREAM
+static bool audio_brief_wait(PlusVitaAudioPlayback *a){
+    struct timespec deadline;
+    if(clock_gettime(CLOCK_REALTIME,&deadline)!=0)return false;
+    deadline.tv_nsec+=12000000L;
+    if(deadline.tv_nsec>=1000000000L){deadline.tv_nsec-=1000000000L;deadline.tv_sec++;}
+    while(!a->stop&&!a->count){if(pthread_cond_timedwait(&a->cond,&a->mutex,&deadline)!=0)break;}
+    return a->count!=0;
+}
+#endif
 static void *audio_worker(void *user)
 {
 	PlusVitaAudioPlayback *a = user;
@@ -160,13 +186,25 @@ static void *audio_worker(void *user)
 	for(;;) {
 		pthread_mutex_lock(&a->mutex);
 		#if PLUS_VITA_ADAPTIVE_STREAM
-		if(a->prebuffer_base && !a->count && a->decoded && !a->audio_buffering) {
-			if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,true);
-			a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;a->fill=0;
-		}
-		while(!a->stop && a->audio_buffering && a->count<a->prebuffer_target)
-			pthread_cond_wait(&a->cond,&a->mutex);
-		if(a->audio_buffering && a->count>=a->prebuffer_target)a->audio_buffering=false;
+        if(a->prebuffer_base && !a->count && a->decoded && !a->audio_buffering && !a->stop) {
+            if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT)&&audio_brief_wait(a))a->brief_waits++;
+            if(!a->count&&!a->stop){
+                if(pv_opt(a->options,PV_OPT_AUDIO_ADAPT))a->prebuffer_target=pv_audio_adjust(a->prebuffer_floor,a->prebuffer_target,true);
+                a->refill_count++;a->refill_started_us=sceKernelGetProcessTimeWide();
+                a->audio_buffering=true;a->audio_fade=true;a->clean_audio_units=0;
+                a->discarded_pcm_samples+=a->fill;a->fill=0;
+            }
+        }
+        while(!a->stop && a->audio_buffering && a->count<a->prebuffer_target)
+            pthread_cond_wait(&a->cond,&a->mutex);
+        if(a->audio_buffering && a->count>=a->prebuffer_target){
+            a->audio_buffering=false;
+            if(a->refill_started_us){
+                uint64_t waited=sceKernelGetProcessTimeWide()-a->refill_started_us;
+                a->refill_wait_total_us+=waited;if(waited>a->refill_wait_max_us)a->refill_wait_max_us=waited;
+                a->refill_started_us=0;
+            }
+        }
 #endif
 		if(!a->stop && !a->count) {
 			uint64_t wait_started_us = sceKernelGetProcessTimeWide();
@@ -218,7 +256,7 @@ static void *audio_worker(void *user)
 					if(n != 480 || !audio_output(a, pcm, (unsigned)n)) goto failed;
 					a->concealed++;
 				}
-			} else { a->sequence_resets++; opus_decoder_ctl(a->decoder, OPUS_RESET_STATE); a->fill = 0; }
+			} else { a->sequence_resets++; opus_decoder_ctl(a->decoder, OPUS_RESET_STATE); a->discarded_pcm_samples+=a->fill;a->fill = 0; a->audio_fade=true; }
 		}
 		pending_local_drops = 0;
 		int n = opus_decode(a->decoder, unit.data, (opus_int32)unit.size, pcm, 480, 0);
@@ -247,7 +285,9 @@ static void *audio_worker(void *user)
 		}
 		#if PLUS_VITA_ADAPTIVE_STREAM
 		unsigned trim=pv_opt(a->options,PV_OPT_PCM_TRIM)?pv_pcm_trim(queue_after_pop,target_snapshot,stable_pcm,(unsigned)n):0;
+		unsigned original=(unsigned)n;
 		n=(int)pv_pcm_shorten(pcm,(unsigned)n,(unsigned)a->channels,trim);
+        a->trimmed_pcm_samples+=original-(unsigned)n;
 		#endif
 		if(!audio_output(a, pcm, (unsigned)n)) goto failed;
 		if(a->decoded == 1) CHIAKI_LOGI(a->log, "Stream probe audio first PCM decoded samples=%d", n);
