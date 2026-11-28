@@ -193,6 +193,8 @@ static void update_view(PlusVitaApp *app){
     snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s%s%s",PV_TR("Installed:"),PLUS_VITA_DISPLAY_VERSION,PV_TR(status[st]),q->version[0]?" ":"",q->version);
     size_t used=strlen(app->update_body);
     if(q->state==PV_UP_ERROR&&q->install_stage){
+        if((unsigned)q->install_error==0x80101114u)snprintf(app->update_body,sizeof(app->update_body),"%s %s\n%s",PV_TR("Installed:"),PLUS_VITA_DISPLAY_VERSION,PV_TR("The running app cannot be replaced. Close VitaPlus and install the VPK in VitaShell."));
+        used=strlen(app->update_body);
         snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s %u / 0x%08X\n%s",PV_TR("Installer stage:"),q->install_stage,(unsigned)q->install_error,PV_TR("Update installation failed; verified VPK retained."));
         used=strlen(app->update_body);
     }
@@ -207,7 +209,7 @@ static void update_view(PlusVitaApp *app){
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_AUTO,q->automatic?"Automatic checks: On":"Automatic checks: Off",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHECK,"Check for updates",64,0,832,34};
     if(q->state==PV_UP_AVAILABLE)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_DOWNLOAD,"Download update",64,0,832,34};
-    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install verified update",64,0,832,34};
+    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and restart VitaPlus",64,0,832,34};
     if(len>220)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
     int first=490-(int)app->view.action_count*40;
@@ -1148,7 +1150,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
         }else if(view->screen==PLUS_VITA_APP_WELCOME){
             size_t selected=view->selected;welcome(app);if(selected<view->action_count)view->selected=selected;
         }
-        if(app->update.state==PV_UP_INSTALLED)view->screen=PLUS_VITA_APP_CLOSED;
+        if(app->update.state==PV_UP_INSTALLED||app->update.state==PV_UP_HANDOFF)view->screen=PLUS_VITA_APP_CLOSED;
         return effect;
     }
     if(event.kind==PLUS_VITA_EVENT_THEME_LOADED){

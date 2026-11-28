@@ -3,6 +3,8 @@
 #define PV_UPDATER_VITA_H
 #include "update_state.h"
 typedef struct PvUpdater PvUpdater;
+bool pv_update_is_helper(void);
+int pv_update_run_helper(void);
 PvUpdater *pv_updater_create(void);
 void pv_updater_destroy(PvUpdater *u);
 bool pv_updater_command(PvUpdater *u,PvUpdateCommand cmd,unsigned language);

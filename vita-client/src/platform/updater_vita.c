@@ -3,6 +3,8 @@
 #include "update_policy.h"
 #include "update_package.h"
 #include "update_head.h"
+#include "update_handoff.h"
+#include <psp2/appmgr.h>
 #include "curl_resolve.h"
 #include <curl/curl.h>
 #include <json_object.h>
@@ -28,6 +30,10 @@
 #define VPK DOWNLOADS "/VitaPlus-update.vpk"
 #define PREFS "ux0:data/VitaPlus/Settings/updates.cfg"
 #define STAGE_ROOT "ux0:data/VitaPlus"
+#define HANDOFF STAGE_ROOT "/Settings/update-handoff.dat"
+#define HANDOFF_RESULT STAGE_ROOT "/Settings/update-handoff.result"
+#define HELPER_PATH "ux0:app/" PV_HELPER_TITLE
+#define MAIN_PATH "ux0:app/" PV_MAIN_TITLE
 #define MAX_VPK (128u*1024u*1024u)
 #define MAX_JSON (2u*1024u*1024u)
 typedef struct {char tag[40],asset[80],notes[4096],hash[65],path[200];size_t size;} Candidate;
@@ -230,15 +236,16 @@ static bool sha1(const unsigned char *data,size_t n,unsigned char out[20]){
     const mbedtls_md_info_t *md=mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
     return md&&mbedtls_md(md,data,n,out)==0;
 }
-static bool stage_header(const char *root,char appver[16]){
+static bool stage_header(const char *root,const char *expected_title,char appver[16]){
     char folder[180],path[200],content[48]={0},title[16]={0};
     unsigned char sfo[8192];size_t n=0;
     snprintf(path,sizeof(path),"%s/sce_sys/param.sfo",root);
-    if(!read_small(path,sfo,sizeof(sfo),&n)||!sfo_value(sfo,n,"TITLE_ID",title,sizeof(title))||strcmp(title,"PLVTB0001")||!sfo_value(sfo,n,"APP_VER",appver,16))return false;
+    if(!read_small(path,sfo,sizeof(sfo),&n)||!sfo_value(sfo,n,"TITLE_ID",title,sizeof(title))||strcmp(title,expected_title)||!sfo_value(sfo,n,"APP_VER",appver,16))return false;
     if(!sfo_value(sfo,n,"CONTENT_ID",content,sizeof(content))||!content[0])
         snprintf(content,sizeof(content),"EP9000-%s_00-0000000000000000",title);
     /* Only our own homebrew identity is accepted. */
-    if(!memchr(content,0,sizeof(content))||!strstr(content,"-PLVTB0001_"))return false;
+    char needle[16];snprintf(needle,sizeof(needle),"-%s_",expected_title);
+    if(!memchr(content,0,sizeof(content))||!strstr(content,needle))return false;
     unsigned char *h=malloc(65537);if(!h)return false;
     bool ok=read_small("app0:sce_sys/package/head.bin",h,65537,&n)&&pv_head_rebuild(h,n,content,sha1);
     snprintf(folder,sizeof(folder),"%s/sce_sys/package",root);
@@ -251,44 +258,213 @@ static bool stage_header(const char *root,char appver[16]){
     }
     free(h);return ok;
 }
+/* Synchronous promoter calls run in the worker or separate helper process.
+ * Never promote the currently running main title. */
+static int promote(const char *path,bool remove_helper,unsigned *stage){
+    uint32_t args[]={0x180000u,UINT32_MAX,UINT32_MAX,1,UINT32_MAX,UINT32_MAX};
+    int paf_result=-1,rc;bool paf=false,prom=false,init=false;
+    SceSysmoduleOpt opt={.flags=sizeof(SceSysmoduleOpt),.result=&paf_result,.unused={-1,-1}};
+    *stage=5;
+    rc=sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF,sizeof(args),args,&opt);
+    if(rc>=0)paf=true;
+    else if(sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PAF)<0)return rc;
+    *stage=6;
+    rc=sceSysmoduleLoadModuleInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL);
+    if(rc>=0)prom=true;
+    else if(sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL)<0)goto done;
+    *stage=7;
+    rc=scePromoterUtilityInit();if(rc<0)goto done;
+    init=true;*stage=8;
+    if(remove_helper)rc=scePromoterUtilityDeletePkg(PV_HELPER_TITLE);
+    else rc=scePromoterUtilityPromotePkgWithRif(path,1);
+done:
+    if(init)scePromoterUtilityExit();
+    if(prom)sceSysmoduleUnloadModuleInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL);
+    if(paf){SceSysmoduleOpt unload={0};sceSysmoduleUnloadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF,0,NULL,&unload);}
+    return rc;
+}
+static bool file_size(const char *path,unsigned *out){
+    struct stat st;
+    if(stat(path,&st)||!S_ISREG(st.st_mode)||st.st_size<=0||(uint64_t)st.st_size>MAX_VPK)return false;
+    *out=(unsigned)st.st_size;return true;
+}
+static bool match_hash(const char *path,unsigned size,const char *expected){
+    char got[65];return hash_file(path,got,size)&&!strcmp(got,expected);
+}
+static bool read_job(PvHandoffJob *job){
+    char raw[200];size_t n=0;
+    if(!read_small(HANDOFF,(unsigned char *)raw,sizeof(raw),&n))return false;
+    raw[n]=0;return pv_handoff_parse(raw,job);
+}
+static bool write_new(const char *path,const void *buf,size_t n){
+    int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if(fd<0)return false;
+    FILE *f=fdopen(fd,"wb");if(!f){close(fd);unlink(path);return false;}
+    bool ok=fwrite(buf,1,n,f)==n;if(fclose(f)!=0)ok=false;
+    if(!ok)unlink(path);
+    return ok;
+}
+static bool read_version(const char *path,const char *title,char ver[16]){
+    unsigned char b[8192];size_t n=0;char tid[16]={0};
+    return read_small(path,b,sizeof(b),&n)&&sfo_value(b,n,"TITLE_ID",tid,sizeof(tid))&&!strcmp(tid,title)&&sfo_value(b,n,"APP_VER",ver,16)&&pv_handoff_version(ver);
+}
+/* Only alter the helper copy's own SFO. Main package remains unchanged. */
+static bool helper_sfo(const char *path){
+    unsigned char b[8192];size_t n=0;
+    if(!read_small(path,b,sizeof(b),&n)||n<20||memcmp(b,"\0PSF",4))return false;
+    uint32_t keys=sfo_le(b+8),data=sfo_le(b+12),count=sfo_le(b+16);unsigned title=0;
+    if(count>128||20u+count*16u>keys||keys>=data||data>n)return false;
+    for(uint32_t j=0;j<count;j++){
+        unsigned char *e=b+20+j*16;uint32_t ko=e[0]|(unsigned)e[1]<<8,len=sfo_le(e+4),off=sfo_le(e+12);
+        if(ko>=data-keys||off>n-data||len>n-data-off)return false;
+        const char *key=(const char *)b+keys+ko;if(!memchr(key,0,data-keys-ko))return false;
+        unsigned char *v=b+data+off;
+        if(!strcmp(key,"TITLE_ID")){
+            if(len!=10||memcmp(v,PV_MAIN_TITLE,10))return false;
+            memcpy(v,PV_HELPER_TITLE,10);title++;
+        }else if(!strcmp(key,"CONTENT_ID")&&len&&v[0]){
+            if(!memchr(v,0,len))return false;
+            char *id=strstr((char *)v,"-" PV_MAIN_TITLE "_");
+            if(!id)return false;
+            memcpy(id+1,PV_HELPER_TITLE,9);
+        }
+    }
+    if(title!=1)return false;
+    /* This is a newly extracted staging file, never an installed file. */
+    FILE *f=fopen(path,"wb");if(!f)return false;
+    bool ok=fwrite(b,1,n,f)==n;if(fclose(f)!=0)ok=false;return ok;
+}
+static bool copy_helper_exe(const char *path,const PvHandoffJob *job){
+    FILE *in=fopen("app0:eboot.bin","rb");if(!in)return false;
+    FILE *out=fopen(path,"wb");if(!out){fclose(in);return false;}
+    unsigned char b[8192];size_t total=0;bool ok=true;
+    while(ok){
+        size_t n=fread(b,1,sizeof(b),in);if(!n)break;
+        total+=n;ok=total<=job->helper_size&&fwrite(b,1,n,out)==n;
+    }
+    ok=ok&&!ferror(in)&&total==job->helper_size;
+    fclose(in);if(fclose(out)!=0)ok=false;
+    return ok&&match_hash(path,job->helper_size,job->helper_hash);
+}
+static bool helper_owned(const PvHandoffJob *job){
+    char ver[16]={0};
+    return read_version(HELPER_PATH "/sce_sys/param.sfo",PV_HELPER_TITLE,ver)&&
+        match_hash(HELPER_PATH "/eboot.bin",job->helper_size,job->helper_hash);
+}
+static bool new_stage(char root[128]){
+    snprintf(root,128,STAGE_ROOT "/UpdateStage-%llu",(unsigned long long)sceKernelGetProcessTimeWide());
+    return mkdir(root,0700)==0;
+}
 static PvUpdateState install_fail(PvUpdater *u,unsigned stage,int code){u->install_stage=stage;u->install_error=code;return PV_UP_ERROR;}
 static PvUpdateState install(PvUpdater *u){
-    Candidate *c=&u->candidate;char actual[65],appver[16]={0};
-    if(!c->path[0]||!hash_file(c->path,actual,c->size)||strcmp(actual,c->hash))return install_fail(u,1,-1);
-    char root[128];snprintf(root,sizeof(root),STAGE_ROOT "/UpdateStage-%llu",(unsigned long long)sceKernelGetProcessTimeWide());
-    if(mkdir(root,0700)!=0)return install_fail(u,2,-errno);
-    if(!pv_update_unpack(c->path,root)){pv_update_clean_stage(root);return install_fail(u,3,-1);}
-    if(!stage_header(root,appver)){pv_update_clean_stage(root);return install_fail(u,4,-1);}
-    uint32_t args[]={0x180000u,UINT32_MAX,UINT32_MAX,1,UINT32_MAX,UINT32_MAX};int paf_result=-1;
-    SceSysmoduleOpt opt={.flags=sizeof(SceSysmoduleOpt),.result=&paf_result,.unused={-1,-1}};
-    int rc=sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF,sizeof(args),args,&opt);
-    if(rc<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PAF)<0){pv_update_clean_stage(root);return install_fail(u,5,rc);}
-    rc=sceSysmoduleLoadModuleInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL);
-    if(rc<0&&sceSysmoduleIsLoadedInternal(SCE_SYSMODULE_INTERNAL_PROMOTER_UTIL)<0){pv_update_clean_stage(root);return install_fail(u,6,rc);}
-    rc=scePromoterUtilityInit();if(rc<0){pv_update_clean_stage(root);return install_fail(u,7,rc);}
-    /* VitaShell's homebrew promotion mode uses 1. No uninstall, app deletion
-     * or direct overwrite of the live application files is attempted. */
-    rc=scePromoterUtilityPromotePkgWithRif(root,1);
-    unsigned stage=8;
-    if(rc>=0){
-        int state=1;uint64_t start=sceKernelGetProcessTimeWide();
-        while(state){
-            rc=scePromoterUtilityGetState(&state);if(rc<0)break;
-            if(state&&sceKernelGetProcessTimeWide()-start>180000000ull){u->install_unsafe=true;return install_fail(u,9,-1);}
-            if(state)sceKernelDelayThread(100000);
-        }
-        if(rc<0&&state){u->install_unsafe=true;return install_fail(u,9,rc);}
-        if(rc>=0){int result=-1;rc=scePromoterUtilityGetResult(&result);if(rc>=0)rc=result;stage=10;}
+    Candidate *c=&u->candidate;char root[128],path[256],ver[16]={0},current[16]={0};
+    struct stat st;PvHandoffJob job={0};
+    if(strcmp(c->path,VPK)||!c->size||c->size>MAX_VPK||!match_hash(VPK,(unsigned)c->size,c->hash))return install_fail(u,1,-1);
+    /* Do not touch another app if the reserved ID is occupied. A stale
+     * pending job is handled on the next main startup. */
+    if(stat(HANDOFF,&st)==0||stat(HANDOFF_RESULT,&st)==0||stat(HELPER_PATH,&st)==0)return install_fail(u,12,-1);
+    job.size=(unsigned)c->size;strcpy(job.hash,c->hash);
+    if(!file_size("app0:eboot.bin",&job.helper_size)||!hash_file("app0:eboot.bin",job.helper_hash,job.helper_size))return install_fail(u,12,-2);
+    if(!new_stage(root))return install_fail(u,2,-errno);
+    if(!pv_update_unpack(VPK,root)){pv_update_clean_stage(root);return install_fail(u,3,-1);}
+    snprintf(path,sizeof(path),"%s/sce_sys/param.sfo",root);
+    if(!read_version(path,PV_MAIN_TITLE,ver)||!read_version("app0:sce_sys/param.sfo",PV_MAIN_TITLE,current)||strcmp(ver,current)<=0){
+        pv_update_clean_stage(root);return install_fail(u,4,-1);
     }
-    scePromoterUtilityExit();
+    memcpy(job.appver,ver,6);
+    if(!helper_sfo(path)){pv_update_clean_stage(root);return install_fail(u,12,-3);}
+    snprintf(path,sizeof(path),"%s/eboot.bin",root);
+    if(!copy_helper_exe(path,&job)||!stage_header(root,PV_HELPER_TITLE,ver)){
+        pv_update_clean_stage(root);return install_fail(u,12,-4);
+    }
+    char request[200];
+    if(!pv_handoff_format(&job,request,sizeof(request))||!write_new(HANDOFF,request,strlen(request))){
+        pv_update_clean_stage(root);return install_fail(u,13,-1);
+    }
+    unsigned stage=0;int rc=promote(root,false,&stage);
     pv_update_clean_stage(root);
-    if(rc<0)return install_fail(u,stage,rc);
-    /* Keep the verified VPK if the running process cannot observe the new
-     * installed version; report ambiguity rather than claiming success. */
-    unsigned char sfo[8192];size_t n=0;char installed[16]={0};
-    if(!read_small("ux0:app/PLVTB0001/sce_sys/param.sfo",sfo,sizeof(sfo),&n)||!sfo_value(sfo,n,"APP_VER",installed,sizeof(installed))||strcmp(installed,appver))return install_fail(u,11,-1);
-    if(hash_file(c->path,actual,c->size)&&!strcmp(actual,c->hash))unlink(c->path);
-    return PV_UP_INSTALLED;
+    if(rc<0||!helper_owned(&job)){
+        /* Keep the job for safe ownership-checked recovery on next launch. */
+        return install_fail(u,stage,rc<0?rc:-1);
+    }
+    rc=sceAppMgrLaunchAppByUri(0xFFFFF,"psgm:play?titleid=" PV_HELPER_TITLE);
+    if(rc<0)return install_fail(u,14,rc);
+    return PV_UP_HANDOFF;
+}
+bool pv_update_is_helper(void){
+    char title[32]={0};
+    return sceAppMgrAppParamGetString(0,12,title,sizeof(title))>=0&&!strcmp(title,PV_HELPER_TITLE);
+}
+static void helper_result(unsigned stage,int rc){
+    char s[64];int n=snprintf(s,sizeof(s),"PVH1 %u %d\n",stage,rc);
+    if(n>0&&(size_t)n<sizeof(s))write_new(HANDOFF_RESULT,s,(size_t)n);
+}
+/* This entrypoint runs under the distinct helper title, before any account,
+ * networking, migration or UI initialization. Only a locally approved,
+ * verified package in the fixed Downloads slot can be installed. */
+int pv_update_run_helper(void){
+    PvHandoffJob job;struct stat st;char current[16]={0},ver[16]={0},root[128],path[256];
+    unsigned stage=15;int rc=-1;
+    if(!pv_update_is_helper())return 1;
+    if(stat(HANDOFF_RESULT,&st)==0)goto launch;
+    if(!read_job(&job)||!helper_owned(&job)||!match_hash(VPK,job.size,job.hash))goto finish;
+    if(!read_version(MAIN_PATH "/sce_sys/param.sfo",PV_MAIN_TITLE,current))goto finish;
+    if(!strcmp(current,job.appver)){stage=0;rc=0;goto finish;}
+    if(strcmp(current,job.appver)>0)goto finish;
+    stage=16;
+    /* User explicitly chose Install. Close the previous foreground title
+     * before promotion, following VitaShell's separate-updater pattern. */
+    sceKernelDelayThread(500000);
+    rc=sceAppMgrDestroyOtherApp();if(rc<0)goto finish;
+    sceKernelDelayThread(300000);
+    stage=2;
+    if(!new_stage(root)){rc=-errno;goto finish;}
+    stage=3;rc=-1;
+    if(!pv_update_unpack(VPK,root))goto cleanup;
+    snprintf(path,sizeof(path),"%s/sce_sys/param.sfo",root);
+    stage=4;
+    if(!read_version(path,PV_MAIN_TITLE,ver)||strcmp(ver,job.appver)||!stage_header(root,PV_MAIN_TITLE,ver))goto cleanup;
+    rc=promote(root,false,&stage);if(rc<0)goto cleanup;
+    stage=11;rc=-1;
+    if(!read_version(MAIN_PATH "/sce_sys/param.sfo",PV_MAIN_TITLE,current)||strcmp(current,job.appver))goto cleanup;
+    stage=0;rc=0;
+cleanup:
+    pv_update_clean_stage(root);
+finish:
+    helper_result(stage,rc);
+    /* Keep the verified VPK even on success until the new main app confirms
+     * the installed version and consumes the receipt. */
+launch:
+    sceKernelDelayThread(500000);
+    sceAppMgrLaunchAppByUri(0xFFFFF,"psgm:play?titleid=" PV_MAIN_TITLE);
+    return 0;
+}
+static void recover_handoff(PvUpdater *u){
+    struct stat st;PvHandoffJob job;
+    if(stat(HANDOFF,&st)!=0)return;
+    unsigned stage=15;int rc=-1;char raw[64],version[16]={0};size_t n=0;
+    if(!read_job(&job)){u->report.state=PV_UP_ERROR;u->report.install_stage=15;u->report.install_error=-2;return;}
+    if(read_small(HANDOFF_RESULT,(unsigned char *)raw,sizeof(raw),&n)){
+        raw[n]=0;char extra;
+        if(sscanf(raw,"PVH1 %u %d %c",&stage,&rc,&extra)!=2||stage>16){stage=15;rc=-3;}
+    }
+    bool installed=read_version("app0:sce_sys/param.sfo",PV_MAIN_TITLE,version)&&!strcmp(version,job.appver);
+    if(installed&&stage==0&&rc==0){
+        if(match_hash(VPK,job.size,job.hash))unlink(VPK);
+        u->report.state=PV_UP_CURRENT;
+    }else{
+        u->report.state=PV_UP_ERROR;u->report.install_stage=stage?stage:11;u->report.install_error=rc?rc:-1;
+        strcpy(u->report.file,VPK);
+    }
+    /* Delete only our exact helper, never the main app or unrelated apps.
+     * If the helper is still exiting, keep the receipt for next startup. */
+    if(stat(HELPER_PATH,&st)==0){
+        if(!helper_owned(&job))return;
+        sceKernelDelayThread(500000);
+        unsigned cleanup_stage=0;
+        if(promote(NULL,true,&cleanup_stage)<0)return;
+    }
+    unlink(HANDOFF_RESULT);unlink(HANDOFF);
 }
 static void *worker(void *opaque){
     PvUpdater *u=opaque;
@@ -308,10 +484,11 @@ PvUpdater *pv_updater_create(void){
     atomic_init(&u->done,false);atomic_init(&u->cancel,false);atomic_init(&u->progress,0);
     u->report.automatic=true;u->dirty=true;
     FILE *f=fopen(PREFS,"rb");if(f){unsigned b=0,a=0;char extra;if(fscanf(f,"%u %u %c",&b,&a,&extra)==2&&b<=1&&a<=1){u->report.beta=b!=0;u->report.automatic=a!=0;}fclose(f);}
+    recover_handoff(u);
     return u;
 }
 bool pv_updater_busy(const PvUpdater *u){return u&&u->running;}
-bool pv_updater_automatic(const PvUpdater *u){return u&&u->report.automatic;}
+bool pv_updater_automatic(const PvUpdater *u){return u&&u->report.automatic&&!u->report.install_stage;}
 void pv_updater_destroy(PvUpdater *u){
     if(!u)return;
     if(u->running){if(u->command!=PV_UP_CMD_INSTALL)atomic_store(&u->cancel,true);pthread_join(u->thread,NULL);}
