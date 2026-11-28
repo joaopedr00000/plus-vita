@@ -21,7 +21,7 @@ option(PLUS_VITA_FINAL_004 "Package VitaPlus search and latency update as v0.0.4
 option(PLUS_VITA_FINAL_005 "Package VitaPlus library update as v0.0.5" OFF)
 option(PLUS_VITA_FINAL_005_2 "Package VitaPlus reference layout as v0.0.5-2" OFF)
 option(PLUS_VITA_FINAL_010 "Package VitaPlus v0.1.0" OFF)
-option(PLUS_VITA_TEST_006_B2 "Package VitaPlus v0.0.6 B2 public beta" OFF)
+option(PLUS_VITA_TEST_006_B3 "Package VitaPlus v0.0.6 B3 public beta" OFF)
 set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
@@ -147,13 +147,13 @@ if(PLUS_VITA_FINAL_010)
   set(VITA_VERSION "01.00")
   set(PLUS_VITA_PUBLIC_VERSION "v0.1.0")
 endif()
-if(PLUS_VITA_TEST_006_B2)
+if(PLUS_VITA_TEST_006_B3)
   if(NOT PLUS_VITA_FINAL_005_2 OR PLUS_VITA_FINAL_010)
-    message(FATAL_ERROR "v0.0.6 B2 requires the v0.0.5-2 profile and excludes v0.1.0")
+    message(FATAL_ERROR "v0.0.6 B3 requires the v0.0.5-2 profile and excludes v0.1.0")
   endif()
-  set(VITA_VERSION "00.29")
-  set(PLUS_VITA_PUBLIC_VERSION "v0.0.6-b2")
-  set(PLUS_VITA_DISPLAY_VERSION "0.0.6 B2")
+  set(VITA_VERSION "00.30")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.0.6-b3")
+  set(PLUS_VITA_DISPLAY_VERSION "0.0.6 B3")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -1283,7 +1283,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   PLUS_VITA_FINAL_001=$<BOOL:${PLUS_VITA_FINAL_001}>
   PLUS_VITA_PS5_EXPERIMENTAL=$<BOOL:${PLUS_VITA_PS5_EXPERIMENTAL}>
   PLUS_VITA_APP_VERSION="${PLUS_VITA_PUBLIC_VERSION}"
-  $<$<BOOL:${PLUS_VITA_TEST_006_B2}>:PLUS_VITA_DISPLAY_VERSION=\"${PLUS_VITA_DISPLAY_VERSION}\">
+  $<$<BOOL:${PLUS_VITA_TEST_006_B3}>:PLUS_VITA_DISPLAY_VERSION=\"${PLUS_VITA_DISPLAY_VERSION}\">
   PLUS_VITA_PS3_STARTUP_SAMPLE=$<BOOL:${PLUS_VITA_PS3_STARTUP_SAMPLE}>
   PLUS_VITA_PS3_REPLAY=$<BOOL:${PLUS_VITA_PS3_REPLAY}>
   PLUS_VITA_PS3_LIVE=$<BOOL:${PLUS_VITA_PS3_LIVE}>
