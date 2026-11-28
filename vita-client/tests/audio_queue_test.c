@@ -21,7 +21,7 @@ static uint64_t next_arrival, output_deadline;
 static unsigned sequence, output_count, log_delay, slow_output, initial_units;
 static unsigned first_pcm_delay;
 static unsigned native_block, expected_block, open_attempts, period_remainder;
-static bool reject_small_block;
+static bool reject_small_block, inject_faults, injected_gap, injected_bad;
 static unsigned options=PV_OPT_ALL; /* Exercise all experimental paths explicitly. */
 static char final_timing[2048], final_summary[1024];
 static PvAudioDiagnostic final_audio;
@@ -33,6 +33,7 @@ static void deliver_until(uint64_t target)
 	while(next_arrival <= target && output_count < 5000) {
 		atomic_store(&now_us, next_arrival);
 		uint8_t packet = 0;
+        if(inject_faults&&!injected_bad&&sequence>500){packet=1;injected_bad=true;}
 		assert(plus_vita_audio_push(audio, (uint16_t)sequence++, &packet, 1));
 		next_arrival += 10000;
 	}
@@ -56,7 +57,7 @@ void opus_encoder_destroy(OpusEncoder *e) { free(e); }
 int opus_encode(OpusEncoder *e, const int16_t *pcm, int n, unsigned char *packet, opus_int32 cap)
 { (void)e; (void)pcm; assert(n == 480 && cap > 0); *packet = 0; return 1; }
 int opus_decode(OpusDecoder *d, const unsigned char *packet, opus_int32 size, int16_t *pcm, int n, int fec)
-{ (void)packet; (void)size; assert(n == 480 && !fec); memset(pcm, 0, 480 * d->channels * sizeof(*pcm)); return 480; }
+{ (void)size; assert(n == 480 && !fec); if(packet&&*packet==1)return -4; memset(pcm, 0, 480 * d->channels * sizeof(*pcm)); return 480; }
 int opus_decoder_ctl(OpusDecoder *d, int request, ...) { (void)d; assert(request == OPUS_RESET_STATE); return OPUS_OK; }
 int sceAudioOutOpenPort(int type, int block, int rate, int mode)
 { assert(type == 0 && rate == 48000 && mode == 1); assert(block == (open_attempts++ ? 960 : (int)expected_block)); if(block == 512 && reject_small_block) return -1; native_block = (unsigned)block; return 1; }
@@ -75,7 +76,11 @@ int sceAudioOutOutput(int port, const void *pcm)
 	period_remainder = scaled % 48000u;
 	output_deadline += period + slow_output;
 	uint64_t target = relative_pacing ? now + period + slow_output : (now > output_deadline ? now : output_deadline);
-	deliver_until(target);
+	if(inject_faults&&!injected_gap&&output_count==1000){
+        injected_gap=true;next_arrival+=1340000u;sequence+=134u;
+        target=next_arrival+100000u;output_deadline=target;
+    }
+    deliver_until(target);
 	output_count++;
 	if(output_count >= 5000) {
 		pthread_mutex_lock(&gate); finished = true; pthread_cond_broadcast(&changed); pthread_mutex_unlock(&gate);
@@ -96,7 +101,7 @@ static unsigned long long field(const char *line, const char *name)
 { const char *p = strstr(line, name); assert(p); return strtoull(p + strlen(name), NULL, 10); }
 static uint64_t run(const char *name, unsigned startup, unsigned writer_delay, unsigned pacing_error, bool relative, bool after_first, unsigned profile)
 {
-	ready = finished = false; audio = NULL; sequence = output_count = 0;
+	ready = finished = false; audio = NULL; sequence = output_count = 0;injected_gap=injected_bad=false;
 	native_block = open_attempts = period_remainder = 0;
 	expected_block = profile == 6000 && pv_opt(options,PV_OPT_AUDIO_SMALL) ? 512 : 960;
 	log_delay = writer_delay; slow_output = pacing_error; relative_pacing = relative;
@@ -160,5 +165,10 @@ int main(void)
     options=0;
     uint64_t fixed=run("6 Mbps / all optional audio optimizations disabled",200000,0,0,false,false,6000);
     assert(fixed<170000 && native_block==960 && final_audio.trimmed_pcm_samples==0 && field(final_summary,"queue_peak=")<=15);
-    puts("audio queue: legacy timing, adaptive backlog and opt-out paths passed; no hardware latency inferred");
+    options=PV_OPT_DEFAULT;inject_faults=true;
+    run("corrupt Opus unit and 1.34 second arrival interruption",200000,0,0,false,false,6000);
+    assert(injected_gap&&injected_bad&&final_audio.decode_errors==1);
+    assert(final_audio.arrival_discontinuities==1&&final_audio.discontinuity_resets==1);
+    assert(final_audio.arrival_gap_max_us>=1340000u&&!final_audio.failed);
+    puts("audio queue: legacy timing, adaptive backlog, interruption and malformed-unit recovery passed; no hardware latency inferred");
 }

@@ -17,7 +17,7 @@
 #define AUDIO_UNIT_MAX 255
 #define AUDIO_BLOCK 960
 #define AUDIO_STALL_US(a) ((uint64_t)(a)->block_frames * 1000000u / 48000u + 10000u)
-typedef struct { uint16_t sequence; size_t size; uint64_t arrived_us; unsigned local_drops_before; uint8_t data[AUDIO_UNIT_MAX]; } AudioUnit;
+typedef struct { uint16_t sequence; size_t size; uint64_t arrived_us; unsigned local_drops_before, epoch; uint8_t data[AUDIO_UNIT_MAX]; } AudioUnit;
 struct plus_vita_audio_playback_t {
 	ChiakiLog *log;
 	OpusDecoder *decoder;
@@ -43,7 +43,7 @@ struct plus_vita_audio_playback_t {
 	unsigned empty_waits, empty_wait_gt20ms, output_gap_stalls;
 	unsigned output_call_stalls, sequence_gaps, sequence_resets, skipped_local;
 	unsigned max_missing_units;
-    unsigned refill_count,brief_waits;
+    unsigned refill_count,brief_waits,arrival_epoch,arrival_discontinuities,discontinuity_resets,decode_errors;
     uint64_t refill_started_us,refill_wait_total_us,refill_wait_max_us,discarded_pcm_samples,trimmed_pcm_samples;
 	uint64_t empty_wait_max_us, output_gap_max_us, output_call_max_us;
 	uint64_t last_output_start_us, queue_age_total_us, queue_age_max_us;
@@ -58,7 +58,7 @@ static void audio_log_timing(PlusVitaAudioPlayback *a, const char *phase)
 	unsigned arrival_gap_gt40ms = a->arrival_gap_gt40ms;
 	uint64_t arrival_gap_max_us = a->arrival_gap_max_us;
 	unsigned queue_count = a->count;
-    unsigned peak=a->peak,drops=a->dropped,target=a->prebuffer_target;
+    unsigned peak=a->peak,drops=a->dropped,target=a->prebuffer_target,discontinuities=a->arrival_discontinuities;
 	pthread_mutex_unlock(&a->mutex);
     PvAudioDiagnostic snapshot={.arrived=arrived,.decoded=a->decoded,.outputs=a->outputs,.concealed=a->concealed,.stale=a->stale,.dropped=drops,.queue_peak=peak,.queue_now=queue_count,
         .arrival_gt20ms=arrival_gap_gt20ms,.arrival_gt40ms=arrival_gap_gt40ms,.output_gap_stalls=a->output_gap_stalls,.output_call_stalls=a->output_call_stalls,
@@ -66,7 +66,7 @@ static void audio_log_timing(PlusVitaAudioPlayback *a, const char *phase)
         .refill_count=a->refill_count,.brief_waits=a->brief_waits,.target_ms=10u*target,.block_frames=a->block_frames,.failed=a->failed,
         .queue_age_avg_us=a->queue_age_samples?a->queue_age_total_us/a->queue_age_samples:0,.queue_age_max_us=a->queue_age_max_us,.arrival_gap_max_us=arrival_gap_max_us,
         .output_gap_max_us=a->output_gap_max_us,.output_call_max_us=a->output_call_max_us,.refill_wait_total_us=a->refill_wait_total_us,.refill_wait_max_us=a->refill_wait_max_us,
-        .discarded_pcm_samples=a->discarded_pcm_samples,.trimmed_pcm_samples=a->trimmed_pcm_samples};
+        .discarded_pcm_samples=a->discarded_pcm_samples,.trimmed_pcm_samples=a->trimmed_pcm_samples,.arrival_discontinuities=discontinuities,.discontinuity_resets=a->discontinuity_resets,.decode_errors=a->decode_errors};
     plus_vita_diagnostic_audio(&snapshot,!strcmp(phase,"final"));
 	CHIAKI_LOGI(a->log,
 		"Stream probe audio timing %s decoded=%u arrived=%u arrival_gap_max_us=%llu arrival_gt20ms=%u arrival_gt40ms=%u empty_waits=%u empty_wait_max_us=%llu empty_gt20ms=%u output_gap_max_us=%llu output_gap_stalls=%u output_call_max_us=%llu output_call_stalls=%u stall_budget_us=%llu queue_age_avg_us=%llu queue_age_max_us=%llu queue_now=%u seq_gaps=%u seq_resets=%u max_missing=%u skipped_local=%u",
@@ -182,7 +182,7 @@ static void *audio_worker(void *user)
 	 * only 160ms fit in the queue. Normal streaming starts decoding at once. */
 	CHIAKI_LOGI(a->log, "Stream probe audio reference tone disabled for live playback");
 	int16_t pcm[480 * 2];
-	unsigned pending_local_drops = 0;
+	unsigned pending_local_drops = 0, decoded_epoch = 0;
 	for(;;) {
 		pthread_mutex_lock(&a->mutex);
 		#if PLUS_VITA_ADAPTIVE_STREAM
@@ -241,7 +241,20 @@ static void *audio_worker(void *user)
 		a->queue_age_total_us += queue_age_us;
 		a->queue_age_samples++;
 		if(queue_age_us > a->queue_age_max_us) a->queue_age_max_us = queue_age_us;
-		pending_local_drops += unit.local_drops_before;
+		/* A receive discontinuity is carried by every subsequent unit, so a
+         * burst evicting the first packet cannot lose the recovery marker.
+         * Never replay missing seconds of sound or retain half an old PCM block. */
+        if(unit.epoch!=decoded_epoch){
+            decoded_epoch=unit.epoch;
+            if(a->sequence_valid){
+                if(opus_decoder_ctl(a->decoder, OPUS_RESET_STATE)!=OPUS_OK)goto failed;
+                a->discontinuity_resets++;
+                a->discarded_pcm_samples+=a->fill;a->fill=0;
+                a->sequence_valid=false;a->audio_fade=true;
+            }
+            pending_local_drops=0;
+        }
+        pending_local_drops += unit.local_drops_before;
 		uint16_t delta = (uint16_t)(unit.sequence - a->sequence);
 		if(a->sequence_valid && (!delta || delta >= 0x8000)) { a->stale++; continue; }
 		if(a->sequence_valid && delta > 1) {
@@ -261,15 +274,28 @@ static void *audio_worker(void *user)
 			if(wire_missing <= 3) {
 				for(unsigned i = 0; i < wire_missing; i++) {
 					int n = opus_decode(a->decoder, NULL, 0, pcm, 480, 0);
-					if(n != 480 || !audio_output(a, pcm, (unsigned)n)) goto failed;
+					if(n != 480){memset(pcm,0,sizeof(pcm));n=480;a->decode_errors++;a->audio_fade=true;}
+                    if(!audio_output(a, pcm, (unsigned)n)) goto failed;
 					a->concealed++;
 				}
-			} else { a->sequence_resets++; opus_decoder_ctl(a->decoder, OPUS_RESET_STATE); a->discarded_pcm_samples+=a->fill;a->fill = 0; a->audio_fade=true; }
+			} else { a->sequence_resets++; if(opus_decoder_ctl(a->decoder, OPUS_RESET_STATE)!=OPUS_OK)goto failed; a->discarded_pcm_samples+=a->fill;a->fill = 0; a->audio_fade=true; }
 		}
 		pending_local_drops = 0;
 		int n = opus_decode(a->decoder, unit.data, (opus_int32)unit.size, pcm, 480, 0);
-		if(n != 480) { CHIAKI_LOGE(a->log, "Stream probe audio decode failed samples=%d", n); goto failed; }
-		a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
+        if(n != 480){
+            /* A malformed compressed unit is not a native output failure.
+             * Consume its sequence once and emit exactly 10 ms of silence. */
+            a->decode_errors++;
+            if(a->decode_errors<=3||a->decode_errors%100==0)
+                CHIAKI_LOGW(a->log,"Stream probe audio decode recovered samples=%d",n);
+            if(opus_decoder_ctl(a->decoder,OPUS_RESET_STATE)!=OPUS_OK)goto failed;
+            memset(pcm,0,sizeof(pcm));
+            a->sequence=unit.sequence;a->sequence_valid=true;
+            a->audio_fade=true;
+            if(!audio_output(a,pcm,480))goto failed;
+            continue;
+        }
+        a->decoded++; a->sequence = unit.sequence; a->sequence_valid = true;
 #if PLUS_VITA_ADAPTIVE_STREAM
 		bool stable_pcm=a->decoded>2&&!a->audio_fade;
 		if(a->audio_fade) {
@@ -352,7 +378,14 @@ bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uin
 	pthread_mutex_lock(&a->mutex);
 	if(a->failed || a->stop) { pthread_mutex_unlock(&a->mutex); return false; }
 	if(a->last_arrival_us) {
-		uint64_t gap_us = arrived_us - a->last_arrival_us;
+		uint64_t gap_us = arrived_us >= a->last_arrival_us ? arrived_us - a->last_arrival_us : 0;
+#if PLUS_VITA_ADAPTIVE_STREAM
+        if(a->prebuffer_base&&pv_audio_discontinuity(a->last_arrival_us,arrived_us)){
+            a->arrival_epoch++;a->arrival_discontinuities++;
+            /* Old queued units are beyond the useful playout window. */
+            a->dropped+=a->count;a->head=0;a->count=0;a->clean_audio_units=0;
+        }
+#endif
 		if(gap_us > a->arrival_gap_max_us) a->arrival_gap_max_us = gap_us;
 		if(gap_us > 20000) a->arrival_gap_gt20ms++;
 		if(gap_us > 40000) a->arrival_gap_gt40ms++;
@@ -373,7 +406,7 @@ bool plus_vita_audio_push(PlusVitaAudioPlayback *a, uint16_t sequence, const uin
 	}
 	AudioUnit *unit = &a->queue[(a->head + a->count) % AUDIO_QUEUE];
 	unit->sequence = sequence; unit->size = size; unit->arrived_us = arrived_us;
-	unit->local_drops_before = 0; memcpy(unit->data, data, size);
+	unit->local_drops_before = 0; unit->epoch=a->arrival_epoch; memcpy(unit->data, data, size);
 	a->count++; if(a->count > a->peak) a->peak = a->count;
 	pthread_cond_signal(&a->cond); pthread_mutex_unlock(&a->mutex); return true;
 }

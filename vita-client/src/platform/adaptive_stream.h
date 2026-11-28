@@ -35,6 +35,15 @@ static inline unsigned pv_audio_adjust(unsigned base,unsigned current,bool starv
 /* 10 ms per unit. A wider bounded margin absorbs burst arrivals without
  * immediately throwing away valid compressed frames. */
 #define PV_AUDIO_CLEAN_UNITS 6000u
+#define PV_AUDIO_DISCONTINUITY_US 250000u
+#define PV_WIFI_GRACE_MS 1800u
+static inline bool pv_audio_discontinuity(uint64_t last,uint64_t now){
+    return last&&now>=last&&now-last>=PV_AUDIO_DISCONTINUITY_US;
+}
+/* A monotonic transient disconnect grace, never applied to startup or sleep. */
+static inline bool pv_wifi_expired(uint64_t first,uint64_t now){
+    return now>=first&&now-first>=PV_WIFI_GRACE_MS;
+}
 static inline unsigned pv_audio_queue_limit(unsigned target){
     if(target<8)target=8;
     if(target>16)target=16;

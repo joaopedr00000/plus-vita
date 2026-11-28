@@ -141,7 +141,7 @@ typedef struct plus_vita_stream_probe_t
 	unsigned int fec_packets_seen;
 	unsigned int fec_attempts, fec_repaired_frames, fec_repaired_units, fec_failed;
 	uint64_t fec_total_us, fec_max_us;
-	unsigned int audio_frames,audio_fec_recovered,audio_duplicate_source;
+	unsigned int audio_frames,audio_fec_recovered,audio_duplicate_source,audio_invalid_packets;
     PvAudioRepair audio_repair;
 	PlusVitaAudioPlayback *audio_playback;
 	bool video_keyframe;
@@ -914,7 +914,7 @@ static ChiakiErrorCode probe_audio_packet(PlusVitaStreamProbe *probe,
 			if(!plus_vita_audio_push(probe->audio_playback, seq,
 				packet->data + index * unit_size, unit_size))
 			{
-				return CHIAKI_ERR_INVALID_DATA;
+				return CHIAKI_ERR_UNKNOWN;
 			}
 			probe->audio_fec_recovered++;
 		}
@@ -926,7 +926,7 @@ static ChiakiErrorCode probe_audio_packet(PlusVitaStreamProbe *probe,
 			(uint16_t)(packet->frame_index + i),
 			packet->data + i * unit_size, unit_size))
 		{
-			return CHIAKI_ERR_INVALID_DATA;
+			return CHIAKI_ERR_UNKNOWN;
 		}
 	}
 	probe->audio_frames += source_units;
@@ -1478,6 +1478,16 @@ static void probe_takion_cb(ChiakiTakionEvent *event, void *user)
 			if(!probe->capture_only)
 				media_err = probe_audio_packet(probe, event->av);
 		}
+        /* Invalid isolated audio packets after playback starts must not
+         * tear down the otherwise healthy video session. The worker still
+         * propagates fatal native-output/initialization errors distinctly. */
+        if(media_err==CHIAKI_ERR_INVALID_DATA&&!event->av->is_video&&!event->av->is_haptics&&
+            probe->video_decoded_frame&&!probe->capture_only){
+            probe->audio_invalid_packets++;
+            if(probe->audio_invalid_packets<=3||probe->audio_invalid_packets%100==0)
+                CHIAKI_LOGW(probe->log,"Stream probe ignored invalid audio packet count=%u",probe->audio_invalid_packets);
+            goto callback_done;
+        }
 		if(media_err != CHIAKI_ERR_SUCCESS)
 		{
 			CHIAKI_LOGE(probe->log,
@@ -1719,6 +1729,7 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 #endif
 	uint64_t last_feedback = started;
 	uint64_t last_heartbeat = started;
+    uint64_t wifi_lost_at=0;
 	const uint64_t first_frame_timeout = probe->ps3_live ? PS3_MEDIA_START_TIMEOUT_MS : PROBE_TIMEOUT_MS;
 	ProbePresentationStats shown={0};
 #if PLUS_VITA_ADAPTIVE_STREAM
@@ -1739,10 +1750,17 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 	plus_vita_diagnostic_stream_timing_begin();
 	while(err == CHIAKI_ERR_SUCCESS)
 	{
-		if(plus_vita_recovery_poll() != PLUS_VITA_RECOVERY_NONE) {
-			err = CHIAKI_ERR_CANCELED;
-			break;
-		}
+        PlusVitaRecovery recovery=plus_vita_recovery_poll();
+        uint64_t wifi_now=sceKernelGetProcessTimeWide()/1000u;
+        if(recovery==PLUS_VITA_RECOVERY_WIFI&&shown.first_display){
+            if(!wifi_lost_at)wifi_lost_at=wifi_now?wifi_now:1;
+            if(pv_wifi_expired(wifi_lost_at,wifi_now)){
+                CHIAKI_LOGW(probe->log,"Stream probe Wi-Fi grace expired");
+                err=CHIAKI_ERR_CANCELED;break;
+            }
+        }else if(recovery!=PLUS_VITA_RECOVERY_NONE){
+            err=CHIAKI_ERR_CANCELED;break;
+        }else wifi_lost_at=0;
 		uint64_t stamp_us=sceKernelGetProcessTimeWide();
         if(present.slots.pending>=0&&(!probe->queue_count||stamp_us-present.submitted_us>=20000u)){
             err=probe_finish_presentation(probe,&present,&shown);
@@ -2138,6 +2156,7 @@ chiaki_mutex_unlock(&probe->mutex);
 	plus_vita_diagnostic_counter("audio_frames",probe->audio_frames);
     plus_vita_diagnostic_counter("audio_fec_recovered",probe->audio_fec_recovered);
     plus_vita_diagnostic_counter("audio_duplicate_source",probe->audio_duplicate_source);
+    CHIAKI_LOGI(probe->log,"Stream probe invalid audio packets=%u",probe->audio_invalid_packets);
 	plus_vita_diagnostic_counter("fec_repaired",probe->fec_repaired_frames);
 	plus_vita_diagnostic_counter("fec_failed",probe->fec_failed);
 	plus_vita_diagnostic_counter("reorder_late",probe->reorder_late_packets);

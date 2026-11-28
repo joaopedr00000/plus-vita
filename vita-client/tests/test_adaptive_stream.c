@@ -37,5 +37,9 @@ int main(void){
  for(unsigned i=0;i<20;i++) { a=pv_audio_adjust(8,a,false); }
  assert(a==8&&PV_AUDIO_CLEAN_UNITS==6000u);
  assert(pv_retry_rate(15000,15000)==12000&&pv_retry_rate(6000,6000)==4800&&pv_retry_rate(6000,2500)==2500);
+ assert(!pv_audio_discontinuity(0,1500000)&&!pv_audio_discontinuity(100000,99999));
+ assert(!pv_audio_discontinuity(100000,349999)&&pv_audio_discontinuity(100000,350000));
+ assert(pv_audio_discontinuity(100000,1440000));
+ assert(!pv_wifi_expired(100,1899)&&pv_wifi_expired(100,1900)&&!pv_wifi_expired(100,99));
  puts("adaptive streaming policy passed");return 0;
 }
