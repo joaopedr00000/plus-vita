@@ -13,5 +13,10 @@ int main(void){
     assert(pv_audio_migrate_options(PV_OPT_ALL)==(PV_OPT_ALL&~(PV_OPT_PCM_TRIM|PV_OPT_AUDIO_SMALL|PV_OPT_AUDIO_BOUND)));
     assert(pv_audio_migrate_options(0)==0);
     assert(pv_audio_migrate_options(PV_OPT_DEFAULT|PV_OPT_PCM_TRIM)==PV_OPT_DEFAULT);
+    assert(pv_portal_migrate_options(PV_OPT_ALL)==(PV_OPT_ALL&~PV_OPT_PS5_PC));
+    assert(pv_portal_migrate_options(0)==0);
+    assert(pv_portal_migrate_options(PV_OPT_DEFAULT|PV_OPT_PS5_PC)==PV_OPT_DEFAULT);
+    assert(pv_cloud_client_mode(true,PV_OPT_DEFAULT)==2&&pv_cloud_client_mode(true,PV_OPT_PS5_PC)==1);
+    assert(pv_cloud_client_mode(false,PV_OPT_PS5_PC)==0);
     return 0;
 }

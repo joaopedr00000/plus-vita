@@ -28,8 +28,9 @@ int main(void){
     PlusVitaApp *app=connected();
     PlusVitaAppEffect discover=click(app,PLUS_VITA_ACTION_GAME);
     assert(!strcmp(discover.datacenter,PLUS_VITA_DC_DISCOVER));
+    assert(!pv_opt(discover.stream_options,PV_OPT_PS5_PC));
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLAY_ENDED,.operation=discover.operation,
-        .status=PLUS_VITA_RESULT_SERVICE_ERROR,.stream_diagnostic={.valid=true,.phase=7,.http=403,.reason=1,.native_error=1}});
+        .status=PLUS_VITA_RESULT_SERVICE_ERROR,.stream_diagnostic={.valid=true,.phase=7,.http=403,.reason=1,.native_error=1,.client_mode=2}});
     PlusVitaAppView v=plus_vita_app_view(app);
     assert(v.screen==PLUS_VITA_APP_DETAILS && strstr(v.body,"Falha antes"));
     assert(strstr(v.body,"Locking Session (7/11)")&&strstr(v.body,"HTTP: 403")&&strstr(v.body,"Service: 002.0011")&&strstr(v.body,"Portal (PS5) / H.264"));

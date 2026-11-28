@@ -321,7 +321,8 @@ static bool theme_save(PlusVitaAppView v){
     remove(PV_THEME_PREFS ".tmp");return false;
 }
 #define PV_STREAM_PREFS PV_STREAM_FILE
-#define PV_AUDIO_OPTIONS_FILE PV_STREAM_OPTIONS_FILE ".audio-v2"
+#define PV_AUDIO_OPTIONS_FILE PV_STREAM_OPTIONS_FILE ".portal-v3"
+#define PV_PREVIOUS_OPTIONS_FILE PV_STREAM_OPTIONS_FILE ".audio-v2"
 static bool stream_options_save(unsigned flags){
     FILE *f=fopen(PV_AUDIO_OPTIONS_FILE ".tmp","wb");if(!f)return false;
     bool ok=fprintf(f,"1 %u\n",flags)>0;if(fclose(f)!=0)ok=false;
@@ -339,7 +340,8 @@ static bool stream_options_load(PlusVitaApp *app){
     unsigned flags=PV_OPT_DEFAULT;
     bool saved=stream_options_read(PV_AUDIO_OPTIONS_FILE,&flags);
     if(!saved){
-        if(stream_options_read(PV_STREAM_OPTIONS_FILE,&flags))flags=pv_audio_migrate_options(flags);
+        if(stream_options_read(PV_PREVIOUS_OPTIONS_FILE,&flags))flags=pv_portal_migrate_options(flags);
+        else if(stream_options_read(PV_STREAM_OPTIONS_FILE,&flags))flags=pv_portal_migrate_options(pv_audio_migrate_options(flags));
         saved=stream_options_save(flags);
     }
     plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_STREAM_OPTIONS,.stream_options=flags});

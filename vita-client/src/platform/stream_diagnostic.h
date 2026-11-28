@@ -5,7 +5,8 @@
 /* Numeric, bounded snapshot only. No server-provided text or identifiers. */
 typedef struct {
     bool valid;
-    unsigned phase, http, reason, startup; /* startup = enum + 1; 0 unavailable */
+    unsigned phase, http, reason, startup;
+    unsigned client_mode; /* actual envelope: 1 PC, 2 Portal; 0 legacy or unavailable */ /* startup = enum + 1; 0 unavailable */
     int native_error; /* -1 unavailable */
 } PlusVitaStreamDiagnostic;
 #endif

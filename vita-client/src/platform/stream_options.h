@@ -21,6 +21,9 @@
 static inline bool pv_opt(unsigned flags,unsigned bit){return (flags&bit)!=0;}
 static inline bool pv_options_valid(unsigned flags){return !(flags&~PV_OPT_ALL);}
 static inline unsigned pv_options_sanitize(unsigned flags){return pv_options_valid(flags)?flags:PV_OPT_DEFAULT;}
+/* New B5 preference namespace: reset only the experimental PS5 mode once. */
+static inline unsigned pv_portal_migrate_options(unsigned flags){return pv_options_sanitize(flags)&~PV_OPT_PS5_PC;}
+static inline unsigned pv_cloud_client_mode(bool ps5,unsigned flags){return ps5?(pv_opt(flags,PV_OPT_PS5_PC)?1u:2u):0u;}
 /* Only migrate audio flags. Preserve every unrelated preference. */
 static inline unsigned pv_audio_migrate_options(unsigned flags){
     return pv_options_sanitize(flags)&~(PV_OPT_PCM_TRIM|PV_OPT_AUDIO_SMALL|PV_OPT_AUDIO_BOUND);

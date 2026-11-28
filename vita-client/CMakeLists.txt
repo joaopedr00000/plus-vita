@@ -27,6 +27,7 @@ option(PLUS_VITA_TEST_007_B1 "Package VitaPlus v0.0.7 B1 audio stability" OFF)
 option(PLUS_VITA_TEST_007_B2 "Package VitaPlus v0.0.7 B2 interruption recovery" OFF)
 option(PLUS_VITA_TEST_007_B3 "Package VitaPlus v0.0.7 B3 audio continuity and PS5 discovery" OFF)
 option(PLUS_VITA_TEST_007_B4 "Package VitaPlus v0.0.7 B4 Portal AVC experiment" OFF)
+option(PLUS_VITA_TEST_007_B5 "Package VitaPlus v0.0.7 B5 Portal authorization diagnostics" OFF)
 set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
@@ -199,6 +200,14 @@ if(PLUS_VITA_TEST_007_B4)
   set(VITA_VERSION "00.38")
   set(PLUS_VITA_PUBLIC_VERSION "v0.0.7-b4")
   set(PLUS_VITA_DISPLAY_VERSION "0.0.7 B4")
+endif()
+if(PLUS_VITA_TEST_007_B5)
+  if(NOT PLUS_VITA_FINAL_007 OR PLUS_VITA_TEST_007_B1 OR PLUS_VITA_TEST_007_B2 OR PLUS_VITA_TEST_007_B3 OR PLUS_VITA_TEST_007_B4)
+    message(FATAL_ERROR "v0.0.7 B5 requires 0.0.7 profile without prior beta overrides")
+  endif()
+  set(VITA_VERSION "00.39")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.0.7-b5")
+  set(PLUS_VITA_DISPLAY_VERSION "0.0.7 B5")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -737,8 +746,16 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
   # One provisioning worker owns the mode for the lifetime of its request.
   # This adds no device credentials and preserves Sony authorization.
   string(PREPEND PLUS_VITA_GAIKAI_TEXT "static int pv_portal_envelope = 1;\nvoid plus_vita_set_portal_envelope(int enabled) { pv_portal_envelope = enabled != 0; }\n")
+  set(PV_PORTAL_CTX_OLD [=[	bool pscloud;]=])
+  set(PV_PORTAL_CTX_NEW [=[	bool pscloud;
+    bool portal_envelope;]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PORTAL_CTX_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux Portal context patch point not found")
+  endif()
+  string(REPLACE "${PV_PORTAL_CTX_OLD}" "${PV_PORTAL_CTX_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   set(PV_PS5_CONFIG_OLD [=[c->pscloud ? "qlite" : "psnow", c->pscloud ? "qlite" : "PC"]=])
-  set(PV_PS5_CONFIG_NEW [=[(c->pscloud && pv_portal_envelope) ? "qlite" : "psnow", (c->pscloud && pv_portal_envelope) ? "qlite" : "PC"]=])
+  set(PV_PS5_CONFIG_NEW [=[c->portal_envelope ? "qlite" : "psnow", c->portal_envelope ? "qlite" : "PC"]=])
   string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_CONFIG_OLD}" PV_POS)
   if(PV_POS EQUAL -1)
     message(FATAL_ERROR "Pylux PS5 configuration patch point not found")
@@ -751,9 +768,9 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
 		S_INT("protocolVersion", 12);
 ]=])
   set(PV_PS5_SPEC_NEW [=[
-		S_STR("model", pv_portal_envelope ? "portal" : "WINDOWS");
-		S_STR("platform", pv_portal_envelope ? "qlite" : "PC");
-		S_STR("gaikaiPlayer", pv_portal_envelope ? "16.4.0" : "12.5.0");
+		S_STR("model", c->portal_envelope ? "portal" : "WINDOWS");
+		S_STR("platform", c->portal_envelope ? "qlite" : "PC");
+		S_STR("gaikaiPlayer", c->portal_envelope ? "16.4.0" : "12.5.0");
 		S_INT("protocolVersion", 12);
 		S_BOOL("audioUploadEnabled", false);
 ]=])
@@ -765,12 +782,23 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
   # The HTTP identity is part of the same PC-format experiment; OAuth
   # redirect, scopes, device ID and client IDs remain the PS5 Cloud ones.
   set(PV_PS5_UA_OLD [=[c.user_agent = c.pscloud ? GK_UA_PSCLOUD : GK_UA_PSNOW;]=])
-  set(PV_PS5_UA_NEW [=[c.user_agent = (c.pscloud && pv_portal_envelope) ? GK_UA_PSCLOUD : GK_UA_PSNOW;]=])
+  set(PV_PS5_UA_NEW [=[c.portal_envelope = c.pscloud && pv_portal_envelope;
+    c.user_agent = c.portal_envelope ? GK_UA_PSCLOUD : GK_UA_PSNOW;
+    plus_vita_diagnostic_event("allocation.envelope_mode",c.pscloud?(c.portal_envelope?2:1):0);]=])
   string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_UA_OLD}" PV_POS)
   if(PV_POS EQUAL -1)
     message(FATAL_ERROR "Pylux PS5 HTTP identity patch point not found")
   endif()
   string(REPLACE "${PV_PS5_UA_OLD}" "${PV_PS5_UA_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+  # Con 0.5.2 uses the official PS5 OAuth service_logo parameter in both
+  # code requests. Preserve the server-issued clients, redirect, and scopes.
+  set(PV_PORTAL_OAUTH_OLD [=[&smcid=qlite&applicationId=qlite&mid=qlite"]=])
+  set(PV_PORTAL_OAUTH_NEW [=[&smcid=qlite&applicationId=qlite&mid=qlite&service_logo=ps"]=])
+  string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PORTAL_OAUTH_OLD}" PV_POS)
+  if(PV_POS EQUAL -1)
+    message(FATAL_ERROR "Pylux PS5 OAuth service parameter patch point not found")
+  endif()
+  string(REPLACE "${PV_PORTAL_OAUTH_OLD}" "${PV_PORTAL_OAUTH_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
   # Vita has no hardware HEVC decoder. Advertise only its supported AVC mode;
   # this is an experimental capability request, NOT a proven PS5 service profile.
   foreach(PV_PROFILE IN ITEMS "hw5.0" "hevc_hw4")
@@ -902,7 +930,8 @@ set(PV_AUTH_NEW [=[
 	if(c->pscloud) {
 		char *next = resp->status_code==200 ? vp_cloud_response_key(k,resp->data) : NULL;
 		free(k);
-		if(next) { free(c->config_key); c->config_key = next; }
+		if(next) { plus_vita_diagnostic_event("allocation.key_updated",1); free(c->config_key); c->config_key = next; }
+        else plus_vita_diagnostic_event("allocation.key_updated",0);
 	} else if(k && *k) { free(c->config_key); c->config_key = k; }
 	else free(k);
 ]=])
@@ -939,6 +968,27 @@ if(PV_POS EQUAL -1)
   message(FATAL_ERROR "Pylux OAuth HTTP diagnostics patch point missing")
 endif()
 string(REPLACE "${PV_AUTH_OLD}" "${PV_AUTH_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
+set(PV_AUTH_READY_OLD [=[
+	gk_progress(c, "Authorizing Session - Step 6 of 10");
+	CCHttpResponse resp = { 0 };
+]=])
+set(PV_AUTH_READY_NEW [=[
+	gk_progress(c, "Authorizing Session - Step 6 of 10");
+    if(c->pscloud) {
+        unsigned ready=(c->gaikai_session_id&&*c->gaikai_session_id?1u:0u)|
+            (c->config_key&&*c->config_key?2u:0u)|
+            (c->gk_cloud_auth_code&&*c->gk_cloud_auth_code?4u:0u)|
+            (c->stream_server_auth_code&&*c->stream_server_auth_code?8u:0u);
+        plus_vita_diagnostic_event("allocation.auth_ready",(int)ready);
+        if(ready!=15u)return CHIAKI_ERR_INVALID_DATA;
+    }
+	CCHttpResponse resp = { 0 };
+]=])
+string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_AUTH_READY_OLD}" PV_POS)
+if(PV_POS EQUAL -1)
+  message(FATAL_ERROR "Pylux PS5 authorization readiness patch point missing")
+endif()
+string(REPLACE "${PV_AUTH_READY_OLD}" "${PV_AUTH_READY_NEW}" PLUS_VITA_GAIKAI_TEXT "${PLUS_VITA_GAIKAI_TEXT}")
 file(WRITE "${PLUS_VITA_GAIKAI_SOURCE}" "${PLUS_VITA_GAIKAI_TEXT}")
 
 # Preserve a release and a new touch in one update when a contact slot is

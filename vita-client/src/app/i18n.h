@@ -470,6 +470,10 @@ static const char *const pv_beta_library[6][8]={
 {"Mis juegos","No se encontraron juegos de la biblioteca.","Biblioteca no disponible o incompleta. Inicia sesión de nuevo.","MI BIBLIOTECA - JUEGOS EN LA NUBE","MI BIBLIOTECA - RESULTADOS POSIBLEMENTE INCOMPLETOS","En tu biblioteca - acceso comprobado al iniciar","Falló la instalación; se conserva el VPK verificado.","Etapa de instalación:"}
 };
 static inline const char *pv_translate(unsigned lang,const char *s){
+    if(s&&(!strcmp(s,"PS5 mode: PC / H.264")||!strcmp(s,"PS5 mode: Portal / H.264"))){
+        int pc=!strcmp(s,"PS5 mode: PC / H.264");
+        if(lang==2||lang==3||lang==4||lang==5)return pc?"Modo PS5: PC / H.264":"Modo PS5: Portal / H.264";
+    }
     if(s){
         if(!strcmp(s,"PS5: PC fallback (experimental)")){
             if(lang==2||lang==3)return "PS5: modo PC alternativo (experimental)";

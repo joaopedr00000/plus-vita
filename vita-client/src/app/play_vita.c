@@ -125,11 +125,12 @@ static void *allocate(void *context)
 		plus_vita_diagnostic_chiaki_log,NULL);
 	plus_vita_diagnostic_event("allocation.begin",0);
     plus_vita_diagnostic_event("video.request_kbps",config.bitrate_kbps);
-    const bool portal=ps5&&!pv_opt(job->stream_options,PV_OPT_PS5_PC);
+    const unsigned mode=pv_cloud_client_mode(ps5,job->stream_options);
+    const bool portal=mode==2u;
 #if defined(__vita__) && PLUS_VITA_PS5_EXPERIMENTAL
     plus_vita_set_portal_envelope(portal);
 #endif
-    plus_vita_diagnostic_event("allocation.client_mode",ps5?(portal?2:1):0);
+    plus_vita_diagnostic_event("allocation.client_mode",(int)mode);
 	plus_vita_diagnostic_event("allocation.phase",0);
 	ChiakiErrorCode error=chiaki_cloud_provision_session(&config,&play->provision,&log);
 	#if PLUS_VITA_PS5_EXPERIMENTAL

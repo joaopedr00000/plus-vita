@@ -265,6 +265,7 @@ static void stream_options_view(PlusVitaApp *app,size_t selected){
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_OPTIONS,.title="Advanced streaming options",.subtitle="SETTINGS AND HELP",
         .body="Toggle individual options. Changes apply to the next stream.",.hint="X  Select     O  Back"};
     for(unsigned j=0;j<PV_OPT_COUNT;j++)app->view.actions[j]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_OPT_REORDER+j),pv_option_labels[j],24,86+(int)j*40,542,34};
+    app->view.actions[10].label=pv_opt(app->stream_options,PV_OPT_PS5_PC)?"PS5 mode: PC / H.264":"PS5 mode: Portal / H.264";
     app->view.actions[PV_OPT_COUNT]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_HUD,"Diagnostic HUD",24,86+(int)PV_OPT_COUNT*40,542,34};
     app->view.actions[PV_OPT_COUNT+1]=(PlusVitaAppButton){PLUS_VITA_ACTION_OPT_DEFAULTS,"Restore recommended options",24,86+(int)(PV_OPT_COUNT+1)*40,542,34};
     app->view.actions[PV_OPT_COUNT+2]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",24,86+(int)(PV_OPT_COUNT+2)*40,542,34};
@@ -1017,7 +1018,7 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 #endif
 	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
 		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
-		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?(pv_opt(app->stream_options,PV_OPT_PS5_PC)?"PC (PS5)":"Portal (PS5)"):"PC");
+		stage,http,reasons[d.reason<=21?d.reason:0],native,d.client_mode==2?"Portal (PS5)":d.client_mode==1?"PC (PS5)":ps5?"PS5 mode unconfirmed":"PC");
 }
 
 static void attach_stream_diagnostic(PlusVitaApp *app)

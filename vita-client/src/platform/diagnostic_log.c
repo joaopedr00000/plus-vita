@@ -479,13 +479,16 @@ void plus_vita_diagnostic_event(const char *event, int code)
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
-		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase","video.request_kbps","video.width","video.height","video.picture_width","video.picture_height","video.rx_kbps","video.server_target_raw","video.server_upstream_raw","catalog.ps5_candidates","catalog.ps5_accepted","catalog.ps5_invalid_id","catalog.ps5_result","allocation.client_mode"};
+		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase","video.request_kbps","video.width","video.height","video.picture_width","video.picture_height","video.rx_kbps","video.server_target_raw","video.server_upstream_raw","catalog.ps5_candidates","catalog.ps5_accepted","catalog.ps5_invalid_id","catalog.ps5_result","allocation.client_mode","allocation.envelope_mode","allocation.key_updated","allocation.auth_ready"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {
 			if(!strcmp(names[i],"ui.stage")) code=code>=0 && code<=17 ? code : 0;
 			else if(!strcmp(names[i],"allocation.stage")) code=code>=0 && code<=5 ? code : 0;
 			else if(!strcmp(names[i],"allocation.phase")) code=code>=0 && code<=11 ? code : 0;
+            else if(!strcmp(names[i],"allocation.client_mode")||!strcmp(names[i],"allocation.envelope_mode"))code=code>=0&&code<=2?code:0;
+            else if(!strcmp(names[i],"allocation.key_updated"))code=code==1?1:0;
+            else if(!strcmp(names[i],"allocation.auth_ready"))code=code>=0&&code<=15?code:0;
 			else if(!strcmp(names[i],"allocation.http")) code=code>=100 && code<=599 ? code : 0;
 			else if(!strcmp(names[i],"allocation.reason")) code=code>=0 && code<=21 ? code : 0;
 			else if(!strcmp(names[i],"https.curl")) code=code>=0&&code<=200?code:-1;
@@ -495,6 +498,7 @@ void plus_vita_diagnostic_event(const char *event, int code)
 			else code=code>=-1 && code<=21 ? code : -1;
 			pthread_mutex_lock(&diagnostic_write_mutex);
 			if(!strcmp(names[i],"allocation.begin")) stream_diag=(PlusVitaStreamDiagnostic){0};
+            else if(!strcmp(names[i],"allocation.envelope_mode"))stream_diag.client_mode=(unsigned)code;
 			else if(!strcmp(names[i],"allocation.phase")) {stream_diag.phase=(unsigned)code;stream_diag.http=0;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.http")) {stream_diag.http=(unsigned)code;stream_diag.reason=0;stream_diag.valid=true;}
 			else if(!strcmp(names[i],"allocation.reason")) stream_diag.reason=(unsigned)code;
