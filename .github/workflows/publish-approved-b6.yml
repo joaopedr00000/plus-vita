@@ -1,0 +1,68 @@
+name: Publish approved B6 beta
+
+on:
+  push:
+    branches:
+      - experimental/vitaplus-direct-b5
+    paths:
+      - '.github/workflows/publish-approved-b6.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-b6:
+    if: github.repository == 'joaopedr00000/plus-vita'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vitaplus-publish-v006-b6
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN: '46096870352'
+      BUILD_SHA: '7ce6d6e0ef4ed8d5dcae0a955939c38e183424af'
+      TAG: v0.0.6-b6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify previously approved build and retrieve only B6
+        run: |
+          set -eu
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq '.conclusion')" = success
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq '.head_sha')" = "$BUILD_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/15243881278" --jq '.name')" = vitaplus-direct-v0.0.6-b6
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/15243881278" --jq '.expired')" = false
+          gh run download "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" --name vitaplus-direct-v0.0.6-b6 --dir dist
+          test -s dist/VitaPlus-v0.0.6-b6.vpk
+          test -s dist/SHA256SUMS.txt
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          import zipfile, struct
+          with zipfile.ZipFile('dist/VitaPlus-v0.0.6-b6.vpk') as z:
+              assert z.testzip() is None
+              assert 'eboot.bin' in z.namelist()
+              sfo = z.read('sce_sys/param.sfo')
+              assert sfo[:4] == b'\0PSF'
+              keys, data, count = struct.unpack_from('<III', sfo, 8)
+              values = {}
+              for i in range(count):
+                  ko, fmt, length, cap, off = struct.unpack_from('<HHIII', sfo, 20+16*i)
+                  key = sfo[keys+ko:sfo.index(b'\0',keys+ko)]
+                  values[key] = sfo[data+off:data+off+length].rstrip(b'\0')
+              assert values[b'TITLE_ID'] == b'PLVTB0001'
+              assert values[b'APP_VER'] == b'00.33'
+          PY
+      - name: Publish only B6 as a prerelease
+        run: |
+          set -eu
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
+            test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" = "$BUILD_SHA"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA" --title "VitaPlus 0.0.6 B6 — Direct Update Target" --notes-file release/v0.0.6-b6.md --draft --prerelease --latest=false
+          fi
+          gh release upload "$TAG" dist/VitaPlus-v0.0.6-b6.vpk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=true --latest=false
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,isDraft,assets
