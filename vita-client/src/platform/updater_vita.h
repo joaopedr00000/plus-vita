@@ -5,7 +5,7 @@
 typedef struct PvUpdater PvUpdater;
 bool pv_update_is_helper(void);
 int pv_update_run_helper(void);
-#if PLUS_VITA_DIRECT_EXPERIMENT
+#if PLUS_VITA_DIRECT_UPDATER
 bool pv_direct_commit_pending(void);
 bool pv_direct_recover_startup(void);
 void pv_direct_cancel_pending(void);

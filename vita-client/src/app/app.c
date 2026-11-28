@@ -198,7 +198,11 @@ static void update_view(PlusVitaApp *app){
         snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s %u / 0x%08X\n%s",PV_TR("Installer stage:"),q->install_stage,(unsigned)q->install_error,PV_TR("Update installation failed; verified VPK retained."));
         used=strlen(app->update_body);
     }
+#if PLUS_VITA_DIRECT_UPDATER
+    if(q->state==PV_UP_READY)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",PV_TR("VitaPlus restarts automatically when possible. Do not turn off the console."));
+#else
     if(q->state==PV_UP_READY)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",PV_TR("After installation, the screen may go black. Wait for it to finish, then press PS and reopen VitaPlus. A black screen alone does not mean failure."));
+#endif
     else if(!update_busy(q->state)&&notes[0]&&!q->install_stage)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
     if(update_busy(q->state)){
@@ -206,9 +210,9 @@ static void update_view(PlusVitaApp *app){
         if(q->state!=PV_UP_INSTALLING)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CANCEL,"Cancel",64,440,832,42};
         return;
     }
-#if PLUS_VITA_DIRECT_EXPERIMENT
+#if PLUS_VITA_DIRECT_UPDATER
     if(q->state==PV_UP_READY){
-        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and restart (experimental)",64,350,832,34};
+        app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and restart",64,350,832,34};
         app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL_HELPER,"Install and reopen manually",64,390,832,34};
         app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,430,832,34};
         return;

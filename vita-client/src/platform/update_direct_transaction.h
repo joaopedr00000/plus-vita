@@ -2,6 +2,13 @@
 #ifndef PV_UPDATE_DIRECT_TRANSACTION_H
 #define PV_UPDATE_DIRECT_TRANSACTION_H
 #include <stdbool.h>
+typedef enum {PV_DIRECT_BOOT_OLD,PV_DIRECT_BOOT_NEW,PV_DIRECT_BOOT_MIXED,PV_DIRECT_BOOT_UNKNOWN} PvDirectBoot;
+static inline PvDirectBoot pv_direct_boot_state(bool old_sfo,bool old_exe,bool new_sfo,bool new_exe){
+    if(new_sfo&&new_exe)return PV_DIRECT_BOOT_NEW;
+    if(old_sfo&&old_exe)return PV_DIRECT_BOOT_OLD;
+    if((old_sfo&&new_exe)||(new_sfo&&old_exe))return PV_DIRECT_BOOT_MIXED;
+    return PV_DIRECT_BOOT_UNKNOWN;
+}
 typedef enum {PV_DIRECT_UNMOUNT_FAILED=1,PV_DIRECT_SFO_FAILED,PV_DIRECT_EBOOT_FAILED,PV_DIRECT_SYNC_FAILED,PV_DIRECT_RESTART_RETURNED,PV_DIRECT_ROLLBACK_FAILED} PvDirectResult;
 typedef struct {
     void *context;

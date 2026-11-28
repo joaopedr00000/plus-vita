@@ -11,6 +11,12 @@ static bool syncfs(void *p){return action(p,'F');}
 static void restart(void *p){(void)action(p,'X');}
 static bool restore(void *p){Fixture *f=p;f->restored=true;(void)action(f,'R');return f->fail!=6;}
 int main(void){
+    assert(pv_direct_boot_state(true,true,false,false)==PV_DIRECT_BOOT_OLD);
+    assert(pv_direct_boot_state(false,false,true,true)==PV_DIRECT_BOOT_NEW);
+    assert(pv_direct_boot_state(true,false,false,true)==PV_DIRECT_BOOT_MIXED);
+    assert(pv_direct_boot_state(false,true,true,false)==PV_DIRECT_BOOT_MIXED);
+    assert(pv_direct_boot_state(false,false,false,false)==PV_DIRECT_BOOT_UNKNOWN);
+    assert(pv_direct_boot_state(true,false,false,false)==PV_DIRECT_BOOT_UNKNOWN);
     const char *expected[]={"US EFXR","U","USR","USER","USEFR","USEFXR","USEFXR"};
     for(unsigned i=0;i<=6;i++){
         Fixture f={.fail=i};

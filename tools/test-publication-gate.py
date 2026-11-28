@@ -12,7 +12,7 @@ import zlib
 
 parser = argparse.ArgumentParser()
 parser.add_argument('vpk', type=Path)
-parser.add_argument('--version', choices=('v000', 'v002', 'beta1', 'beta2', 'beta3', 'v0.0.1', 'v0.0.2', 'v0.0.3', 'v0.0.4', 'v0.0.5', 'v0.0.5-2', 'v0.1.0', 'v0.0.5-b1', 'v0.0.5-b3', 'v0.0.5-b4', 'v0.0.6', 'v0.0.6-b1', 'v0.0.6-b2', 'v0.0.6-b3', 'v0.0.6-b4', 'v0.0.6-b5', 'v0.0.6-b6'), default='v000')
+parser.add_argument('--version', choices=('v000', 'v002', 'beta1', 'beta2', 'beta3', 'v0.0.1', 'v0.0.2', 'v0.0.3', 'v0.0.4', 'v0.0.5', 'v0.0.5-2', 'v0.1.0', 'v0.0.5-b1', 'v0.0.5-b3', 'v0.0.5-b4', 'v0.0.6', 'v0.0.6-b1', 'v0.0.6-b2', 'v0.0.6-b3', 'v0.0.6-b4', 'v0.0.6-b5', 'v0.0.6-b6', 'v0.0.7'), default='v000')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 gate = root / 'tools/publication_gate.py'
