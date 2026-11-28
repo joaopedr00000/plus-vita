@@ -406,7 +406,7 @@ int pv_update_run_helper(void){
     PvHandoffJob job;struct stat st;char current[16]={0},ver[16]={0},root[128],path[256];
     unsigned stage=15;int rc=-1;
     if(!pv_update_is_helper())return 1;
-    if(stat(HANDOFF_RESULT,&st)==0)goto launch;
+    if(stat(HANDOFF_RESULT,&st)==0)return 0;
     if(!read_job(&job)||!helper_owned(&job)||!match_hash(VPK,job.size,job.hash))goto finish;
     if(!read_version(MAIN_PATH "/sce_sys/param.sfo",PV_MAIN_TITLE,current))goto finish;
     if(!strcmp(current,job.appver)){stage=0;rc=0;goto finish;}
@@ -434,9 +434,8 @@ finish:
     helper_result(stage,rc);
     /* Keep the verified VPK even on success until the new main app confirms
      * the installed version and consumes the receipt. */
-launch:
-    sceKernelDelayThread(500000);
-    sceAppMgrLaunchAppByUri(0xFFFFF,"psgm:play?titleid=" PV_MAIN_TITLE);
+    /* Exit the helper normally (main calls sceKernelExitProcess). Never
+     * race a launch of the just-promoted title; the user reopens it manually. */
     return 0;
 }
 static void recover_handoff(PvUpdater *u){

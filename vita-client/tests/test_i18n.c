@@ -7,6 +7,11 @@ int main(void){
     assert(pv_language(19)==0);
     for(unsigned l=0;l<PV_LANG_COUNT;l++){
         assert(pv_locale_names[l]&&*pv_locale_names[l]);
+        for(unsigned k=0;k<2;k++){
+            assert(pv_manual_restart[l][k]&&*pv_manual_restart[l][k]);
+            assert(!strcmp(pv_translate(l,pv_manual_restart[0][k]),pv_manual_restart[l][k]));
+            if(l>1)assert(strcmp(pv_manual_restart[l][k],pv_manual_restart[0][k]));
+        }
         assert(pv_catalogue_search_hint[l]&&*pv_catalogue_search_hint[l]);
         assert(pv_ps5_notice[l]&&*pv_ps5_notice[l]);
         assert(pv_ps5_test[l]&&*pv_ps5_test[l]);

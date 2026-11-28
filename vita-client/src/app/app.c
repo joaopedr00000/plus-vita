@@ -198,7 +198,8 @@ static void update_view(PlusVitaApp *app){
         snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s %u / 0x%08X\n%s",PV_TR("Installer stage:"),q->install_stage,(unsigned)q->install_error,PV_TR("Update installation failed; verified VPK retained."));
         used=strlen(app->update_body);
     }
-    if(!update_busy(q->state)&&notes[0]&&!q->install_stage)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
+    if(q->state==PV_UP_READY)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",PV_TR("After installation, the screen may go black. Wait for it to finish, then press PS and reopen VitaPlus. A black screen alone does not mean failure."));
+    else if(!update_busy(q->state)&&notes[0]&&!q->install_stage)snprintf(app->update_body+used,sizeof(app->update_body)-used,"\n%s",notes);
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_UPDATES,.title="Updates",.subtitle="SETTINGS AND HELP",.body=app->update_body,.hint="X  Select     O  Back"};
     if(update_busy(q->state)){
         app->view.hint=q->state==PV_UP_INSTALLING?"Please wait":"O  Cancel";
@@ -209,8 +210,8 @@ static void update_view(PlusVitaApp *app){
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_AUTO,q->automatic?"Automatic checks: On":"Automatic checks: Off",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_CHECK,"Check for updates",64,0,832,34};
     if(q->state==PV_UP_AVAILABLE)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_DOWNLOAD,"Download update",64,0,832,34};
-    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and restart VitaPlus",64,0,832,34};
-    if(len>220)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
+    if(q->state==PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_INSTALL,"Install and reopen manually",64,0,832,34};
+    if(len>220&&q->state!=PV_UP_READY)app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_UPDATE_NOTES,"Next release notes page",64,0,832,34};
     app->view.actions[app->view.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",64,0,832,34};
     int first=490-(int)app->view.action_count*40;
     for(size_t j=0;j<app->view.action_count;j++)app->view.actions[j].y=first+(int)j*40;
