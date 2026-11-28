@@ -320,7 +320,7 @@ jobs:
           if-no-files-found: error
 
 
-  # Experimental artifact only. No release publication job.
+  # Publish only after the source and VPK checks have succeeded.
 
   publish-v007:
     if: github.repository == 'joaopedr00000/plus-vita' && github.ref == 'refs/heads/release/v0.0.7' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -335,6 +335,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/download-artifact@v4
         with:
           name: vitaplus-v0.0.7
