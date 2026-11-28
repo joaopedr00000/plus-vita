@@ -490,7 +490,13 @@ static bool direct_replace(void *context,unsigned i){
     return direct_swap(direct_files[i+2],direct_live[i],park[i],context,i+2,i);
 }
 static bool direct_sync(void *context){(void)context;return sceIoSync("ux0:",0)>=0;}
-static void direct_restart(void *context){(void)context;(void)sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);}
+static void direct_restart(void *context){
+    (void)context;
+    /* UI/worker shutdown and storage sync already succeeded. Give the
+     * previous scanout and app-manager mount transition time to settle. */
+    sceKernelDelayThread(500000);
+    (void)sceAppMgrLoadExec("app0:eboot.bin",NULL,NULL);
+}
 static bool direct_rollback(void *context){return direct_restore(context);}
 static void direct_outcome(unsigned result){
     char s[64];int n=snprintf(s,sizeof(s),"direct update outcome %u\n",result);

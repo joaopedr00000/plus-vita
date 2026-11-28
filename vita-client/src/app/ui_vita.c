@@ -409,7 +409,7 @@ int plus_vita_app_run(void)
 	if(!display_open(display))
 	{ free(display); plus_vita_app_destroy(app); plus_vita_account_close(account); plus_vita_account_close(storage); plus_vita_play_close(play); plus_vita_covers_close(covers); plus_vita_diagnostic_ui_end(); return 1; }
 #if PLUS_VITA_DIRECT_UPDATER
-    pv_direct_confirm();
+    bool direct_confirmed=false;
 #endif
 	/* Keep a process-lifetime reference while account HTTP and artwork overlap.
 	 * Individual account requests balance their own curl reference as before. */
@@ -523,6 +523,9 @@ int plus_vita_app_run(void)
 		if(flow.dirty)
 		{
 			if(!draw(display, &flow)) { result = 1; break; }
+#if PLUS_VITA_DIRECT_UPDATER
+            if(!direct_confirmed){pv_direct_confirm();direct_confirmed=true;}
+#endif
 			uint64_t shown = plus_vita_latency_now_us();
 			if(flow.input_since && shown >= flow.input_since) plus_vita_diagnostic_ui_sample(PLUS_VITA_UI_INPUT_PRESENT, shown-flow.input_since);
 			flow.input_since = 0;

@@ -272,6 +272,12 @@ static bool append_catalog_entry(PlusVitaAuthProbeResult *result,
 	if(!entry->id[0]) snprintf(entry->id, sizeof(entry->id), "No identifier");
 	snprintf(entry->platform, sizeof(entry->platform), "%s",
 		platform ? platform : infer_catalog_platform(entry->id));
+    struct json_object *original=NULL;
+    entry->ps2_classic=pv_cloud_enum_equal(platform,"ps2");
+    if(json_object_object_get_ex(item,"originalPlatform",&original)&&json_object_is_type(original,json_type_string)){
+        const char *s=json_object_get_string(original);
+        if(s&&(size_t)json_object_get_string_len(original)==strlen(s)&&pv_cloud_enum_equal(s,"ps2"))entry->ps2_classic=true;
+    }
 	entry->launch_id_valid = strlen(entry->id) >= 8 && strlen(entry->id) < sizeof(entry->id);
 	for(size_t i = 0; entry->launch_id_valid && entry->id[i]; i++)
 		if(!isalnum((unsigned char)entry->id[i]) && entry->id[i] != '-'

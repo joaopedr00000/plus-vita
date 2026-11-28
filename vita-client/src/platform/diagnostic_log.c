@@ -479,7 +479,7 @@ void plus_vita_diagnostic_event(const char *event, int code)
 		"stream.video.slice_guard_rejected",
 		"replay.begin","replay.complete","replay.input_validated","replay.decoder_ready",
 		"replay.drain_begin","recovery.wifi","recovery.sleep","app.start","app.stop",
-		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase","video.request_kbps","video.width","video.height","video.picture_width","video.picture_height","video.rx_kbps","video.server_target_raw","video.server_upstream_raw","catalog.ps5_candidates","catalog.ps5_accepted","catalog.ps5_invalid_id","catalog.ps5_result"};
+		"attempt.begin","attempt.end","ui.stage","account.complete","auth.phase","https.phase","https.curl","catalog.phase","video.request_kbps","video.width","video.height","video.picture_width","video.picture_height","video.rx_kbps","video.server_target_raw","video.server_upstream_raw","catalog.ps5_candidates","catalog.ps5_accepted","catalog.ps5_invalid_id","catalog.ps5_result","allocation.client_mode"};
 	if(!event) return;
 	for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);i++)
 		if(strncmp(event,names[i],strlen(names[i])+1)==0) {

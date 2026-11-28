@@ -470,6 +470,16 @@ static const char *const pv_beta_library[6][8]={
 {"Mis juegos","No se encontraron juegos de la biblioteca.","Biblioteca no disponible o incompleta. Inicia sesión de nuevo.","MI BIBLIOTECA - JUEGOS EN LA NUBE","MI BIBLIOTECA - RESULTADOS POSIBLEMENTE INCOMPLETOS","En tu biblioteca - acceso comprobado al iniciar","Falló la instalación; se conserva el VPK verificado.","Etapa de instalación:"}
 };
 static inline const char *pv_translate(unsigned lang,const char *s){
+    if(s){
+        if(!strcmp(s,"PS5: PC fallback (experimental)")){
+            if(lang==2||lang==3)return "PS5: modo PC alternativo (experimental)";
+            if(lang==4||lang==5)return "PS5: modo PC alternativo (experimental)";
+        }
+        if(!strcmp(s,"Off: experimental Portal session envelope for PS5. On: legacy PC session envelope for PS5. Both request H.264; Sony may reject the session or codec. PS3 and PS4 are unchanged.")){
+            if(lang==2||lang==3)return "Desligado: modo Portal experimental para PS5. Ligado: modo PC alternativo para PS5. Ambos solicitam H.264; a Sony pode recusar a sessão ou codec. PS3 e PS4 não mudam.";
+            if(lang==4||lang==5)return "Desactivado: modo Portal experimental para PS5. Activado: modo PC alternativo para PS5. Ambos solicitan H.264; Sony puede rechazar la sesión o el códec. PS3 y PS4 no cambian.";
+        }
+    }
     if(!s||!pv_language(lang))return s;
     size_t len=strlen(s);
     /* Use the same non-inlined, length-checked lookup as the other locale

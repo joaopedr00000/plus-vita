@@ -259,8 +259,8 @@ static void stream_settings_view(PlusVitaApp *app)
 			{PLUS_VITA_ACTION_BACK,"Back to settings",64,450,832,40}},
 		.action_count=5,.selected=profile==6000?0:profile==10000?1:2};
 }
-static const char *const pv_option_labels[PV_OPT_COUNT]={"Adaptive packet reordering","Adaptive video catch-up","Triple video buffering (experimental)","Adaptive audio buffering","Gentle PCM correction","Smaller audio blocks (experimental)","Fast native gamepad","Worker CPU affinity (experimental)","60-second benchmark","Bounded audio backlog"};
-static const char *const pv_option_help[PV_OPT_COUNT]={"Adapts how long video waits for late packets (4-30 ms, depending on profile and recovery). Less waiting can lower delay; unstable Wi-Fi may need more time. Off: fixed B3 window (16/24/32 ms).","Prioritizes timely decoded pictures when the queue grows, without dropping compressed H.264 references. Try off if motion looks uneven. Error recovery stays active.","Uses a third video surface to overlap decoding and display. Can reduce waiting but uses more video memory. Off: two synchronous buffers. Experimental; automatic two-buffer fallback.","Starts at 40/40/60 ms for the three profiles. Raises the target after underruns, up to 110 ms, and reduces it when stable. Off: fixed target. Try off to compare stutter and delay.","Shortens excess queued PCM by up to 1-2% during stable playback. Can reduce audio delay with small pitch or speed changes. Off: original samples. Startup and refill are excluded.","Uses 512 samples (10.7 ms) instead of 960 (20 ms) in Low Latency only. Can reduce output delay; may increase audio workload. Off or unsupported port: 960 samples.","Reduces repeated controller enumeration for the built-in Vita pad while keeping 4 ms polling. External controllers retain compatibility. Off: full native polling on every read.","Allows audio and input threads to use selected CPU cores. May reduce contention, but benefits depend on scheduling. Off: default scheduler. Experimental.","Records 60 seconds of local video timing after 10 seconds of warmup. Compare mean, P95 and P99 in the logs. Does not measure total button-to-screen latency. Off: no benchmark.","Reduces the compressed audio queue margin by one 10 ms unit to limit accumulated delay. Off: wider B3 margin; both modes keep a bounded queue."};
+static const char *const pv_option_labels[PV_OPT_COUNT]={"Adaptive packet reordering","Adaptive video catch-up","Triple video buffering (experimental)","Adaptive audio buffering","Gentle PCM correction","Smaller audio blocks (experimental)","Fast native gamepad","Worker CPU affinity (experimental)","60-second benchmark","Bounded audio backlog","PS5: PC fallback (experimental)"};
+static const char *const pv_option_help[PV_OPT_COUNT]={"Adapts how long video waits for late packets (4-30 ms, depending on profile and recovery). Less waiting can lower delay; unstable Wi-Fi may need more time. Off: fixed B3 window (16/24/32 ms).","Prioritizes timely decoded pictures when the queue grows, without dropping compressed H.264 references. Try off if motion looks uneven. Error recovery stays active.","Uses a third video surface to overlap decoding and display. Can reduce waiting but uses more video memory. Off: two synchronous buffers. Experimental; automatic two-buffer fallback.","Starts at 40/40/60 ms for the three profiles. Raises the target after underruns, up to 110 ms, and reduces it when stable. Off: fixed target. Try off to compare stutter and delay.","Shortens excess queued PCM by up to 1-2% during stable playback. Can reduce audio delay with small pitch or speed changes. Off: original samples. Startup and refill are excluded.","Uses 512 samples (10.7 ms) instead of 960 (20 ms) in Low Latency only. Can reduce output delay; may increase audio workload. Off or unsupported port: 960 samples.","Reduces repeated controller enumeration for the built-in Vita pad while keeping 4 ms polling. External controllers retain compatibility. Off: full native polling on every read.","Allows audio and input threads to use selected CPU cores. May reduce contention, but benefits depend on scheduling. Off: default scheduler. Experimental.","Records 60 seconds of local video timing after 10 seconds of warmup. Compare mean, P95 and P99 in the logs. Does not measure total button-to-screen latency. Off: no benchmark.","Reduces the compressed audio queue margin by one 10 ms unit to limit accumulated delay. Off: wider B3 margin; both modes keep a bounded queue.","Off: experimental Portal session envelope for PS5. On: legacy PC session envelope for PS5. Both request H.264; Sony may reject the session or codec. PS3 and PS4 are unchanged."};
 static void stream_options_view(PlusVitaApp *app,size_t selected){
     app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_STREAM_OPTIONS,.title="Advanced streaming options",.subtitle="SETTINGS AND HELP",
         .body="Toggle individual options. Changes apply to the next stream.",.hint="X  Select     O  Back"};
@@ -887,7 +887,7 @@ static void filter_catalogue(PlusVitaApp *app)
 	app->matches_count = 0;
 	for(size_t i=0;i<app->catalogue_count;i++){
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(pv_catalog_entry_matches(app->platform_filter,app->catalogue[i].platform,app->catalogue[i].in_library) && title_matches(app->catalogue[i].name,app->search))
+		if(pv_catalog_entry_matches(app->platform_filter,app->catalogue[i].ps2_classic?"PS2":app->catalogue[i].platform,app->catalogue[i].in_library) && title_matches(app->catalogue[i].name,app->search))
 #else
 		if(title_matches(app->catalogue[i].name,app->search))
 #endif
@@ -926,10 +926,9 @@ static void catalogue_view(PlusVitaApp *app)
 	if(app->search_focus||!v.list_count)v.selected=v.action_count;
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_SEARCH,app->search_button,21,62,app->search[0]?238:288,32};
 	if(app->search[0])v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_CLEAR_SEARCH,"Clear search",263,62,46,32};
-	for(unsigned filter=0;filter<5;filter++)
-		v.actions[v.action_count++]=(PlusVitaAppButton){(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+filter),PV_TR(filter?pv_catalog_filter_name(filter):"All"),343+(int)filter*80,64,filter==4?174:70,28};
+	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_PLATFORM_FILTER,app->filter_button,343,62,480,32};
 	if(v.detail)v.actions[v.action_count++]=(PlusVitaAppButton){v.detail->launch_id_valid?PLUS_VITA_ACTION_PLAY:PLUS_VITA_ACTION_DISABLED,
-		v.detail->launch_id_valid?(pv_catalog_platform(v.detail->platform)==3?"Experimental test":"Play"):"Play unavailable",672,386,264,46};
+		v.detail->launch_id_valid?((v.detail->ps5_stream_id[0]||pv_catalog_platform(v.detail->platform)==3)?"Experimental test":"Play"):"Play unavailable",672,386,264,46};
 	v.actions[v.action_count++]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",866,500,80,36};
 	app->view=v;
 #else
@@ -977,6 +976,21 @@ static void catalogue_view(PlusVitaApp *app)
 #endif
 }
 
+#if PLUS_VITA_ADAPTIVE_STREAM
+static void filter_dialog(PlusVitaApp *app){
+    static const unsigned order[]={0,5,1,2,3,4};
+    app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_FILTER_DIALOG,.title="Filter",.subtitle="CLOUD CATALOGUE",.hint="X  Select     O  Back",.platform_filter=app->platform_filter};
+    for(unsigned j=0;j<6;j++){
+        unsigned n=order[j];
+        PlusVitaAppAction id=n==5?PLUS_VITA_ACTION_FILTER_PS2:(PlusVitaAppAction)(PLUS_VITA_ACTION_FILTER_ALL+n);
+        app->view.actions[j]=(PlusVitaAppButton){id,pv_catalog_filter_name(n),270,138+(int)j*47,420,41};
+        if(n==app->platform_filter)app->view.selected=j;
+    }
+    app->view.actions[6]=(PlusVitaAppButton){PLUS_VITA_ACTION_BACK,"Back",270,420,420,41};
+    app->view.action_count=7;
+}
+#endif
+
 /* Technical codes and protocol stage names remain recognizable in issue reports. */
 static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 {
@@ -1003,7 +1017,7 @@ static void stream_diagnostic_text(PlusVitaApp *app,PlusVitaStreamDiagnostic d)
 #endif
 	snprintf(app->stream_diag_text,sizeof(app->stream_diag_text),
 		"Phase: %s | HTTP: %s | Service: %s | E%s\nRequested: %s / H.264",
-		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?"PC (PS5)":"PC");
+		stage,http,reasons[d.reason<=21?d.reason:0],native,ps5?(pv_opt(app->stream_options,PV_OPT_PS5_PC)?"PC (PS5)":"Portal (PS5)"):"PC");
 }
 
 static void attach_stream_diagnostic(PlusVitaApp *app)
@@ -1017,7 +1031,7 @@ static void detail_view(PlusVitaApp *app, const char *notice)
 {
 	const PlusVitaCatalogEntry *game=&app->catalogue[app->matches[app->catalogue_selection]];
 	char platform_line[128];
-	snprintf(platform_line,sizeof(platform_line),PV_TR("Platform: %s"),game->platform[0] ? game->platform : PV_TR("Not specified"));
+	snprintf(platform_line,sizeof(platform_line),PV_TR("Platform: %s"),game->ps2_classic?"PS2":game->platform[0] ? game->platform : PV_TR("Not specified"));
 	snprintf(app->detail_status,sizeof(app->detail_status),"%s\n%s\n%s",game->name,platform_line,
 		PV_TR(notice ? notice : game->launch_id_valid ? "Cloud catalogue title. Streaming eligibility is checked at launch." : "Play unavailable: required launch information is missing."));
 	app->view=(PlusVitaAppView){.screen=PLUS_VITA_APP_DETAILS,.title=game->name,.subtitle="GAME DETAILS",.body=app->detail_status,.hint="X  Select     O  Back",.detail=game,
@@ -1555,9 +1569,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	}
 #if PLUS_VITA_ADAPTIVE_STREAM
 	if(event.kind==PLUS_VITA_EVENT_PLATFORM_FILTER && view->screen==PLUS_VITA_APP_CATALOGUE) {
-		app->platform_filter=pv_catalog_next(app->platform_filter);
-		app->search_focus=false;
-		filter_catalogue(app);catalogue_view(app);return effect;
+		filter_dialog(app);return effect;
 	}
 #endif
 	if(event.kind==PLUS_VITA_EVENT_SEARCH && view->screen==PLUS_VITA_APP_CATALOGUE) {
@@ -1666,7 +1678,8 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 	else if(event.kind == PLUS_VITA_EVENT_BACK)
 	{
 #if PLUS_VITA_ADAPTIVE_STREAM
-		if(view->screen==PLUS_VITA_APP_STREAM_OPTIONS){stream_settings_view(app);return effect;}
+		if(view->screen==PLUS_VITA_APP_FILTER_DIALOG){catalogue_view(app);return effect;}
+        if(view->screen==PLUS_VITA_APP_STREAM_OPTIONS){stream_settings_view(app);return effect;}
         if(view->screen==PLUS_VITA_APP_UPDATES){
             if(app->update.state==PV_UP_INSTALLING)return effect;
             if(update_busy(app->update.state))return update_effect(app,PV_UP_CMD_CANCEL);
@@ -1721,10 +1734,14 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
 		if(action==PLUS_VITA_ACTION_SEARCH) return plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_SEARCH});
 		else if(action==PLUS_VITA_ACTION_PLATFORM_FILTER) return plus_vita_app_dispatch(app,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PLATFORM_FILTER});
 #if PLUS_VITA_ADAPTIVE_STREAM
-		else if(action>=PLUS_VITA_ACTION_FILTER_ALL && action<=PLUS_VITA_ACTION_FILTER_OWNED && view->screen==PLUS_VITA_APP_CATALOGUE){
-			app->platform_filter=(unsigned)(action-PLUS_VITA_ACTION_FILTER_ALL);app->search_focus=false;
-			filter_catalogue(app);catalogue_view(app);return effect;
-		}
+		else if(view->screen==PLUS_VITA_APP_FILTER_DIALOG){
+            if(action==PLUS_VITA_ACTION_BACK){catalogue_view(app);return effect;}
+            if(action==PLUS_VITA_ACTION_FILTER_PS2||(action>=PLUS_VITA_ACTION_FILTER_ALL&&action<=PLUS_VITA_ACTION_FILTER_OWNED)){
+                app->platform_filter=action==PLUS_VITA_ACTION_FILTER_PS2?5u:(unsigned)(action-PLUS_VITA_ACTION_FILTER_ALL);
+                app->search_focus=false;filter_catalogue(app);catalogue_view(app);
+            }
+            return effect;
+        }
 #endif
 		else if(action==PLUS_VITA_ACTION_CLEAR_SEARCH) { app->search[0]=0; filter_catalogue(app); app->search_focus=false; catalogue_view(app); }
 		else if(action==PLUS_VITA_ACTION_GAME && view->screen==PLUS_VITA_APP_CATALOGUE) {
@@ -1861,7 +1878,7 @@ PlusVitaAppEffect plus_vita_app_dispatch(PlusVitaApp *app, PlusVitaAppEvent even
         else if(action==PLUS_VITA_ACTION_STREAM_OPTIONS&&view->screen==PLUS_VITA_APP_STREAM_SETTINGS)stream_options_view(app,0);
         else if(view->screen==PLUS_VITA_APP_STREAM_OPTIONS){
             size_t selected=view->selected;
-            if(action>=PLUS_VITA_ACTION_OPT_REORDER&&action<=PLUS_VITA_ACTION_OPT_AUDIO_BOUND)app->stream_options^=1u<<(action-PLUS_VITA_ACTION_OPT_REORDER);
+            if(action>=PLUS_VITA_ACTION_OPT_REORDER&&action<=PLUS_VITA_ACTION_OPT_PS5_PC)app->stream_options^=1u<<(action-PLUS_VITA_ACTION_OPT_REORDER);
             else if(action==PLUS_VITA_ACTION_OPT_HUD)app->hud=!app->hud;
             else if(action==PLUS_VITA_ACTION_OPT_DEFAULTS){app->stream_options=PV_OPT_DEFAULT;app->hud=false;}
             else if(action==PLUS_VITA_ACTION_BACK){stream_settings_view(app);return effect;}

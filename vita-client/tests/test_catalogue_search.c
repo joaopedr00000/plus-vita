@@ -51,12 +51,12 @@ int main(void){
     assert(v.screen==PLUS_VITA_APP_CATALOGUE&&v.list_total==10&&v.list_count==7);
     search(a,"rAcInG");
     v=plus_vita_app_view(a);
-    assert(v.list_total==9&&v.list_count==7&&v.action_count==16);
+    assert(v.list_total==9&&v.list_count==7&&v.action_count==12);
     assert(strstr(v.actions[v.list_count].label,"rAcInG"));
     assert(v.actions[v.list_count+1].id==PLUS_VITA_ACTION_CLEAR_SEARCH);
-    click(a,PLUS_VITA_ACTION_FILTER_PS3);
+    click(a,PLUS_VITA_ACTION_PLATFORM_FILTER);click(a,PLUS_VITA_ACTION_FILTER_PS3);
     v=plus_vita_app_view(a);assert(v.platform_filter==1&&v.list_total==1&&v.detail&&!strcmp(v.detail->platform,"PS3"));
-    click(a,PLUS_VITA_ACTION_FILTER_PS4);
+    click(a,PLUS_VITA_ACTION_PLATFORM_FILTER);click(a,PLUS_VITA_ACTION_FILTER_PS4);
     v=plus_vita_app_view(a);assert(v.platform_filter==2&&v.list_total==7);
     entered(a,click(a,PLUS_VITA_ACTION_SEARCH),PLUS_VITA_RESULT_CANCELLED,NULL);
     v=plus_vita_app_view(a);assert(v.list_total==7&&v.platform_filter==2);
@@ -81,6 +81,8 @@ int main(void){
     v=plus_vita_app_view(a);assert(v.list_total==8&&v.platform_filter==2);
     plus_vita_app_dispatch(a,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD_RESET,.pad={.left_x=128,.left_y=128}});
     plus_vita_app_dispatch(a,(PlusVitaAppEvent){.kind=PLUS_VITA_EVENT_PAD,.pad={.buttons=PLUS_VITA_MENU_TRIANGLE,.left_x=128,.left_y=128}});
+    v=plus_vita_app_view(a);assert(v.screen==PLUS_VITA_APP_FILTER_DIALOG);
+    click(a,PLUS_VITA_ACTION_FILTER_PS5);
     v=plus_vita_app_view(a);assert(v.platform_filter==3&&v.list_total==1&&v.detail&&!strcmp(v.detail->platform,"PS5"));
     bool experimental=false;
     for(size_t i=0;i<v.action_count;i++)if(v.actions[i].id==PLUS_VITA_ACTION_PLAY)

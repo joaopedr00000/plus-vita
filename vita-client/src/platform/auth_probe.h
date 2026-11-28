@@ -18,6 +18,7 @@ typedef struct plus_vita_catalog_entry_t
 	char platform[8];
 	bool launch_id_valid;
 	bool in_library; /* verified active entitlement, not proof of purchase or playback */
+    bool ps2_classic; /* explicit original-platform metadata only; launch platform unchanged */
 	char cover_url[512];
 	PlusVitaArtworkMetadata cover_metadata;
 	char ps5_stream_id[128]; /* Exact entitlement identifier returned by unified catalogue. */

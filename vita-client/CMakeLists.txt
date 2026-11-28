@@ -26,6 +26,7 @@ option(PLUS_VITA_FINAL_007 "Package VitaPlus v0.0.7 stable with direct updater" 
 option(PLUS_VITA_TEST_007_B1 "Package VitaPlus v0.0.7 B1 audio stability" OFF)
 option(PLUS_VITA_TEST_007_B2 "Package VitaPlus v0.0.7 B2 interruption recovery" OFF)
 option(PLUS_VITA_TEST_007_B3 "Package VitaPlus v0.0.7 B3 audio continuity and PS5 discovery" OFF)
+option(PLUS_VITA_TEST_007_B4 "Package VitaPlus v0.0.7 B4 Portal AVC experiment" OFF)
 set(PLUS_VITA_CURL_ROOT "" CACHE PATH "Isolated Vita libcurl built with Mbed TLS")
 set(PLUS_VITA_RELEASE_VERSION "v000" CACHE STRING "Distribution version (v000 or v002)")
 if(NOT PLUS_VITA_RELEASE_VERSION MATCHES "^(v000|v002)$")
@@ -190,6 +191,14 @@ if(PLUS_VITA_TEST_007_B3)
   set(VITA_VERSION "00.37")
   set(PLUS_VITA_PUBLIC_VERSION "v0.0.7-b3")
   set(PLUS_VITA_DISPLAY_VERSION "0.0.7 B3")
+endif()
+if(PLUS_VITA_TEST_007_B4)
+  if(NOT PLUS_VITA_FINAL_007 OR PLUS_VITA_TEST_007_B1 OR PLUS_VITA_TEST_007_B2 OR PLUS_VITA_TEST_007_B3)
+    message(FATAL_ERROR "v0.0.7 B4 requires 0.0.7 profile without prior beta overrides")
+  endif()
+  set(VITA_VERSION "00.38")
+  set(PLUS_VITA_PUBLIC_VERSION "v0.0.7-b4")
+  set(PLUS_VITA_DISPLAY_VERSION "0.0.7 B4")
 endif()
 if(PLUS_VITA_PS3_STARTUP_SAMPLE)
   set(VITA_APP_NAME "Plus-Vita PS3 Test")
@@ -725,8 +734,11 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
   # PC configuration after the October 002.0011 regression. Keep cronos,
   # protocol 12, Sony-issued entitlement, PS5 OAuth and measured network.
   # This independently adapted compatibility experiment still requests AVC.
+  # One provisioning worker owns the mode for the lifetime of its request.
+  # This adds no device credentials and preserves Sony authorization.
+  string(PREPEND PLUS_VITA_GAIKAI_TEXT "static int pv_portal_envelope = 1;\nvoid plus_vita_set_portal_envelope(int enabled) { pv_portal_envelope = enabled != 0; }\n")
   set(PV_PS5_CONFIG_OLD [=[c->pscloud ? "qlite" : "psnow", c->pscloud ? "qlite" : "PC"]=])
-  set(PV_PS5_CONFIG_NEW [=["psnow", "PC"]=])
+  set(PV_PS5_CONFIG_NEW [=[(c->pscloud && pv_portal_envelope) ? "qlite" : "psnow", (c->pscloud && pv_portal_envelope) ? "qlite" : "PC"]=])
   string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_CONFIG_OLD}" PV_POS)
   if(PV_POS EQUAL -1)
     message(FATAL_ERROR "Pylux PS5 configuration patch point not found")
@@ -739,9 +751,9 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
 		S_INT("protocolVersion", 12);
 ]=])
   set(PV_PS5_SPEC_NEW [=[
-		S_STR("model", "WINDOWS");
-		S_STR("platform", "PC");
-		S_STR("gaikaiPlayer", "12.5.0");
+		S_STR("model", pv_portal_envelope ? "portal" : "WINDOWS");
+		S_STR("platform", pv_portal_envelope ? "qlite" : "PC");
+		S_STR("gaikaiPlayer", pv_portal_envelope ? "16.4.0" : "12.5.0");
 		S_INT("protocolVersion", 12);
 		S_BOOL("audioUploadEnabled", false);
 ]=])
@@ -753,7 +765,7 @@ if(PLUS_VITA_PS5_EXPERIMENTAL)
   # The HTTP identity is part of the same PC-format experiment; OAuth
   # redirect, scopes, device ID and client IDs remain the PS5 Cloud ones.
   set(PV_PS5_UA_OLD [=[c.user_agent = c.pscloud ? GK_UA_PSCLOUD : GK_UA_PSNOW;]=])
-  set(PV_PS5_UA_NEW [=[c.user_agent = GK_UA_PSNOW;]=])
+  set(PV_PS5_UA_NEW [=[c.user_agent = (c.pscloud && pv_portal_envelope) ? GK_UA_PSCLOUD : GK_UA_PSNOW;]=])
   string(FIND "${PLUS_VITA_GAIKAI_TEXT}" "${PV_PS5_UA_OLD}" PV_POS)
   if(PV_POS EQUAL -1)
     message(FATAL_ERROR "Pylux PS5 HTTP identity patch point not found")

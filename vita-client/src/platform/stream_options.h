@@ -13,7 +13,8 @@
 #define PV_OPT_AFFINITY (1u<<7)
 #define PV_OPT_BENCHMARK (1u<<8)
 #define PV_OPT_AUDIO_BOUND (1u<<9)
-#define PV_OPT_COUNT 10u
+#define PV_OPT_PS5_PC (1u<<10) /* opt-in PC fallback; default PS5 Portal envelope */
+#define PV_OPT_COUNT 11u
 #define PV_OPT_ALL ((1u<<PV_OPT_COUNT)-1u)
 #define PV_OPT_DEFAULT (PV_OPT_VIDEO_CATCHUP|PV_OPT_AUDIO_ADAPT|PV_OPT_FAST_INPUT)
 /* Keep new B4 experiments and diagnostic overhead opt-in. */

@@ -149,7 +149,7 @@ typedef struct plus_vita_stream_probe_t
 	bool awaiting_recovery_idr;
 	uint64_t recovery_started_ms;
 	uint64_t recovery_last_request_ms;
-	ChiakiSeqNum16 recovery_report_start;
+	ChiakiSeqNum16 recovery_report_start, recovery_report_end;
 	unsigned int recovery_requests;
 	unsigned int recovery_count, recovery_dropped;
 	unsigned int recovery_resumes;
@@ -649,6 +649,7 @@ static ChiakiErrorCode probe_report_corrupt_frames(PlusVitaStreamProbe *probe,
 	ChiakiSeqNum16 end)
 {
 	probe->recovery_requests++;
+    probe->recovery_report_end=end;
 	tkproto_TakionMessage msg = { 0 };
 	msg.type = tkproto_TakionMessage_PayloadType_CORRUPTFRAME;
 	msg.has_corrupt_payload = true;
@@ -1997,6 +1998,13 @@ static ChiakiErrorCode probe_visible_preview(PlusVitaStreamProbe *probe,
 			break;
 		}
 #endif
+		if(probe->awaiting_recovery_idr&&now>=probe->recovery_last_request_ms&&
+            now-probe->recovery_last_request_ms>=PROBE_RECOVERY_RETRY_MS&&
+            now>=probe->recovery_started_ms&&now-probe->recovery_started_ms<PROBE_RECOVERY_TIMEOUT_MS){
+            probe->recovery_last_request_ms=now;
+            err=probe_report_corrupt_frames(probe,probe->recovery_report_end);
+            if(err!=CHIAKI_ERR_SUCCESS)break;
+        }
 		if(probe->awaiting_recovery_idr
 			&& now >= probe->recovery_started_ms
 			&& now - probe->recovery_started_ms >= PROBE_RECOVERY_TIMEOUT_MS)

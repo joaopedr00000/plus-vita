@@ -269,7 +269,7 @@ static void library_button(Canvas *d,const PlusVitaAppView *v,const PlusVitaCove
 		int cx=b->x+100;
 		for(int j=-9;j<=9;j++)rectangle(d,cx-7,b->y+23+j,15-((j<0?-j:j)*15/10),1,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
 		/* Long experimental label needs the complete button width. */
-		bool ps5=v->detail&&pv_catalog_platform(v->detail->platform)==3;
+		bool ps5=v->detail&&(v->detail->ps5_stream_id[0]||pv_catalog_platform(v->detail->platform)==3);
 		if(ps5){
 			round_gradient(d,b->x+2,b->y+2,b->width-4,b->height-4,7,primary(d,RGB(255,216,126)),secondary(d,RGB(185,137,44)));
 			text(d,label,b->x+15,b->y+10,TEXT_CONTROL,b->width-30,34,false,(d->custom?pv_theme_ink(mix(d->primary,d->secondary,128)):MENU_INK));
@@ -311,7 +311,7 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 		int offset=(int)((size_t)(v->list_height-thumb)*v->list_first/(v->list_total-v->list_count));
 		round_gradient(d,386,v->list_y+offset,6,thumb,3,RGB(118,118,120),RGB(95,95,98));
 	}
-	bool ps5=v->detail?pv_catalog_platform(v->detail->platform)==3:v->platform_filter==3;
+	bool ps5=v->detail?(v->detail->ps5_stream_id[0]||pv_catalog_platform(v->detail->platform)==3):v->platform_filter==3;
 	if(v->detail){
 		const PlusVitaCatalogEntry *g=v->detail;
 		const PlusVitaCoverImage *art=v->preview_eligible?plus_vita_covers_find(covers,g->cover_url):NULL;
@@ -322,14 +322,14 @@ static void library_paint(Canvas *d,const PlusVitaAppView *v,const PlusVitaCover
 		}
 		text(d,g->name,670,117,TEXT_TITLE,270,57,true,MENU_WHITE);
 		outline(d,672,177,57,25,7,readable(d,MENU_ACCENT),RGB(24,24,26),RGB(15,15,17));
-		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),681,179,TEXT_HINT,46,23,false,readable(d,MENU_ACCENT));
+		text(d,g->ps2_classic?"PS2":g->platform[0]?g->platform:localized(d,"Not specified"),681,179,TEXT_HINT,46,23,false,readable(d,MENU_ACCENT));
 		if(ps5)text(d,localized(d,"PS5 streaming is not available yet. Support is planned."),672,207,TEXT_MICRO,264,56,true,readable(d,MENU_ACCENT));
 		else text(d,localized(d,"Cloud streaming"),672,210,TEXT_BODY,264,46,true,MENU_BODY);
 		rectangle(d,672,270,264,1,RGB(108,108,110));
 		text(d,localized(d,"Status:"),678,279,TEXT_HINT,105,23,false,MENU_MUTED);
-		text(d,localized(d,ps5?"Unavailable":g->launch_id_valid?"Check eligibility":"Unavailable"),789,279,TEXT_HINT,147,23,false,readable(d,MENU_ACCENT));
+		text(d,localized(d,g->launch_id_valid?"Check eligibility":"Unavailable"),789,279,TEXT_HINT,147,23,false,readable(d,MENU_ACCENT));
 		text(d,localized(d,"Platform:"),678,303,TEXT_HINT,105,23,false,MENU_MUTED);
-		text(d,g->platform[0]?g->platform:localized(d,"Not specified"),789,303,TEXT_HINT,147,23,false,MENU_WHITE);
+		text(d,g->ps2_classic?"PS2":g->platform[0]?g->platform:localized(d,"Not specified"),789,303,TEXT_HINT,147,23,false,MENU_WHITE);
 		text(d,localized(d,"Game ID:"),678,326,TEXT_HINT,105,23,false,MENU_MUTED);
 		text(d,g->launch_id_valid?g->id:localized(d,"Unavailable"),789,326,TEXT_MICRO,147,23,false,MENU_WHITE);
 		text(d,localized(d,g->in_library?"In your library - access checked at launch":"Playtime: unavailable | Trophies: unavailable"),678,350,TEXT_MICRO,258,34,true,g->in_library?readable(d,MENU_ACCENT):MENU_MUTED);
@@ -456,6 +456,12 @@ static void menu_chrome(Canvas *d,const PlusVitaAppView *v)
 static void menu_paint(Canvas *d,const PlusVitaAppView *v)
 {
     menu_chrome(d,v);
+    if(v->screen==PLUS_VITA_APP_FILTER_DIALOG){
+        outline(d,242,80,476,408,12,RGB(115,115,120),RGB(30,30,33),RGB(14,14,16));
+        text(d,localized(d,"Filter"),270,96,TEXT_TITLE,420,38,false,readable(d,MENU_ACCENT));
+        for(size_t j=0;j<v->action_count;j++)menu_card(d,v,j);
+        return;
+    }
     if(v->screen==PLUS_VITA_APP_STREAM_OPTIONS){
         outline(d,592,78,348,412,12,RGB(91,91,96),RGB(30,30,33),RGB(14,14,16));
         text(d,localized(d,"About this option"),608,92,TEXT_HINT,316,30,false,readable(d,MENU_ACCENT));
