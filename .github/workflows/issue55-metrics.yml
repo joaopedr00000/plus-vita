@@ -1,0 +1,15 @@
+name: Issue 55 redacted diagnostic metrics
+on:
+  push:
+    branches: [diagnostics/issue55-metrics]
+    paths: ['.github/workflows/issue55-metrics.yml', 'tools/issue55-metrics.py']
+permissions:
+  contents: read
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve only allowlisted technical metrics
+        run: python3 tools/issue55-metrics.py
